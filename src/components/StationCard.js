@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 const FUEL_LABELS = {
   petrol: 'Petrol (E10)',
@@ -8,11 +8,11 @@ const FUEL_LABELS = {
   premium_diesel: 'Premium Diesel',
 };
 
-const StationCard = ({ station }) => {
+const StationCard = ({ station, onPress }) => {
   const { name, brand, address, prices = {} } = station;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.header}>
         <Text style={styles.brand}>{brand ?? 'Unknown'}</Text>
         <Text style={styles.name}>{name}</Text>
@@ -32,7 +32,7 @@ const StationCard = ({ station }) => {
           </View>
         ))}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -75,18 +75,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   priceChip: {
-    backgroundColor: '#F1F3F5',
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
-    paddingVertical: 6,
     paddingHorizontal: 10,
-    alignItems: 'center',
+    paddingVertical: 6,
   },
   fuelLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#6C757D',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   priceValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#212529',
     marginTop: 2,
