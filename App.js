@@ -11,6 +11,7 @@ import AlertsScreen from './src/screens/AlertsScreen';
 import SearchScreen from './src/screens/SearchScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import MapScreen from './src/screens/MapScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -77,7 +78,21 @@ function TabNavigator() {
         name="Home"
         component={HomeStack}
         options={{
+          tabBarLabel: 'Near Me',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="location-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{
           tabBarLabel: 'Map',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#ffffff',
+          headerTitle: 'Fuel Map',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map-outline" color={color} size={size} />
           ),
