@@ -9,6 +9,8 @@ import HomeScreen from './src/screens/HomeScreen';
 import StationDetailScreen from './src/screens/StationDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SearchScreen from './src/screens/SearchScreen';
+import FavouritesScreen from './src/screens/FavouritesScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -26,6 +28,29 @@ function HomeStack() {
         name="HomeMain"
         component={HomeScreen}
         options={{ title: 'Free Fuel Price' }}
+      />
+      <Stack.Screen
+        name="StationDetail"
+        component={StationDetailScreen}
+        options={{ title: 'Station Detail' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function FavouritesStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#1a1a2e' },
+        headerTintColor: '#ffffff',
+        headerTitleStyle: { fontWeight: '700' },
+      }}
+    >
+      <Stack.Screen
+        name="FavouritesMain"
+        component={FavouritesScreen}
+        options={{ title: 'Favourites' }}
       />
       <Stack.Screen
         name="StationDetail"
@@ -73,6 +98,16 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Favourites"
+        component={FavouritesStack}
+        options={{
+          tabBarLabel: 'Saved',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="heart-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Alerts"
         component={AlertsScreen}
         options={{
@@ -83,6 +118,20 @@ function TabNavigator() {
           headerTitle: 'My Price Alerts',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Settings',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#ffffff',
+          headerTitle: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
       />
