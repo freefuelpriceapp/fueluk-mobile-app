@@ -12,7 +12,7 @@ import StationCard from '../components/StationCard';
 import { getNearbyStations } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +46,10 @@ const HomeScreen = () => {
     fetchStations();
   };
 
+  const handleStationPress = (station) => {
+    navigation.navigate('StationDetail', { station });
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -71,7 +75,12 @@ const HomeScreen = () => {
         <FlatList
           data={stations}
           keyExtractor={(item) => item.site_id?.toString() ?? item.id?.toString()}
-          renderItem={({ item }) => <StationCard station={item} />}
+          renderItem={({ item }) => (
+            <StationCard
+              station={item}
+              onPress={() => handleStationPress(item)}
+            />
+          )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
