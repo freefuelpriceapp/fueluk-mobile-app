@@ -88,3 +88,50 @@ export async function deleteAlert(alertId) {
   const resp = await api.delete(`/api/v1/alerts/${alertId}`);
   return resp.data;
 }
+
+/**
+ * Sprint 6: Get prices for a specific station
+ * @param {number} stationId
+ * @param {string} fuelType - Optional filter
+ */
+export async function getPricesByStation(stationId, fuelType = null) {
+  const params = {};
+  if (fuelType) params.fuel_type = fuelType;
+  const resp = await api.get(`/api/v1/prices/station/${stationId}`, { params });
+  return resp.data;
+}
+
+/**
+ * Sprint 6: Submit a user-reported fuel price
+ * @param {object} priceData - { station_id, fuel_type, price_pence }
+ */
+export async function submitPrice(priceData) {
+  const resp = await api.post('/api/v1/prices', priceData);
+  return resp.data;
+}
+
+/**
+ * Sprint 6: Get latest prices across all stations
+ * @param {string} fuelType - Optional filter
+ * @param {number} limit - Max results (default 50)
+ */
+export async function getLatestPrices(fuelType = null, limit = 50) {
+  const params = { limit };
+  if (fuelType) params.fuel_type = fuelType;
+  const resp = await api.get('/api/v1/prices/latest', { params });
+  return resp.data;
+}
+
+/**
+ * Sprint 6: Get cheapest nearby stations
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} radiusKm
+ * @param {string} fuelType
+ */
+export async function getCheapestStations({ lat, lon, radiusKm = 10, fuelType = 'petrol' }) {
+  const resp = await api.get('/api/v1/stations/cheapest', {
+    params: { lat, lon, radius: radiusKm, fuel_type: fuelType },
+  });
+  return resp.data;
+}
