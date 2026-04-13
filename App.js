@@ -4,12 +4,36 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './src/screens/HomeScreen';
-import SearchScreen from './src/screens/SearchScreen';
 import StationDetailScreen from './src/screens/StationDetailScreen';
+import AlertsScreen from './src/screens/AlertsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+function HomeStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#1a1a2e' },
+        headerTintColor: '#ffffff',
+        headerTitleStyle: { fontWeight: '700' },
+      }}
+    >
+      <Stack.Screen
+        name="HomeMain"
+        component={HomeScreen}
+        options={{ title: 'Free Fuel Price' }}
+      />
+      <Stack.Screen
+        name="StationDetail"
+        component={StationDetailScreen}
+        options={{ title: 'Station Detail' }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 function TabNavigator() {
   return (
@@ -18,19 +42,34 @@ function TabNavigator() {
         headerStyle: { backgroundColor: '#1a1a2e' },
         headerTintColor: '#ffffff',
         tabBarStyle: { backgroundColor: '#1a1a2e' },
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: '#888888',
+        tabBarActiveTintColor: '#2ECC71',
+        tabBarInactiveTintColor: '#888',
+        headerShown: false,
       }}
     >
       <Tab.Screen
-        name="Nearby"
-        component={HomeScreen}
-        options={{ title: 'Nearby Stations' }}
+        name="Home"
+        component={HomeStack}
+        options={{
+          tabBarLabel: 'Map',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map-outline" color={color} size={size} />
+          ),
+        }}
       />
       <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{ title: 'Search Stations' }}
+        name="Alerts"
+        component={AlertsScreen}
+        options={{
+          tabBarLabel: 'Alerts',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#ffffff',
+          headerTitle: 'My Price Alerts',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" color={color} size={size} />
+          ),
+        }}
       />
     </Tab.Navigator>
   );
@@ -40,28 +79,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: { backgroundColor: '#0D1117' },
-            headerTintColor: '#E6EDF3',
-            headerBackTitleVisible: false,
-          }}
-        >
-          <Stack.Screen
-            name="Main"
-            component={TabNavigator}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="StationDetail"
-            component={StationDetailScreen}
-            options={({ route }) => ({
-              title: route.params?.station?.name || route.params?.station?.brand || 'Station Detail',
-            })}
-          />
-        </Stack.Navigator>
+        <StatusBar style="light" />
+        <TabNavigator />
       </NavigationContainer>
-      <StatusBar style="light" />
     </SafeAreaProvider>
   );
 }
