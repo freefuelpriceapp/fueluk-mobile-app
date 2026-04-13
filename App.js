@@ -12,6 +12,7 @@ import SearchScreen from './src/screens/SearchScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MapScreen from './src/screens/MapScreen';
+import PremiumScreen from './src/screens/PremiumScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -147,6 +148,20 @@ function TabNavigator() {
           headerTitle: 'Settings',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Premium"
+        component={PremiumScreen}
+        options={{
+          tabBarLabel: 'Premium',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#ffffff',
+          headerTitle: 'FreeFuelPrice Premium',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="star-outline" color={color} size={size} />
           ),
         }}
       />
