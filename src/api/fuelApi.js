@@ -135,3 +135,11 @@ export async function getCheapestStations({ lat, lon, radiusKm = 10, fuelType = 
   });
   return resp.data;
 }
+
+/**
+ * Sprint 7: Get premium tier status for the current user
+ */
+export async function getPremiumStatus() {
+  const resp = await api.get('/api/v1/premium/status');
+  return resp.data;
+}
