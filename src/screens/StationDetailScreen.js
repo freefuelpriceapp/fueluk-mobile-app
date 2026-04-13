@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getPriceHistory, createAlert } from '../api/fuelApi';
+import { getPriceHistory, createAlert, getPricesByStation } from '../api/fuelApi';
 
 const FUEL_TYPES = ['petrol', 'diesel', 'e10'];
 
@@ -32,20 +32,24 @@ const FUEL_COLORS = {
 export default function StationDetailScreen({ route }) {
   const { station } = route.params;
   const [history, setHistory] = useState({});
+  const [livePrices, setLivePrices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFuel, setSelectedFuel] = useState('petrol');
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertFuelType, setAlertFuelType] = useState('petrol');
   const [alertThreshold, setAlertThreshold] = useState('');
   const [alertSaving, setAlertSaving] = useState(false);
 
-  const loadHistory = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const data = await getPriceHistory(station.id);
-      setHistory(data);
+      const [historyData, currentPrices] = await Promise.all([
+        getPriceHistory(station.id),
+        getPricesByStation(station.id)
+      ]);
+      setHistory(historyData);
+      setLivePrices(currentPrices || []);
     } catch (e) {
-      console.error('Failed to load price history', e);
+      console.error('Failed to load station data', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,12 +57,12 @@ export default function StationDetailScreen({ route }) {
   }, [station.id]);
 
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    loadData();
+  }, [loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadHistory();
+    loadData();
   };
 
   const openAlertModal = (fuelType) => {
@@ -78,12 +82,12 @@ export default function StationDetailScreen({ route }) {
       await createAlert({
         station_id: station.id,
         fuel_type: alertFuelType,
-        threshold_ppl: threshold,
+        threshold_pence: threshold,
       });
       setAlertModalVisible(false);
       Alert.alert(
         'Alert set!',
-        `You\'ll be notified when ${FUEL_LABELS[alertFuelType]} drops below ${threshold}p at this station.`
+        `You'll be notified when ${FUEL_LABELS[alertFuelType]} drops below ${threshold}p at this station.`
       );
     } catch (e) {
       Alert.alert('Error', 'Failed to save alert. Please try again.');
@@ -94,15 +98,23 @@ export default function StationDetailScreen({ route }) {
 
   const renderPriceRow = (fuelType) => {
     const entries = history[fuelType] || [];
-    const latest = entries[0];
+    const live = livePrices.find(p => p.fuel_type === fuelType);
+    
     return (
       <View key={fuelType} style={styles.fuelCard}>
         <View style={styles.fuelHeader}>
           <View style={[styles.fuelDot, { backgroundColor: FUEL_COLORS[fuelType] }]} />
           <Text style={styles.fuelLabel}>{FUEL_LABELS[fuelType]}</Text>
-          {latest ? (
-            <Text style={[styles.fuelPrice, { color: FUEL_COLORS[fuelType] }]}>
-              {latest.price_ppl}p
+          {live ? (
+            <View style={styles.priceContainer}>
+              <Text style={[styles.fuelPrice, { color: FUEL_COLORS[fuelType] }]}>
+                {live.price_pence}p
+              </Text>
+              <Text style={styles.liveTag}>LIVE</Text>
+            </View>
+          ) : entries[0] ? (
+            <Text style={[styles.fuelPrice, { color: '#888' }]}>
+              {entries[0].price_ppl}p
             </Text>
           ) : (
             <Text style={styles.noData}>No data</Text>
@@ -114,9 +126,10 @@ export default function StationDetailScreen({ route }) {
             <Ionicons name="notifications-outline" size={18} color="#2ECC71" />
           </TouchableOpacity>
         </View>
-        {entries.length > 1 && (
+        {entries.length > 0 && (
           <View style={styles.historyList}>
-            {entries.slice(1, 6).map((entry, i) => (
+            <Text style={styles.historyHeader}>Price History</Text>
+            {entries.slice(0, 5).map((entry, i) => (
               <View key={i} style={styles.historyRow}>
                 <Text style={styles.historyDate}>
                   {new Date(entry.recorded_at).toLocaleDateString()}
@@ -154,12 +167,11 @@ export default function StationDetailScreen({ route }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Fuel Prices</Text>
+          <Text style={styles.sectionTitle}>Prices & Trends</Text>
           {FUEL_TYPES.map(renderPriceRow)}
         </View>
       </ScrollView>
 
-      {/* Set Alert Modal */}
       <Modal
         visible={alertModalVisible}
         transparent
@@ -252,7 +264,9 @@ const styles = StyleSheet.create({
   fuelHeader: { flexDirection: 'row', alignItems: 'center' },
   fuelDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   fuelLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#ffffff' },
-  fuelPrice: { fontSize: 18, fontWeight: '700', marginRight: 10 },
+  priceContainer: { alignItems: 'flex-end', marginRight: 10 },
+  fuelPrice: { fontSize: 18, fontWeight: '700' },
+  liveTag: { fontSize: 9, fontWeight: '800', color: '#2ECC71', marginTop: -2 },
   noData: { fontSize: 13, color: '#555', marginRight: 10 },
   alertBtn: {
     padding: 4,
@@ -260,11 +274,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2ECC71',
   },
-  historyList: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#0D1117', paddingTop: 8 },
-  historyRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  historyList: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#0D1117', paddingTop: 10 },
+  historyHeader: { fontSize: 11, fontWeight: '600', color: '#555', marginBottom: 6, textTransform: 'uppercase' },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   historyDate: { fontSize: 12, color: '#888' },
   historyPrice: { fontSize: 12, color: '#aaa' },
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
