@@ -34,6 +34,18 @@ export async function searchStations(q) {
 }
 
 /**
+ * Get price history for a station
+ * @param {string} stationId - Station ID
+ * @param {number} days - Number of days of history (default 30)
+ */
+export async function getPriceHistory(stationId, days = 30) {
+  const resp = await api.get(`/api/v1/prices/history/${stationId}`, {
+    params: { days },
+  });
+  return resp.data;
+}
+
+/**
  * Get API status
  */
 export async function getApiStatus() {
