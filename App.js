@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './src/screens/HomeScreen';
 import StationDetailScreen from './src/screens/StationDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
+import SearchScreen from './src/screens/SearchScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -58,6 +59,20 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarLabel: 'Search',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#1a1a2e' },
+          headerTintColor: '#ffffff',
+          headerTitle: 'Search Stations',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="search-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Alerts"
         component={AlertsScreen}
         options={{
@@ -84,4 +99,4 @@ export default function App() {
       </NavigationContainer>
     </SafeAreaProvider>
   );
-}
+          }
