@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 
-const BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://api.freefuelprice.co.uk';
+const BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://api.freefuelpriceapp.com';
 
 const api = axios.create({
   baseURL: BASE_URL,
