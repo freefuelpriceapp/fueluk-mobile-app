@@ -2,8 +2,8 @@
   "expo": {
     "name": "FreeFuelPrice UK",
     "slug": "fueluk-mobile-app",
-    "version": "1.0.0",
-    "runtimeVersion": "1.0.0",
+    "version": "9.0.0",
+    "runtimeVersion": "9.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,8 +21,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.freefuelprice.uk",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.freefuelpriceapp.uk",
+      "buildNumber": "9",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations."
@@ -33,8 +33,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.freefuelprice.uk",
-      "versionCode": 1,
+      "package": "com.freefuelpriceapp.uk",
+      "versionCode": 9,
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
     },
     "plugins": [
@@ -54,7 +54,7 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "https://api.freefuelprice.co.uk",
+      "apiBaseUrl": "https://api.freefuelpriceapp.com",
       "eas": {
         "projectId": "YOUR_EAS_PROJECT_ID"
       }
