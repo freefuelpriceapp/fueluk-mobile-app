@@ -5,7 +5,7 @@
  * can be changed in one place without touching screens.
  */
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.freefuelprice.co.uk';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.freefuelpriceapp.com';
 const TIMEOUT_MS = 10000;
 
 async function request(path, options = {}) {
