@@ -11,10 +11,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PRIVACY_URL = 'https://freefuelprice.co.uk/privacy';
-const SUPPORT_URL = 'https://freefuelprice.co.uk/support';
-const CONTACT_EMAIL = 'support@freefuelprice.co.uk';
-const APP_VERSION = '1.0.0';
+const PRIVACY_URL = 'https://freefuelpriceapp.com/privacy';
+const SUPPORT_URL = 'https://freefuelpriceapp.com/support';
+const CONTACT_EMAIL = 'refurb79@gmail.com';
+const APP_VERSION = '9.0.0';
 
 function SettingsRow({ icon, label, sublabel, onPress, showChevron = true, danger = false }) {
   return (
