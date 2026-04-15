@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,21 +15,45 @@ import { Ionicons } from '@expo/vector-icons';
 import StationCard from '../components/StationCard';
 import { searchStations } from '../api/fuelApi';
 
+const FUEL_TYPES = [
+  { key: 'petrol',          label: 'Petrol',          color: '#2ECC71' },
+  { key: 'diesel',          label: 'Diesel',          color: '#3498DB' },
+  { key: 'e10',             label: 'E10',             color: '#F39C12' },
+  { key: 'super_unleaded',  label: 'Super',           color: '#9B59B6' },
+  { key: 'premium_diesel',  label: 'Premium Diesel',  color: '#E74C3C' },
+];
+
 const SearchScreen = ({ navigation }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedFuel, setSelectedFuel] = useState('petrol');
+  const debounceRef = useRef(null);
 
-  const handleSearch = useCallback(async () => {
-    const q = query.trim();
-    if (!q) return;
+  // Debounced live search — fires 400ms after user stops typing
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      handleSearch(query.trim());
+    }, 400);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
+
+  const handleSearch = useCallback(async (q) => {
+    const searchQ = (q || query).trim();
+    if (!searchQ) return;
     setLoading(true);
     setError(null);
     setSearched(true);
     try {
-      const data = await searchStations(q);
+      const data = await searchStations(searchQ);
       setResults(data.stations || []);
     } catch (err) {
       setError('Search failed. Please try again.');
@@ -41,6 +65,8 @@ const SearchScreen = ({ navigation }) => {
   const handleStationPress = (station) => {
     navigation.navigate('StationDetail', { station });
   };
+
+  const selectedFuelMeta = FUEL_TYPES.find(f => f.key === selectedFuel);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,7 +83,7 @@ const SearchScreen = ({ navigation }) => {
             placeholderTextColor="#555"
             value={query}
             onChangeText={setQuery}
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={() => handleSearch()}
             returnKeyType="search"
             autoFocus
             autoCorrect={false}
@@ -70,9 +96,26 @@ const SearchScreen = ({ navigation }) => {
           )}
         </View>
 
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <Text style={styles.searchBtnText}>Search</Text>
-        </TouchableOpacity>
+        {/* Fuel type filter */}
+        <View style={styles.filterRow}>
+          {FUEL_TYPES.map(ft => (
+            <TouchableOpacity
+              key={ft.key}
+              style={[
+                styles.filterBtn,
+                selectedFuel === ft.key && { backgroundColor: ft.color, borderColor: ft.color },
+              ]}
+              onPress={() => setSelectedFuel(ft.key)}
+            >
+              <Text style={[
+                styles.filterBtnText,
+                selectedFuel === ft.key && { color: '#0D1117' },
+              ]}>
+                {ft.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Results */}
         {loading ? (
@@ -92,7 +135,7 @@ const SearchScreen = ({ navigation }) => {
             renderItem={({ item }) => (
               <StationCard
                 station={item}
-                fuelType="petrol"
+                fuelType={selectedFuel}
                 onPress={() => handleStationPress(item)}
               />
             )}
@@ -140,15 +183,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#ffffff',
   },
-  searchBtn: {
-    marginHorizontal: 12,
-    marginBottom: 12,
-    backgroundColor: '#2ECC71',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    backgroundColor: '#1a1a2e',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
   },
-  searchBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 15 },
+  filterBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+    alignItems: 'center',
+    margin: 3,
+  },
+  filterBtnText: { fontSize: 12, fontWeight: '600', color: '#888' },
   list: { padding: 12 },
   loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
   errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12 },
