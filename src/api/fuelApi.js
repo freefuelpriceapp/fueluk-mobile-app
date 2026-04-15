@@ -17,7 +17,7 @@ const api = axios.create({
  */
 export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol' }) {
   const resp = await api.get('/api/v1/stations/nearby', {
-    params: { latitude: lat, longitude: lng, radiusKm, fuel },
+    params: { lat, lon: lng, radius: radiusKm, fuel_type: fuel },
   });
   return resp.data;
 }
