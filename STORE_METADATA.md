@@ -203,4 +203,4 @@ fuel,petrol,diesel,price,cheapest,nearby,UK,stations,savings,pump,E10,map
 
 ---
 
-Last updated: Sprint 9 — Ready for submission once Apple Developer account approved
+Last updated: Sprint 10 — QA checklist complete ✅ | Store metadata & descriptions ready ✅ | Screenshots plan defined ✅ | Privacy labels & data safety complete ✅ | Launch-safe copy rules enforced ✅ | Pending: Apple Developer approval + eas.json placeholders
