@@ -28,6 +28,7 @@ function formatFreshness(updatedAt) {
   if (diffHrs < 1) return 'Updated just now';
   if (diffHrs < 24) return `Updated ${diffHrs}h ago`;
   const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays >= 7) return 'Price may be outdated';
   return `Updated ${diffDays}d ago`;
 }
 
