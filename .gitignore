@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Native builds
+ios/
+android/
+*.ipa
+*.apk
+*.aab
+
+# Secrets (NEVER commit)
+.env
+.env.*
+!.env.example
+google-service-account.json
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# EAS
+eas-credentials.json
+
+# macOS / editors
+.DS_Store
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.vscode/
+.idea/
+
