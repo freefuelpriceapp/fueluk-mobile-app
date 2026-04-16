@@ -72,7 +72,7 @@ const HomeScreen = ({ navigation }) => {
         setUsingFallback(true);
         data = await searchStations(location.postcode);
       } else {
-        setError('Location unavailable. Please enable location access.');
+        setError('We can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
         setLoading(false);
         return;
       }
@@ -170,7 +170,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.fallbackBanner}>
           <Ionicons name="navigate-outline" size={14} color="#F39C12" />
           <Text style={styles.fallbackText}>
-            Location off \u2014 showing default area.
+            Location is off \u2014 showing stations near a default area. Turn on location for prices near you.
           </Text>
           <TouchableOpacity onPress={openSettings}>
             <Text style={styles.settingsLink}>Open Settings</Text>
@@ -247,7 +247,7 @@ const HomeScreen = ({ navigation }) => {
           ListFooterComponent={
             updatedInfo ? (
               <Text style={[styles.footerText, updatedInfo.stale && styles.footerStale]}>
-                Prices last updated: {updatedInfo.label}{updatedInfo.stale ? ' (stale \u2014 pull to refresh)' : ''}
+                Prices last checked: {updatedInfo.label}{updatedInfo.stale ? ' (data may be out of date \u2014 pull down to refresh)' : ''}
               </Text>
             ) : null
           }
