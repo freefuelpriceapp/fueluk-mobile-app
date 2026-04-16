@@ -129,9 +129,9 @@ not normalise postcode whitespace.
 | D-03 | P2 | HomeScreen | Empty state visually indistinguishable from error state                 | OPEN |
 | D-04 | P3 | HomeScreen | No CTA in empty state to broaden search radius                          | OPEN |
 | D-05 | P3 | HomeScreen | Fuel-filter-empty is not differentiated from truly-empty                | OPEN |
-| D-06 | P1 | HomeScreen | `last_updated` is not surfaced anywhere in the UI                        | OPEN |
+| D-06 | P1 | HomeScreen | `last_updated` is not surfaced anywhere in the UI                        | FIXED (25c500b) |
 | D-07 | P3 | HomeScreen | `last_updated` timestamp likely needs local-time formatting             | OPEN |
-| D-08 | P1 | HomeScreen / useLocation | Permission-denied fallback sets error instead of using postcode   | OPEN |
+| D-08 | P1 | HomeScreen / useLocation | Permission-denied fallback sets error instead of using postcode   | FIXED (25c500b) |
 | D-09 | P2 | HomeScreen | No "Open Settings" deep-link for denied permission                      | OPEN |
 | D-10 | P2 | fuelApi / HomeScreen | Offline and 5xx show same generic error message                   | OPEN |
 | D-11 | P2 | fuelApi | No offline cache of last-known good response                            | OPEN |
