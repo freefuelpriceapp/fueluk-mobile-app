@@ -12,12 +12,12 @@ All copy describes ONLY the MVP features available at launch. No post-MVP featur
 | App Name | FreeFuelPrice UK |
 | Bundle ID (iOS) | com.freefuelpriceapp.uk |
 | Package (Android) | com.freefuelpriceapp.uk |
-| Version | 9.0.0 |
+| Version | 1.0.0 |
 | Category | Navigation / Travel |
 | Content Rating | 4+ (iOS) / Everyone (Android) |
-| Support URL | https://freefuelpriceapp.com/support |
-| Privacy Policy URL | https://freefuelpriceapp.com/privacy |
-| Contact Email | refurb79@gmail.com |
+| Support URL | https://api.freefuelpriceapp.com/support |
+| Privacy Policy URL | https://api.freefuelpriceapp.com/privacy |
+| Contact Email | support@freefuelpriceapp.com |
 
 ---
 
