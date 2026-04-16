@@ -25,7 +25,8 @@
       "buildNumber": "9",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
