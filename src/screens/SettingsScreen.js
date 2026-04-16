@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PRIVACY_URL = 'https://freefuelpriceapp.com/privacy';
 const SUPPORT_URL = 'https://freefuelpriceapp.com/support';
-const CONTACT_EMAIL = 'refurb79@gmail.com';
+const CONTACT_EMAIL = 'support@freefuelpriceapp.com';
 const APP_VERSION = '9.0.0';
 
 function SettingsRow({ icon, label, sublabel, onPress, showChevron = true, danger = false }) {
