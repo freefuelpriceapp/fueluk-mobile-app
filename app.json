@@ -24,8 +24,7 @@
       "bundleIdentifier": "com.freefuelpriceapp.uk",
       "buildNumber": "9",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "FreeFuelPrice uses your location to find nearby fuel stations.",
+        "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
         "UIBackgroundModes": ["remote-notification"]
       }
     },
@@ -42,7 +41,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "FreeFuelPrice uses your location to find nearby fuel stations."
+          "locationWhenInUsePermission": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared."
         }
       ],
       [
