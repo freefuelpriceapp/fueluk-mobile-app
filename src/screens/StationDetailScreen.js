@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getPriceHistory, createAlert, getPricesByStation } from '../api/fuelApi';
+import { FEATURES } from '../lib/featureFlags';
 
 const FUEL_TYPES = ['petrol', 'diesel', 'e10'];
 
@@ -65,7 +66,7 @@ export default function StationDetailScreen({ route }) {
     loadData();
   };
 
-  const openAlertModal = (fuelType) => {
+  const openAlertModal = (fuelType) => { if (!FEATURES.priceAlerts) return;
     setAlertFuelType(fuelType);
     setAlertThreshold('');
     setAlertModalVisible(true);
@@ -120,7 +121,7 @@ export default function StationDetailScreen({ route }) {
             <Text style={styles.noData}>No data</Text>
           )}
           <TouchableOpacity
-            style={styles.alertBtn}
+            style={[styles.alertBtn, !FEATURES.priceAlerts && { display: 'none' }]}
             onPress={() => openAlertModal(fuelType)}
           >
             <Ionicons name="notifications-outline" size={18} color="#2ECC71" />
@@ -173,7 +174,7 @@ export default function StationDetailScreen({ route }) {
       </ScrollView>
 
       <Modal
-        visible={alertModalVisible}
+        visible={alertModalVisible && FEATURES.priceAlerts}
         transparent
         animationType="slide"
         onRequestClose={() => setAlertModalVisible(false)}
