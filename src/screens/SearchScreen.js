@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import StationCard from '../components/StationCard';
 import { searchStations } from '../api/fuelApi';
+import { trackSearchPerformed } from '../lib/analytics';
 
 const FUEL_TYPES = [
   { key: 'petrol',          label: 'Petrol',          color: '#2ECC71' },
@@ -52,6 +53,7 @@ const SearchScreen = ({ navigation }) => {
     setLoading(true);
     setError(null);
     setSearched(true);
+                trackSearchPerformed({ query: searchQ });
     try {
       const data = await searchStations(searchQ);
       setResults(data.stations || []);
