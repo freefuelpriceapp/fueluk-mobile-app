@@ -170,7 +170,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.fallbackBanner}>
           <Ionicons name="navigate-outline" size={14} color="#F39C12" />
           <Text style={styles.fallbackText}>
-            Location is off \u2014 showing stations near a default area. Turn on location for prices near you.
+            Precise location is off \u2014 showing results for your default area. Turn on location for prices near you.
           </Text>
           <TouchableOpacity onPress={openSettings}>
             <Text style={styles.settingsLink}>Open Settings</Text>
