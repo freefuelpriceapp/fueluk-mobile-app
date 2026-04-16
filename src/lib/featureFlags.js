@@ -18,7 +18,7 @@ export const FEATURES = {
   search: true,              // Postcode / location search screen
   stationDetail: true,       // Individual station detail screen
   favourites: true,          // Save favourite stations locally
-  priceAlerts: true,         // Set price-drop alerts by station
+  priceAlerts: false,         // Set price-drop alerts by station // LAUNCH-SAFE: gated OFF until Sprint 4 approval
   settings: true,            // Settings, privacy, support links
 
   // ─────────────────────────────────────────────────
