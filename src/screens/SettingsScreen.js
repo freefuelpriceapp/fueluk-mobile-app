@@ -11,8 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PRIVACY_URL = 'https://freefuelpriceapp.com/privacy';
-const SUPPORT_URL = 'https://freefuelpriceapp.com/support';
+const PRIVACY_URL = 'https://api.freefuelpriceapp.com/privacy';
+const SUPPORT_URL = 'https://api.freefuelpriceapp.com/support';
 const CONTACT_EMAIL = 'support@freefuelpriceapp.com';
 const APP_VERSION = '9.0.0';
 
