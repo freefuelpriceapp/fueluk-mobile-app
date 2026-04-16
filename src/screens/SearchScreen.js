@@ -53,7 +53,7 @@ const SearchScreen = ({ navigation }) => {
     setLoading(true);
     setError(null);
     setSearched(true);
-      trackSearchPerformed({ query: searchQ });
+    trackSearchPerformed({ query: searchQ });
     try {
       const data = await searchStations(searchQ);
       setResults(data.stations || []);
