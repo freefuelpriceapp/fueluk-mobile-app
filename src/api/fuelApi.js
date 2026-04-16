@@ -143,3 +143,12 @@ export async function getPremiumStatus() {
   const resp = await api.get('/api/v1/premium/status');
   return resp.data;
 }
+
+/**
+ * Get backend freshness marker. Returns { last_updated, status }.
+ * Used by HomeScreen to render the "Prices last updated …" footer (D-06).
+ */
+export async function getLastUpdated() {
+  const resp = await api.get('/api/v1/meta/last-updated');
+  return resp.data;
+}
