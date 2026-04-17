@@ -12,7 +12,7 @@ All copy describes ONLY the MVP features available at launch. No post-MVP featur
 | App Name | FreeFuelPrice UK |
 | Bundle ID (iOS) | com.freefuelpriceapp.uk |
 | Package (Android) | com.freefuelpriceapp.uk |
-| Version | 9.0.0 |
+| Version | 1.0.0 |
 | Category | Navigation / Travel |
 | Content Rating | 4+ (iOS) / Everyone (Android) |
 | Support URL | https://api.freefuelpriceapp.com/support |
@@ -168,7 +168,7 @@ fuel,petrol,diesel,price,cheapest,nearby,UK,stations,savings,pump,E10,map
 - [ ] Privacy policy URL opens correctly
 - [ ] Support URL opens correctly
 - [ ] Contact email opens mail app
-- [ ] App version shown correctly (9.0.0)
+- [ ] App version shown correctly (1.0.0)
 - [ ] No placeholder text visible anywhere in the app
 - [ ] No references to future features (route intelligence, rewards, etc.)
 
@@ -208,7 +208,7 @@ placeholders
 
 ---
 
-## Release Notes (v9.0.0 — Initial Launch)
+## Release Notes (v1.0.0 — Initial Launch)
 
 ### App Store (iOS)
 
