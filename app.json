@@ -2,8 +2,8 @@
   "expo": {
     "name": "FreeFuelPrice UK",
     "slug": "fueluk-mobile-app",
-    "version": "9.0.0",
-    "runtimeVersion": "9.0.0",
+            "version": "1.0.0",
+        "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -22,7 +22,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.freefuelpriceapp.uk",
-      "buildNumber": "9",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
         "UIBackgroundModes": ["remote-notification"]
@@ -34,7 +34,7 @@
         "backgroundColor": "#1a1a2e"
       },
       "package": "com.freefuelpriceapp.uk",
-      "versionCode": 9,
+      "versionCode": 1,
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
     },
     "plugins": [
