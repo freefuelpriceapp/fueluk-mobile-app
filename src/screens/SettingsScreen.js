@@ -46,7 +46,7 @@ export default function SettingsScreen() {
       } else {
         Alert.alert('Error', 'Unable to open this link.');
       }
-    } catch {
+    } catch (_e) {
       Alert.alert('Error', 'Unable to open this link.');
     }
   };
@@ -124,7 +124,7 @@ export default function SettingsScreen() {
           icon="location-outline"
           label="Location Data"
           sublabel="Used only to find nearby stations. Never stored."
-          onPress={() =>{}}
+          onPress={() => {}}
           showChevron={false}
         />
       </View>
@@ -163,7 +163,7 @@ export default function SettingsScreen() {
           onPress={() => {}}
           showChevron={false}
         />
-                    <View style={styles.divider} />
+        <View style={styles.divider} />
         <SettingsRow
           icon="time-outline"
           label="Price Freshness"
@@ -174,8 +174,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={styles.footer}>
-        FreeFuelPrice © 2025{'’'}26{'’'} All rights reserved.{'
-'}Helping UK drivers find the cheapest fuel nearby.
+        {`FreeFuelPrice \u00A9 2025-26. All rights reserved.\nHelping UK drivers find the cheapest fuel nearby.`}
       </Text>
     </ScrollView>
   );
