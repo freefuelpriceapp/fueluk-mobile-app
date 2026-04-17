@@ -12,7 +12,7 @@ import SearchScreen from './src/screens/SearchScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MapScreen from './src/screens/MapScreen';
-import PremiumScreen from './src/screens/PremiumScreen';
+// DEFERRED: monetization — import PremiumScreen from './src/screens/PremiumScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -151,6 +151,7 @@ function TabNavigator() {
           ),
         }}
       />
+      {/* DEFERRED: monetization — Premium tab hidden for launch
       <Tab.Screen
         name="Premium"
         component={PremiumScreen}
@@ -165,6 +166,7 @@ function TabNavigator() {
           ),
         }}
       />
+            */}
     </Tab.Navigator>
   );
 }
