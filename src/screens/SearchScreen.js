@@ -33,20 +33,6 @@ const SearchScreen = ({ navigation }) => {
   const [selectedFuel, setSelectedFuel] = useState('petrol');
   const debounceRef = useRef(null);
 
-  // Debounced live search — fires 400ms after user stops typing
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      setSearched(false);
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      handleSearch(query.trim());
-    }, 400);
-    return () => clearTimeout(debounceRef.current);
-  }, [query]);
-
   const handleSearch = useCallback(async (q) => {
     const searchQ = (q || query).trim();
     if (!searchQ) return;
@@ -63,6 +49,20 @@ const SearchScreen = ({ navigation }) => {
       setLoading(false);
     }
   }, [query]);
+
+  // Debounced live search — fires 400ms after user stops typing
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      handleSearch(query.trim());
+    }, 400);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, handleSearch]);
 
   const handleStationPress = (station) => {
     navigation.navigate('StationDetail', { station });
