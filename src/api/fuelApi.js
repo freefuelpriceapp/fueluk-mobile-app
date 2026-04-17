@@ -50,7 +50,7 @@ export async function getPriceHistory(stationId, days = 30, fuel = null) {
  * Get API status
  */
 export async function getApiStatus() {
-  const resp = await api.get('/api/v1/status');
+  const resp = await api.get('/health');
   return resp.data;
 }
 
