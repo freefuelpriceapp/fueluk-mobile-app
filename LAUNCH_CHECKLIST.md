@@ -48,7 +48,7 @@
 
 ## Sprint 6 — Store Submission 🕒 IN PROGRESS
 
-- [x] `app.json` bundleId `com.freefuelpriceapp.uk`, version 1.0.0, buildNumber 9
+- [x] `app.json` bundleId `com.freefuelpriceapp.uk`, version 1.0.0, buildNumber 1
 - [x] `eas.json` build profiles (development / preview / production) committed
 - [x] STORE_METADATA.md copy finalised (descriptions, keywords, privacy labels, data safety)
 - [ ] Apple Developer enrollment payment — awaiting Apple verification (up to 48h)
