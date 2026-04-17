@@ -39,7 +39,10 @@ const formatUpdated = (iso) => {
     const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const dateStr = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
     return { label: `${dateStr} at ${timeStr}`, stale: ageH > 24, ageH };
-  } catch { return null; }
+  } catch (_e) {
+    // Ignore date parse errors.
+    return null;
+  }
 };
 
 const HomeScreen = ({ navigation }) => {
@@ -72,14 +75,18 @@ const HomeScreen = ({ navigation }) => {
         setUsingFallback(true);
         data = await searchStations(location.postcode);
       } else {
-        setError('We can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
+        setError('We\u2019can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
         setLoading(false);
         return;
       }
       const list = data.stations || [];
       setStations(list);
       // D-11: cache successful response
-      try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch {}
+      try {
+        await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list));
+      } catch (_e) {
+        // Ignore cache write errors.
+      }
     } catch (err) {
       // D-10: differentiate offline vs server error
       if (isOffline(err)) {
@@ -93,7 +100,8 @@ const HomeScreen = ({ navigation }) => {
           } else {
             setError('You\u2019re offline and no cached data is available.');
           }
-        } catch {
+        } catch (_e) {
+          // Ignore cache read errors when offline.
           setError('You\u2019re offline. Please check your connection.');
         }
       } else {
@@ -109,7 +117,9 @@ const HomeScreen = ({ navigation }) => {
     try {
       const data = await getLastUpdated();
       if (data?.last_updated) setLastUpdated(data.last_updated);
-    } catch {}
+    } catch (_e) {
+      // Ignore last-updated fetch errors.
+    }
   }, []);
 
   useEffect(() => {
