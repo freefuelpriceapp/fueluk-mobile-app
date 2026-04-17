@@ -1,6 +1,6 @@
 # FreeFuelPrice UK — Mobile App
 
-> Route-aware fuel price app for iOS & Android, built with React Native (Expo).
+> UK fuel price app for iOS & Android, built with React Native (Expo).
 
 ![React Native](https://img.shields.io/badge/React_Native-Expo-blue) ![Version](https://img.shields.io/badge/version-9.0.0-green) ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey)
 
@@ -8,20 +8,40 @@
 
 ## Overview
 
-FreeFuelPrice UK is a free mobile app that helps UK drivers find the cheapest fuel near them or along their route. It pulls live prices from major UK supermarkets and fuel brands, displayed on an interactive map.
+FreeFuelPrice UK helps UK drivers find the cheapest fuel stations near them using live data from UKPIA, CMA, and Gov.UK sources. Fuel-first, privacy-first, no account required.
 
-**App Store**: `com.freefuelprice.app`
-**API**: `https://api.freefuelprice.co.uk`
+- **Bundle ID (iOS)**: `com.freefuelpriceapp.uk`
+- **Package (Android)**: `com.freefuelpriceapp.uk`
+- **API**: `https://api.freefuelpriceapp.com`
+- **Version**: 9.0.0
 
 ---
 
-## Features (MVP)
+## Quick Start (One-Command)
 
-- Find nearby fuel stations with live prices
-- Filter by fuel type (petrol / diesel)
-- Station detail view with price breakdown by brand
-- Device registration for future push notifications
-- Supports iOS and Android
+```bash
+git clone https://github.com/freefuelpriceapp/fueluk-mobile-app.git
+cd fueluk-mobile-app
+cp .env.example .env
+npm install
+npx expo start
+```
+
+For the full setup, local/ECS differences, and troubleshooting, see **[`docs/RUNBOOK.md`](./docs/RUNBOOK.md)**.
+
+---
+
+## Features (MVP — Live at Launch)
+
+- Nearby cheapest fuel stations, ranked by price and distance
+- Search by postcode or town
+- Station detail with petrol, diesel, E10, super unleaded, premium diesel
+- Price freshness indicators
+- Favourites (local device storage)
+- Map and list views
+- Settings with privacy, support, and contact links
+
+All post-MVP features (route intelligence, road reports, community contributions, rewards, monetization, predictive pricing) are feature-flagged **OFF** at launch. See [`docs/DEFERRED_FEATURES.md`](./docs/DEFERRED_FEATURES.md).
 
 ---
 
@@ -29,13 +49,13 @@ FreeFuelPrice UK is a free mobile app that helps UK drivers find the cheapest fu
 
 | Layer | Technology |
 |-------|------------|
-| Framework | React Native (Expo SDK 51) |
-| Navigation | React Navigation v6 |
+| Framework | React Native (Expo SDK 50) |
+| Navigation | React Navigation v6 (bottom tabs + native stack) |
 | Maps | React Native Maps |
-| API Client | Axios |
-| Notifications | Expo Notifications |
+| HTTP | Native fetch via `src/services/apiClient.js` |
+| Location | expo-location |
 | Build & Deploy | EAS Build + EAS Submit |
-| State | React hooks (useState, useEffect) |
+| State | React hooks + custom hooks (`useStations`, `useLocation`) |
 
 ---
 
@@ -44,144 +64,77 @@ FreeFuelPrice UK is a free mobile app that helps UK drivers find the cheapest fu
 ```
 fueluk-mobile-app/
 ├── src/
-│   ├── screens/
-│   │   ├── HomeScreen.js       # Map + nearby stations
-│   │   ├── StationDetailScreen.js
-│   │   └── SettingsScreen.js
-│   ├── services/
-│   │   ├── stationService.js   # Nearby stations API calls
-│   │   ├── priceService.js     # Price data API calls
-│   │   └── deviceService.js    # Device registration
-│   ├── components/
-│   │   ├── StationMarker.js
-│   │   └── PriceCard.js
-│   └── utils/
-│       └── api.js              # Axios base client
-├── App.js                      # Root navigation
-├── app.json                    # Expo config
-├── eas.json                    # EAS build profiles
+│   ├── api/            # High-level API helpers
+│   ├── components/     # StationCard, shared UI
+│   ├── hooks/          # useStations, useLocation
+│   ├── lib/            # featureFlags, logger
+│   ├── screens/        # Home, Search, Map, Favourites, Settings, etc.
+│   └── services/       # apiClient, stationService, priceService, deviceService
+├── docs/
+│   ├── DEFERRED_FEATURES.md
+│   ├── ICON_AND_SCREENSHOT_PLAN.md
+│   ├── QA_SCRIPT.md
+│   ├── RELEASE_PACKET.md
+│   └── RUNBOOK.md
+├── App.js
+├── app.json
+├── eas.json
 ├── package.json
+├── .env.example
+├── LAUNCH_CHECKLIST.md
+├── STORE_METADATA.md
 └── README.md
 ```
 
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- Expo CLI: `npm install -g expo-cli`
-- EAS CLI: `npm install -g eas-cli`
-- iOS Simulator (Mac) or Android Emulator
-- Expo Go app on physical device
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/freefuelpriceapp/fueluk-mobile-app.git
-cd fueluk-mobile-app
-
-# Install dependencies
-npm install
-
-# Start development server
-npx expo start
-```
-
-Scan the QR code with Expo Go, or press `i` for iOS Simulator / `a` for Android Emulator.
+Full tree in [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) §5.
 
 ---
 
-## Environment Configuration
+## Environment Variables
 
-The API base URL is configured in `src/utils/api.js`:
+The app reads `EXPO_PUBLIC_API_URL` at build time (with a production fallback hardcoded in `src/services/apiClient.js`).
 
-```js
-// Development
-const BASE_URL = 'http://localhost:3000';
-
-// Production
-const BASE_URL = 'https://api.freefuelprice.co.uk';
-```
-
-Switch to production URL before building a release.
+See [`.env.example`](./.env.example) for the template.
 
 ---
 
 ## Building for Release
 
 ### iOS
-
 ```bash
-# Production build
 eas build --platform ios --profile production
-
-# Submit to App Store
 eas submit --platform ios
 ```
 
 ### Android
-
 ```bash
-# Production build
 eas build --platform android --profile production
-
-# Submit to Google Play
 eas submit --platform android
 ```
 
----
-
-## Key Screens
-
-### Home Screen
-- Displays map centred on user location
-- Shows fuel station markers with live prices
-- Filter bar for fuel type (petrol/diesel)
-- Tap marker to open station detail
-
-### Station Detail Screen
-- Station name, address, brand
-- Price per litre for each fuel type
-- Last updated timestamp
-- Distance from user
-
-### Settings Screen
-- Fuel type preference
-- Search radius
-- Notification preferences (post-MVP)
+Placeholders in `eas.json` (appleId, ascAppId, appleTeamId) and `app.json` (EAS project ID) must be filled first — see [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) §8.
 
 ---
 
-## API Integration
+## Master Documents
 
-All API calls go through the backend at `https://api.freefuelprice.co.uk`.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/stations/nearby` | GET | Stations within radius of coordinates |
-| `/prices` | GET | Current prices for a station |
-| `/device/register` | POST | Register device for notifications |
-
-See the [backend README](https://github.com/freefuelpriceapp/fueluk-prod-api) for full API reference.
-
----
-
-## Feature Flags
-
-Post-MVP features are gated behind feature flags (disabled at launch):
-
-- `ROUTE_AWARE_PRICING` — Cheapest fuel along a route
-- `PRICE_ALERTS` — Push notifications for price drops
-- `FAVOURITE_STATIONS` — Save favourite stations
-- `PREMIUM_SUBSCRIPTIONS` — Premium tier unlock
-- `TRIP_COST_CALCULATOR` — Estimate trip fuel cost
+| Document | Purpose |
+|----------|---------|
+| [`LAUNCH_CHECKLIST.md`](./LAUNCH_CHECKLIST.md) | Sprint status, endpoint verification, blocking items |
+| [`STORE_METADATA.md`](./STORE_METADATA.md) | Store copy, privacy labels, review notes, release notes |
+| [`docs/DEFERRED_FEATURES.md`](./docs/DEFERRED_FEATURES.md) | Features that must remain disabled at launch |
+| [`docs/RELEASE_PACKET.md`](./docs/RELEASE_PACKET.md) | Full submission readiness packet |
+| [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) | Setup, local dev, ECS differences, troubleshooting |
+| [`docs/QA_SCRIPT.md`](./docs/QA_SCRIPT.md) | Pre-submission test cases |
+| [`docs/ICON_AND_SCREENSHOT_PLAN.md`](./docs/ICON_AND_SCREENSHOT_PLAN.md) | Visual asset plan |
 
 ---
 
-## Supported Brands
+## Supported Fuel Types
+
+Petrol, Diesel, E10, Super Unleaded, Premium Diesel.
+
+## Supported UK Brands
 
 Asda, BP, Co-op, Esso, JET, Morrisons, Moto, Motor Fuel Group, Rontec, Sainsbury's, SGN, Shell, Tesco.
 
@@ -189,4 +142,4 @@ Asda, BP, Co-op, Esso, JET, Morrisons, Moto, Motor Fuel Group, Rontec, Sainsbury
 
 ## Licence
 
-Private — All rights reserved. FreeFuelPrice UK © 2024.
+Private — All rights reserved. FreeFuelPrice UK © 2026.
