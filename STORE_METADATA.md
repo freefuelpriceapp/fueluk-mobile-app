@@ -21,7 +21,7 @@ All copy describes ONLY the MVP features available at launch. No post-MVP featur
 
 ---
 
-## Short Description (30 chars max — Google Play)
+## Short Description (80 chars max — Google Play)
 
 ```
 Find cheap fuel near you, fast.
