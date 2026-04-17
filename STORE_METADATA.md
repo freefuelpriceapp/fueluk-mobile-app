@@ -203,4 +203,85 @@ fuel,petrol,diesel,price,cheapest,nearby,UK,stations,savings,pump,E10,map
 
 ---
 
-Last updated: Sprint 10 — QA checklist complete ✅ | Store metadata & descriptions ready ✅ | Screenshots plan defined ✅ | Privacy labels & data safety complete ✅ | Launch-safe copy rules enforced ✅ | Pending: Apple Developer approval + eas.json placeholders
+Last updated: Sprint 10 — QA checklist complete ✅ | Store metadata & descriptions ready ✅ | Screenshots plan defined ✅ | Privacy labels & data safety complete ✅ | Launch-safe copy rules enforced ✅ | Pending: Apple Developer approval + eas.json 
+placeholders
+
+---
+
+## Release Notes (v9.0.0 — Initial Launch)
+
+### App Store (iOS)
+
+```
+Welcome to FreeFuelPrice UK!
+
+Find the cheapest petrol, diesel, and E10 near you — instantly.
+
+- See nearby fuel stations ranked by price
+- Search by postcode or town
+- Save your favourite stations
+- View prices on a map
+- Freshness indicators show when prices were last updated
+
+Privacy-first: location is used only to find nearby stations and is never stored.
+```
+
+### Google Play (Android)
+
+```
+FreeFuelPrice UK — initial release.
+
+- Nearby fuel stations ranked by price and distance
+- Search by postcode, town, or brand
+- Save favourite stations for quick access
+- Map and list views
+- Price freshness indicators
+- Privacy-first: no account required, no location data stored
+```
+
+---
+
+## Submission Copy Drafts
+
+### App Store Review Notes (Apple)
+
+```
+FreeFuelPrice UK is a fuel price comparison app for UK drivers.
+
+The app uses location services solely to display nearby fuel stations
+sorted by price. Location data is never stored or transmitted to
+third parties.
+
+No account or sign-in is required. The app does not collect personal
+data beyond what is needed for core functionality (device token for
+price alerts, which is an optional feature currently gated off for
+launch).
+
+Data source: UK Government fuel price data via UKPIA/CMA datasets.
+
+Test instructions:
+1. Grant location permission when prompted
+2. The app will display nearby fuel stations ranked by price
+3. Tap any station to see price details and history
+4. Use the Search tab to find stations by postcode (try SW1A 1AA)
+5. Save a station to Favourites via the heart icon
+6. Check Settings for privacy policy and support links
+
+No demo account is needed.
+```
+
+### Google Play Review Notes
+
+```
+FreeFuelPrice UK displays live fuel prices from UK stations using
+official government data sources. The app requires location access
+to show nearby stations but does not store or share location data.
+
+No in-app purchases. No ads. No account required.
+```
+
+### Promotional Text (App Store — 170 chars max)
+
+```
+Find the cheapest petrol, diesel & E10 near you. Real UK fuel prices, updated regularly. Privacy-first — no account needed, no location stored.
+```
