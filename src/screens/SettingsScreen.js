@@ -163,6 +163,14 @@ export default function SettingsScreen() {
           onPress={() => {}}
           showChevron={false}
         />
+                    <View style={styles.divider} />
+        <SettingsRow
+          icon="time-outline"
+          label="Price Freshness"
+          sublabel="Prices older than 7 days are flagged as potentially outdated."
+          onPress={() => {}}
+          showChevron={false}
+        />
       </View>
 
       <Text style={styles.footer}>
