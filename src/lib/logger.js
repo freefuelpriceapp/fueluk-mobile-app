@@ -113,7 +113,11 @@ export const installCrashHandlers = () => {
       g.ErrorUtils.setGlobalHandler((err, isFatal) => {
         logger.fatal('uncaught_js_error', { isFatal: !!isFatal }, err);
         if (typeof prev === 'function') {
-          try { prev(err, isFatal); } catch (_) {}
+          try {
+            prev(err, isFatal);
+          } catch (_e) {
+            // Ignore errors from previous handler chain.
+          }
         }
       });
     }
