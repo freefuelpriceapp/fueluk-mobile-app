@@ -21,6 +21,22 @@ const FUEL_COLORS = {
   premium_diesel: '#E74C3C',
 };
 
+/** Safely coerce a value to a number, returning null if not numeric. */
+function toNum(v) {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+/** Map from fuelType key to the flat API field name */
+const PRICE_FIELD = {
+  petrol: 'petrol_price',
+  diesel: 'diesel_price',
+  e10: 'e10_price',
+  super_unleaded: 'super_unleaded_price',
+  premium_diesel: 'premium_diesel_price',
+};
+
 function formatFreshness(updatedAt) {
   if (!updatedAt) return null;
   const diffMs = Date.now() - new Date(updatedAt).getTime();
@@ -38,6 +54,20 @@ function formatDistance(km) {
   return `${km.toFixed(1)}km`;
 }
 
+/**
+ * Resolve price for a given fuel type from a station object.
+ * Checks prices[fuelType] first (normalised object), then falls back to
+ * the flat API field (e.g. station.petrol_price).
+ */
+function resolvePrice(station, fuelType) {
+  const prices = station.prices || {};
+  const fromPrices = toNum(prices[fuelType]);
+  if (fromPrices !== null) return fromPrices;
+  const field = PRICE_FIELD[fuelType];
+  if (field) return toNum(station[field]);
+  return null;
+}
+
 const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
   const {
     id,
@@ -45,7 +75,6 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
     brand,
     address,
     distance_km,
-    prices = {},
     last_updated,
   } = station;
 
@@ -74,10 +103,17 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
     setIsFavourite(!isFavourite);
   };
 
-  const selectedPrice = prices[fuelType];
+  const selectedPrice = resolvePrice(station, fuelType);
   const selectedColor = FUEL_COLORS[fuelType] ?? '#2ECC71';
   const freshnessLabel = formatFreshness(last_updated);
   const distanceLabel = formatDistance(distance_km);
+
+  // Build other-fuel entries
+  const otherFuels = Object.keys(FUEL_LABELS)
+    .filter((ft) => ft !== fuelType)
+    .map((ft) => ({ ft, ppl: resolvePrice(station, ft) }))
+    .filter(({ ppl }) => ppl !== null)
+    .slice(0, 2);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.78}>
@@ -116,7 +152,7 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
             {FUEL_LABELS[fuelType] ?? fuelType}
           </Text>
           <Text style={[styles.primaryPrice, { color: selectedColor }]}>
-            {typeof selectedPrice === 'number'
+            {selectedPrice !== null
               ? `${selectedPrice.toFixed(1)}p`
               : 'N/A'}
           </Text>
@@ -124,14 +160,11 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
 
         {/* Other fuel prices at smaller size */}
         <View style={styles.otherPrices}>
-          {Object.entries(prices)
-            .filter(([ft]) => ft !== fuelType)
-            .slice(0, 2)
-            .map(([ft, ppl]) => (
+          {otherFuels.map(({ ft, ppl }) => (
               <View key={ft} style={styles.otherChip}>
                 <Text style={styles.otherFuelLabel}>{FUEL_LABELS[ft] ?? ft}</Text>
                 <Text style={styles.otherPrice}>
-                  {typeof ppl === 'number' ? `${ppl.toFixed(1)}p` : 'N/A'}
+                  {ppl !== null ? `${ppl.toFixed(1)}p` : 'N/A'}
                 </Text>
               </View>
             ))}
