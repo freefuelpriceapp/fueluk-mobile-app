@@ -79,7 +79,7 @@ const HomeScreen = ({ navigation }) => {
         setLoading(false);
         return;
       }
-      const list = data.stations || [];
+      const rawList = data.stations || []; const list = rawList.map(s => ({ ...s, prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } }));
       setStations(list);
       // D-11: cache successful response
       try {
