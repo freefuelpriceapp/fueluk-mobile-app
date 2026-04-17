@@ -1,6 +1,6 @@
 # Free Fuel Price App — Launch Checklist
 
-> Last updated: 2026-04-16 — Backend audit complete, Sprints 1-7 verified live
+> Last updated: 2026-04-17 — Backend audit complete, Sprints 1-7 verified live
 
 ## Sprint 1 — Infrastructure & Backend ✅ COMPLETE
 
@@ -61,7 +61,7 @@
 - [ ] `eas build --platform android --profile production`
 - [ ] TestFlight beta testing
 - [ ] Store screenshots (6.9"/6.5"/5.5" iPhone + iPad Pro 12.9" + Android phone/tablet)
-- [ ] Privacy Policy live at freefuelpriceapp.com/privacy
+- [x] Privacy Policy live at api.freefuelpriceapp.com/privacy (v9.0.0 launch policy deployed via fueluk-prod-api PR #1)
 - [ ] App Store / Play Store submission + review
 
 ## Sprint 7 — Premium Scaffold ✅ COMPLETE (feature-flagged OFF at launch)
