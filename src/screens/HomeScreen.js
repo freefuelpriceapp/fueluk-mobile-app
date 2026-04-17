@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
   SafeAreaView,
   TouchableOpacity,
@@ -14,6 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StationCard from '../components/StationCard';
+import BrandHeader from '../components/BrandHeader';
+import ScanningLoader from '../components/ScanningLoader';
+import BestOptionCard from '../components/BestOptionCard';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
@@ -26,7 +28,6 @@ const FUEL_TYPES = [
 
 const STATIONS_CACHE_KEY = 'cached_nearby_stations';
 
-/** D-10: detect offline vs server errors */
 const isOffline = (err) =>
   err && (err.message === 'Network Error' || err.code === 'ECONNABORTED' || !err.response);
 
@@ -40,7 +41,6 @@ const formatUpdated = (iso) => {
     const dateStr = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
     return { label: `${dateStr} at ${timeStr}`, stale: ageH > 24, ageH };
   } catch (_e) {
-    // Ignore date parse errors.
     return null;
   }
 };
@@ -56,7 +56,6 @@ const HomeScreen = ({ navigation }) => {
   const [usingFallback, setUsingFallback] = useState(false);
   const { location } = useLocation();
 
-  // D-13: track screen view
   useEffect(() => { trackNearbyScreenView(); }, []);
 
   const fetchStations = useCallback(async () => {
@@ -75,34 +74,25 @@ const HomeScreen = ({ navigation }) => {
         setUsingFallback(true);
         data = await searchStations(location.postcode);
       } else {
-        setError('We\u2019can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
+        setError('We can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
         setLoading(false);
         return;
       }
-      const rawList = data.stations || []; setStations(data.stations ? data.stations.map(s => ({ ...s, distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined), prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } })) : []); const list = rawList.map(s => ({ ...s, distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined), prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } }));
-      // D-11: cache successful response
-      try {
-        await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list));
-      } catch (_e) {
-        // Ignore cache write errors.
-      }
+      const list = (data.stations || []).map(s => ({
+        ...s,
+        distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined),
+        prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null },
+      }));
+      setStations(list);
+      try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch (_e) {}
     } catch (err) {
-      // D-10: differentiate offline vs server error
       if (isOffline(err)) {
         setOffline(true);
-        // D-11: serve cached stations when offline
         try {
           const cached = await AsyncStorage.getItem(STATIONS_CACHE_KEY);
-          if (cached) {
-            setStations(JSON.parse(cached));
-            setError(null);
-          } else {
-            setError('You\u2019re offline and no cached data is available.');
-          }
-        } catch (_e) {
-          // Ignore cache read errors when offline.
-          setError('You\u2019re offline. Please check your connection.');
-        }
+          if (cached) { setStations(JSON.parse(cached)); setError(null); }
+          else setError('You\u2019re offline and no cached data is available.');
+        } catch (_e) { setError('You\u2019re offline. Please check your connection.'); }
       } else {
         setError('Unable to load stations. Please try again.');
       }
@@ -116,9 +106,7 @@ const HomeScreen = ({ navigation }) => {
     try {
       const data = await getLastUpdated();
       if (data?.last_updated) setLastUpdated(data.last_updated);
-    } catch (_e) {
-      // Ignore last-updated fetch errors.
-    }
+    } catch (_e) {}
   }, []);
 
   useEffect(() => {
@@ -137,18 +125,29 @@ const HomeScreen = ({ navigation }) => {
     navigation.navigate('StationDetail', { station });
   };
 
-  // D-09: deep-link to OS settings
   const openSettings = () => {
     if (Platform.OS === 'ios') Linking.openURL('app-settings:');
     else Linking.openSettings();
   };
 
+  // Dynamic subtitle for BrandHeader
+  const headerSub = loading
+    ? 'Scanning for the best prices near you'
+    : stations.length
+    ? `Showing ${stations.length} station${stations.length !== 1 ? 's' : ''} nearby`
+    : 'Finding the best nearby fuel prices';
+
+  /* ---- LOADING STATE (branded) ---- */
   if (loading && !refreshing) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2ECC71" />
-        <Text style={styles.loadingText}>Finding nearby stations...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <BrandHeader
+          subtitle="Scanning for the best prices near you"
+          onSearchPress={() => navigation.navigate('Search')}
+          pulse
+        />
+        <ScanningLoader />
+      </SafeAreaView>
     );
   }
 
@@ -156,30 +155,18 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Nearby Fuel Prices</Text>
-          {location && (
-            <Text style={styles.subtitle}>
-              {location.postcode}{location.coords ? ` \u00B7 within ${location.radiusKm || 5}km` : ' (default area)'}
-            </Text>
-          )}
-        </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Search')}
-          style={styles.searchBtn}
-        >
-          <Ionicons name="search" size={20} color="#2ECC71" />
-        </TouchableOpacity>
-      </View>
+      {/* Branded header */}
+      <BrandHeader
+        subtitle={headerSub}
+        onSearchPress={() => navigation.navigate('Search')}
+      />
 
-      {/* D-08 + D-09: fallback banner with settings link */}
+      {/* Fallback banner */}
       {usingFallback && (
         <View style={styles.fallbackBanner}>
           <Ionicons name="navigate-outline" size={14} color="#F39C12" />
           <Text style={styles.fallbackText}>
-            Precise location is off \u2014 showing results for your default area. Turn on location for prices near you.
+            Precise location is off \u2014 showing results for your default area.
           </Text>
           <TouchableOpacity onPress={openSettings}>
             <Text style={styles.settingsLink}>Open Settings</Text>
@@ -187,7 +174,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       )}
 
-      {/* D-10: offline banner */}
+      {/* Offline banner */}
       {offline && !error && (
         <View style={styles.offlineBanner}>
           <Ionicons name="cloud-offline-outline" size={14} color="#DC3545" />
@@ -217,7 +204,6 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       {error ? (
-        /* D-03: error state uses red icon + distinct copy */
         <View style={styles.centered}>
           <Ionicons name="alert-circle-outline" size={40} color="#DC3545" />
           <Text style={styles.errorText}>{error}</Text>
@@ -237,15 +223,17 @@ const HomeScreen = ({ navigation }) => {
             />
           )}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#2ECC71"
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2ECC71" />
           }
           contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <BestOptionCard
+              stations={stations}
+              fuelType={selectedFuel}
+              onPress={handleStationPress}
+            />
+          }
           ListEmptyComponent={
-            /* D-03: empty state uses green search icon + distinct copy */
             <View style={styles.emptyState}>
               <Ionicons name="search-outline" size={48} color="#2ECC71" />
               <Text style={styles.emptyTitle}>No stations found</Text>
@@ -269,14 +257,6 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117', padding: 24 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#1a1a2e', borderBottomWidth: 1, borderBottomColor: '#222',
-  },
-  title: { fontSize: 20, fontWeight: '700', color: '#ffffff' },
-  subtitle: { fontSize: 12, color: '#888', marginTop: 2 },
-  searchBtn: { padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2ECC71' },
   fallbackBanner: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#2a2200',
@@ -290,15 +270,14 @@ const styles = StyleSheet.create({
   offlineText: { fontSize: 12, color: '#DC3545', marginLeft: 6 },
   filterRow: {
     flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#1a1a2e', borderBottomWidth: 1, borderBottomColor: '#222',
+    backgroundColor: '#0D1117', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1E2634',
   },
   filterBtn: {
     flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
     borderColor: '#333', alignItems: 'center', marginHorizontal: 3,
   },
   filterBtnText: { fontSize: 13, fontWeight: '600', color: '#888' },
-  list: { padding: 12 },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
+  list: { paddingBottom: 12 },
   errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12, marginBottom: 16 },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2ECC71', borderRadius: 8 },
   retryBtnText: { color: '#0D1117', fontWeight: '700' },
