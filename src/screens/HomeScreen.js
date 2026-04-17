@@ -16,6 +16,7 @@ import StationCard from '../components/StationCard';
 import BrandHeader from '../components/BrandHeader';
 import ScanningLoader from '../components/ScanningLoader';
 import BestOptionCard from '../components/BestOptionCard';
+import BrandFilter from '../components/BrandFilter';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
@@ -52,6 +53,7 @@ const HomeScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [offline, setOffline] = useState(false);
   const [selectedFuel, setSelectedFuel] = useState('petrol');
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
   const { location } = useLocation();
@@ -69,12 +71,12 @@ const HomeScreen = ({ navigation }) => {
       let data;
       if (lat && lng) {
         setUsingFallback(false);
-        data = await getNearbyStations({ lat, lng, radiusKm: location.radiusKm || 5, fuel: selectedFuel });
+        data = await getNearbyStations({ lat, lng, radiusKm: location.radiusKm || 5, fuel: selectedFuel, brand: selectedBrand });
       } else if (location.postcode) {
         setUsingFallback(true);
         data = await searchStations(location.postcode);
       } else {
-        setError('We can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
+        setError('We\u2019can\u2019t determine your location. Enable location in Settings to see nearby stations, or search by postcode.');
         setLoading(false);
         return;
       }
@@ -100,7 +102,7 @@ const HomeScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [location, selectedFuel]);
+  }, [location, selectedFuel, selectedBrand]);
 
   const fetchLastUpdated = useCallback(async () => {
     try {
@@ -130,14 +132,12 @@ const HomeScreen = ({ navigation }) => {
     else Linking.openSettings();
   };
 
-  // Dynamic subtitle for BrandHeader
   const headerSub = loading
     ? 'Scanning for the best prices near you'
     : stations.length
     ? `Showing ${stations.length} station${stations.length !== 1 ? 's' : ''} nearby`
     : 'Finding the best nearby fuel prices';
 
-  /* ---- LOADING STATE (branded) ---- */
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -155,13 +155,11 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Branded header */}
       <BrandHeader
         subtitle={headerSub}
         onSearchPress={() => navigation.navigate('Search')}
       />
 
-      {/* Fallback banner */}
       {usingFallback && (
         <View style={styles.fallbackBanner}>
           <Ionicons name="navigate-outline" size={14} color="#F39C12" />
@@ -174,7 +172,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       )}
 
-      {/* Offline banner */}
       {offline && !error && (
         <View style={styles.offlineBanner}>
           <Ionicons name="cloud-offline-outline" size={14} color="#DC3545" />
@@ -202,6 +199,9 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Brand filter */}
+      <BrandFilter selectedBrand={selectedBrand} onSelectBrand={setSelectedBrand} />
 
       {error ? (
         <View style={styles.centered}>
