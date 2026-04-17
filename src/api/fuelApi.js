@@ -14,11 +14,20 @@ const api = axios.create({
  * @param {number} lng - Longitude
  * @param {number} radiusKm - Search radius in km (default 5)
  * @param {string} fuel - Fuel type: petrol | diesel | e10 (default petrol)
+ * @param {string} brand - Optional brand filter
  */
-export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol' }) {
-  const resp = await api.get('/api/v1/stations/nearby', {
-    params: { lat, lon: lng, radius: radiusKm, fuel_type: fuel },
-  });
+export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol', brand = null }) {
+  const params = { lat, lon: lng, radius: radiusKm, fuel_type: fuel };
+  if (brand) params.brand = brand;
+  const resp = await api.get('/api/v1/stations/nearby', { params });
+  return resp.data;
+}
+
+/**
+ * Get distinct brand list for filter UI
+ */
+export async function getBrands() {
+  const resp = await api.get('/api/v1/stations/brands');
   return resp.data;
 }
 
@@ -146,7 +155,6 @@ export async function getPremiumStatus() {
 
 /**
  * Get backend freshness marker. Returns { last_updated, status }.
- * Used by HomeScreen to render the "Prices last updated …" footer (D-06).
  */
 export async function getLastUpdated() {
   const resp = await api.get('/api/v1/meta/last-updated');
