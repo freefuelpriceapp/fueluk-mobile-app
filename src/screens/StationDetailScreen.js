@@ -48,7 +48,7 @@ export default function StationDetailScreen({ route }) {
         getPricesByStation(station.id)
       ]);
       setHistory(historyData);
-      setLivePrices(currentPrices || []);
+      const safePrices = Array.isArray(currentPrices) ? currentPrices : Array.isArray(currentPrices?.prices) ? currentPrices.prices : []; setLivePrices(safePrices);
     } catch (e) {
       console.error('Failed to load station data', e);
     } finally {
@@ -99,7 +99,7 @@ export default function StationDetailScreen({ route }) {
 
   const renderPriceRow = (fuelType) => {
     const entries = history[fuelType] || [];
-    const live = livePrices.find(p => p.fuel_type === fuelType);
+    const live = (Array.isArray(livePrices) ? livePrices : []).find(p => p.fuel_type === fuelType);
     
     return (
       <View key={fuelType} style={styles.fuelCard}>
