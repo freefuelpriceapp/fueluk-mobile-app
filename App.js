@@ -29,7 +29,7 @@ function HomeStack() {
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
-        options={{ title: 'Free Fuel Price' }}
+        options={{ title: 'FreeFuelPrice UK' }}
       />
       <Stack.Screen
         name="StationDetail"
