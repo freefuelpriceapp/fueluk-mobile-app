@@ -79,7 +79,7 @@ const HomeScreen = ({ navigation }) => {
         setLoading(false);
         return;
       }
-      const rawList = data.stations || []; const list = rawList.map(s => ({ ...s, distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined), prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } }));
+      const rawList = data.stations || []; setStations(data.stations ? data.stations.map(s => ({ ...s, distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined), prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } })) : []); const list = rawList.map(s => ({ ...s, distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined), prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null } }));
       // D-11: cache successful response
       try {
         await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list));
