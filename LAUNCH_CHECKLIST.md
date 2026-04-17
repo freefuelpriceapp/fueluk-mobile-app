@@ -11,7 +11,7 @@
 - [x] 3910 fuel stations upserted from UKPIA / CMA / Gov.UK data (up from 2842 at Sprint 1 baseline)
 - [x] Ingestion cron running — last fuel sync completed 2026-04-16 11:00 UTC-7 (3910 upserted)
 - [x] AlertJob cron firing every 15 min — verified in CloudWatch logs
-- [x] `/api/v1/health` returns `{status: healthy, db: connected, version: 9.0.0}`
+- [x] `/api/v1/health` returns `{status: healthy, db: connected, version: 1.0.0}`
 - [x] `/api/v1/stations/nearby` returns live station data (20 London stations verified)
 - [x] `/api/v1/stations/cheapest` endpoint active (verified diesel sort, distance_miles)
 - [x] `/api/v1/stations/search` endpoint active (brand + postcode search verified)
@@ -48,7 +48,7 @@
 
 ## Sprint 6 — Store Submission 🕒 IN PROGRESS
 
-- [x] `app.json` bundleId `com.freefuelpriceapp.uk`, version 9.0.0, buildNumber 9
+- [x] `app.json` bundleId `com.freefuelpriceapp.uk`, version 1.0.0, buildNumber 9
 - [x] `eas.json` build profiles (development / preview / production) committed
 - [x] STORE_METADATA.md copy finalised (descriptions, keywords, privacy labels, data safety)
 - [ ] Apple Developer enrollment payment — awaiting Apple verification (up to 48h)
@@ -61,7 +61,7 @@
 - [ ] `eas build --platform android --profile production`
 - [ ] TestFlight beta testing
 - [ ] Store screenshots (6.9"/6.5"/5.5" iPhone + iPad Pro 12.9" + Android phone/tablet)
-- [x] Privacy Policy live at api.freefuelpriceapp.com/privacy (v9.0.0 launch policy deployed via fueluk-prod-api PR #1)
+- [x] Privacy Policy live at api.freefuelpriceapp.com/privacy (v1.0.0 launch policy deployed via fueluk-prod-api PR #1)
 - [ ] App Store / Play Store submission + review
 
 ## Sprint 7 — Premium Scaffold ✅ COMPLETE (feature-flagged OFF at launch)
@@ -83,7 +83,7 @@
 
 | Endpoint | Status | Notes |
 |---|---|---|
-| `GET /health` | ✅ Live | uptime 140k+ sec, v9.0.0 |
+| `GET /health` | ✅ Live | uptime 140k+ sec, v1.0.0 |
 | `GET /api/v1/stations/nearby` | ✅ Live | 20 stations within 5-mile radius (London tested) |
 | `GET /api/v1/stations/cheapest` | ✅ Live | Sort by fuel_type verified |
 | `GET /api/v1/stations/search` | ✅ Live | Brand + postcode search verified |
