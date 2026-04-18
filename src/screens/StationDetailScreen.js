@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getPriceHistory, createAlert, getPricesByStation } from '../api/fuelApi';
+import FacilitiesPills from '../components/FacilitiesPills';
+import ReportPriceButton from '../components/ReportPriceButton';
 import { FEATURES } from '../lib/featureFlags';
 
 const FUEL_TYPES = ['petrol', 'diesel', 'e10'];
@@ -171,7 +173,19 @@ export default function StationDetailScreen({ route }) {
           <Text style={styles.sectionTitle}>Prices & Trends</Text>
           {FUEL_TYPES.map(renderPriceRow)}
         </View>
-      </ScrollView>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Facilities</Text>
+            <FacilitiesPills facilities={station.facilities || station.amenities || []} />
+          </View>
+
+          <View style={styles.section}>
+            <ReportPriceButton
+              onPress={() => FEATURES.priceReports && Alert.alert("Report a price", "Price reporting coming soon!")}
+              disabled={!FEATURES.priceReports}
+              label="Report a price"
+            />
+          </View>
+        </ScrollView>
 
       <Modal
         visible={alertModalVisible && FEATURES.priceAlerts}
