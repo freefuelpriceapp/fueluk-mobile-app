@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { filterRankable } from '../lib/quarantine';
 
 /**
  * BestOptionCard — hero intelligence card for the top of the Nearby list.
@@ -28,10 +29,7 @@ function pickBest(stations, fuelType) {
   const priceKey = fuelType === 'diesel' ? 'diesel_price' : fuelType === 'e10' ? 'e10_price' : 'petrol_price';
   const altKey = fuelType === 'diesel' ? 'diesel' : fuelType === 'e10' ? 'e10' : 'petrol';
 
-  const withPrice = stations.filter(s => {
-    const p = s[priceKey] ?? s.prices?.[altKey];
-    return p != null && p > 0;
-  });
+    const withPrice = filterRankable(stations, fuelType);
   if (!withPrice.length) return null;
 
   const cheapest = [...withPrice].sort((a, b) => {
