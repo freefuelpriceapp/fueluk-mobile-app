@@ -7,7 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "build:android": "eas build --platform android",
-    "build:ios": "eas build --platform ios"
+    "build:ios": "eas build --platform ios",
+    "test": "BABEL_CONFIG_FILE=./babel.config.test.js jest --config jest.config.js",
+    "test:watch": "BABEL_CONFIG_FILE=./babel.config.test.js jest --config jest.config.js --watch"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
