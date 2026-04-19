@@ -14,7 +14,7 @@
     },
     "updates": {
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID"
+      "url": "https://u.expo.dev/6a52b661-f990-4436-9ecb-49148533d02b"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -63,7 +63,7 @@
     "extra": {
       "apiBaseUrl": "https://api.freefuelpriceapp.com",
       "eas": {
-        "projectId": "__SET_BY_EAS_INIT__"
+        "projectId": "6a52b661-f990-4436-9ecb-49148533d02b"
       }
     }
   }
