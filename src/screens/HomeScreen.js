@@ -21,6 +21,7 @@ import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelAp
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
 import { resolvePrice } from '../lib/quarantine';
+import { rankStationsByValue } from '../lib/smartDecision';
 
 const FUEL_TYPES = [
   { key: 'petrol', label: 'Petrol', color: '#2ECC71' },
@@ -30,8 +31,16 @@ const FUEL_TYPES = [
 
 const SORT_MODES = [
   { key: 'nearest',  label: 'Nearest',  icon: 'navigate-outline' },
-  { key: 'cheapest', label: 'Cheapest', icon: 'trending-down-outline' },
+  { key: 'cheapest', label: 'Best Value', icon: 'trending-down-outline' },
 ];
+
+const FUEL_PRICE_KEY = {
+  petrol: 'petrol_price',
+  diesel: 'diesel_price',
+  e10: 'e10_price',
+  super_unleaded: 'super_unleaded_price',
+  premium_diesel: 'premium_diesel_price',
+};
 
 const STATIONS_CACHE_KEY = 'cached_nearby_stations';
 
@@ -140,19 +149,14 @@ const HomeScreen = ({ navigation }) => {
   };
 
   // Sort the stations array based on the current sortMode.
-  // 'nearest' — preserve API order (already sorted by distance_km ascending).
-  // 'cheapest' — sort by resolvePrice for the selected fuel, ascending.
-  //              Stations with no price are pushed to the end.
+  // 'nearest' — preserve API order (already sorted by distance ascending).
+  // 'cheapest' — rank by effective price (pump price + amortised drive cost)
+  //              so that nearby stations rank higher unless a distant one is
+  //              genuinely cheaper after accounting for fuel to get there.
   const sortedStations = useMemo(() => {
     if (sortMode === 'nearest') return stations;
-    return [...stations].sort((a, b) => {
-      const pa = resolvePrice(a, selectedFuel);
-      const pb = resolvePrice(b, selectedFuel);
-      if (pa === null && pb === null) return 0;
-      if (pa === null) return 1;
-      if (pb === null) return -1;
-      return pa - pb;
-    });
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    return rankStationsByValue(stations, { fuelKey });
   }, [stations, sortMode, selectedFuel]);
 
   const headerSub = loading
