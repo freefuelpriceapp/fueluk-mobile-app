@@ -25,6 +25,12 @@ export const FEATURES = {
   // FUTURE FEATURES — DISABLED (do not enable without Sprint approval)
   // ─────────────────────────────────────────────────
 
+  // Smart Decisions (Sprint 5+)
+  // "Worth the Drive?" analysis — calculates whether driving to a cheaper
+  // station saves money once fuel cost of the detour is factored in.
+  // REQUIRES: user distance baseline, MPG preference UI
+  smartDecisions: false,
+
   // Route Intelligence (Sprint 8+)
   // Fuel-aware route planning and savings estimator
   routeIntelligence: false,

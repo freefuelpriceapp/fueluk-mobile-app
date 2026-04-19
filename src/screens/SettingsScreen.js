@@ -10,11 +10,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 const PRIVACY_URL = 'https://api.freefuelpriceapp.com/privacy';
 const SUPPORT_URL = 'https://api.freefuelpriceapp.com/support';
 const CONTACT_EMAIL = 'support@freefuelpriceapp.com';
-const APP_VERSION = '1.0.0';
+
+// Read the version from Expo's app config (app.json / app.config.js).
+// Falls back to '1.0.0' if the config is not available (e.g. bare workflow edge cases).
+const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || '1.0.0';
 
 function SettingsRow({ icon, label, sublabel, onPress, showChevron = true, danger = false }) {
   return (

@@ -5,7 +5,12 @@
  * Run: `npx jest src/lib/__tests__/smartDecision.test.js`
  */
 
-const { driveCostPence, grossSavingsPence, worthTheDrive } = require('../smartDecision');
+const {
+  driveCostPence,
+  grossSavingsPence,
+  worthTheDrive,
+  rankStationsByValue,
+} = require('../smartDecision');
 
 describe('grossSavingsPence', () => {
   test('positive saving when alt is cheaper', () => {
@@ -54,6 +59,77 @@ describe('worthTheDrive', () => {
     const r = worthTheDrive({ basePpl: null, altPpl: 140, extraMiles: 2 });
     expect(r.verdict).toBe('unknown');
     expect(r.worthIt).toBe(false);
+  });
+});
+
+describe('rankStationsByValue', () => {
+  test('nearby slightly-dearer station beats distant much-cheaper one when gap is small', () => {
+    const stations = [
+      { id: 'far', petrol_price: 139.0, distance_miles: 7.3 },
+      { id: 'near', petrol_price: 140.0, distance_miles: 0.9 },
+    ];
+    const ranked = rankStationsByValue(stations, { fuelKey: 'petrol_price' });
+    expect(ranked[0].id).toBe('near');
+    expect(ranked[1].id).toBe('far');
+  });
+
+  test('distant station still wins when price gap is large enough', () => {
+    const stations = [
+      { id: 'far_cheap', petrol_price: 130.0, distance_miles: 7.3 },
+      { id: 'near_dear', petrol_price: 145.0, distance_miles: 0.9 },
+    ];
+    const ranked = rankStationsByValue(stations, { fuelKey: 'petrol_price' });
+    expect(ranked[0].id).toBe('far_cheap');
+  });
+
+  test('stations without a price for selected fuel go to the bottom', () => {
+    const stations = [
+      { id: 'no_price', diesel_price: 150, distance_miles: 0.2 },
+      { id: 'has_price', petrol_price: 140, distance_miles: 2 },
+    ];
+    const ranked = rankStationsByValue(stations, { fuelKey: 'petrol_price' });
+    expect(ranked[0].id).toBe('has_price');
+    expect(ranked[1].id).toBe('no_price');
+    expect(ranked[1]._hasPrice).toBe(false);
+  });
+
+  test('sorts ascending by effective price (price + amortised drive cost)', () => {
+    const stations = [
+      { id: 'a', petrol_price: 140, distance_miles: 0 },
+      { id: 'b', petrol_price: 140, distance_miles: 5 },
+      { id: 'c', petrol_price: 140, distance_miles: 2 },
+    ];
+    const ranked = rankStationsByValue(stations, { fuelKey: 'petrol_price' });
+    expect(ranked.map((s) => s.id)).toEqual(['a', 'c', 'b']);
+    expect(ranked[0]._effectivePrice).toBeLessThan(ranked[1]._effectivePrice);
+    expect(ranked[1]._effectivePrice).toBeLessThan(ranked[2]._effectivePrice);
+  });
+
+  test('returns empty array for non-array input', () => {
+    expect(rankStationsByValue(null)).toEqual([]);
+    expect(rankStationsByValue(undefined)).toEqual([]);
+  });
+
+  test('does not mutate input array', () => {
+    const stations = [
+      { id: 'a', petrol_price: 140, distance_miles: 2 },
+      { id: 'b', petrol_price: 135, distance_miles: 5 },
+    ];
+    const snapshot = JSON.parse(JSON.stringify(stations));
+    rankStationsByValue(stations, { fuelKey: 'petrol_price' });
+    expect(stations).toEqual(snapshot);
+  });
+
+  test('respects custom fuelKey (diesel_price)', () => {
+    const stations = [
+      { id: 'p_only', petrol_price: 100, distance_miles: 0.5 },
+      { id: 'd_cheap', diesel_price: 140, distance_miles: 1 },
+      { id: 'd_dear', diesel_price: 145, distance_miles: 1 },
+    ];
+    const ranked = rankStationsByValue(stations, { fuelKey: 'diesel_price' });
+    expect(ranked[0].id).toBe('d_cheap');
+    expect(ranked[1].id).toBe('d_dear');
+    expect(ranked[2].id).toBe('p_only');
   });
 });
 

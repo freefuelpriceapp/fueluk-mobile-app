@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,27 @@ import BrandFilter from '../components/BrandFilter';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
+import { resolvePrice } from '../lib/quarantine';
+import { rankStationsByValue } from '../lib/smartDecision';
 
 const FUEL_TYPES = [
   { key: 'petrol', label: 'Petrol', color: '#2ECC71' },
   { key: 'diesel', label: 'Diesel', color: '#3498DB' },
   { key: 'e10',    label: 'E10',    color: '#F39C12' },
 ];
+
+const SORT_MODES = [
+  { key: 'nearest',  label: 'Nearest',  icon: 'navigate-outline' },
+  { key: 'cheapest', label: 'Best Value', icon: 'trending-down-outline' },
+];
+
+const FUEL_PRICE_KEY = {
+  petrol: 'petrol_price',
+  diesel: 'diesel_price',
+  e10: 'e10_price',
+  super_unleaded: 'super_unleaded_price',
+  premium_diesel: 'premium_diesel_price',
+};
 
 const STATIONS_CACHE_KEY = 'cached_nearby_stations';
 
@@ -56,6 +71,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [sortMode, setSortMode] = useState('nearest'); // 'nearest' | 'cheapest'
   const { location } = useLocation();
 
   useEffect(() => { trackNearbyScreenView(); }, []);
@@ -132,6 +148,17 @@ const HomeScreen = ({ navigation }) => {
     else Linking.openSettings();
   };
 
+  // Sort the stations array based on the current sortMode.
+  // 'nearest' — preserve API order (already sorted by distance ascending).
+  // 'cheapest' — rank by effective price (pump price + amortised drive cost)
+  //              so that nearby stations rank higher unless a distant one is
+  //              genuinely cheaper after accounting for fuel to get there.
+  const sortedStations = useMemo(() => {
+    if (sortMode === 'nearest') return stations;
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    return rankStationsByValue(stations, { fuelKey });
+  }, [stations, sortMode, selectedFuel]);
+
   const headerSub = loading
     ? 'Scanning for the best prices near you'
     : stations.length
@@ -157,6 +184,8 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <BrandHeader
         subtitle={headerSub}
+        stations={stations}
+        fuelType={selectedFuel}
         onSearchPress={() => navigation.navigate('Search')}
       />
 
@@ -200,6 +229,35 @@ const HomeScreen = ({ navigation }) => {
         ))}
       </View>
 
+      {/* Sort toggle — Nearest / Cheapest */}
+      <View style={styles.sortRow}>
+        {SORT_MODES.map(sm => {
+          const active = sortMode === sm.key;
+          return (
+            <TouchableOpacity
+              key={sm.key}
+              style={[
+                styles.sortBtn,
+                active && styles.sortBtnActive,
+              ]}
+              onPress={() => setSortMode(sm.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Ionicons
+                name={sm.icon}
+                size={13}
+                color={active ? '#0D1117' : '#8B949E'}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.sortBtnText, active && styles.sortBtnTextActive]}>
+                {sm.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Brand filter */}
       <BrandFilter selectedBrand={selectedBrand} onSelectBrand={setSelectedBrand} />
 
@@ -213,7 +271,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       ) : (
         <FlatList
-          data={stations}
+          data={sortedStations}
           keyExtractor={(item) => item.id?.toString()}
           renderItem={({ item }) => (
             <StationCard
@@ -270,20 +328,46 @@ const styles = StyleSheet.create({
   offlineText: { fontSize: 12, color: '#DC3545', marginLeft: 6 },
   filterRow: {
     flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#0D1117', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1E2634',
+    backgroundColor: '#0D1117', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#30363D',
   },
   filterBtn: {
     flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
-    borderColor: '#333', alignItems: 'center', marginHorizontal: 3,
+    borderColor: '#30363D', alignItems: 'center', marginHorizontal: 3,
   },
-  filterBtnText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  filterBtnText: { fontSize: 13, fontWeight: '600', color: '#8B949E' },
+  // Sort toggle
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#0D1117',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#30363D',
+    gap: 8,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    backgroundColor: '#161B22',
+  },
+  sortBtnActive: {
+    backgroundColor: '#2ECC71',
+    borderColor: '#2ECC71',
+  },
+  sortBtnText: { fontSize: 13, fontWeight: '600', color: '#8B949E' },
+  sortBtnTextActive: { color: '#0D1117' },
   list: { paddingBottom: 12 },
   errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12, marginBottom: 16 },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2ECC71', borderRadius: 8 },
   retryBtnText: { color: '#0D1117', fontWeight: '700' },
   emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: '#2ECC71', marginTop: 12 },
-  emptyText: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 6 },
+  emptyText: { fontSize: 15, color: '#8B949E', textAlign: 'center', marginTop: 6 },
   emptySubtext: { fontSize: 13, color: '#555', textAlign: 'center', marginTop: 6 },
   footerText: { fontSize: 11, color: '#555', textAlign: 'center', paddingVertical: 16 },
   footerStale: { color: '#F39C12' },

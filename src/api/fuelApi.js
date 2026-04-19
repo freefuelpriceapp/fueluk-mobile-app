@@ -34,11 +34,15 @@ export async function getBrands() {
 /**
  * Search stations by query
  * @param {string} q - Search query (name, address, postcode, brand)
+ * @param {object} [options] - Optional params
+ * @param {string} [options.fuelType] - Filter by fuel type: petrol | diesel | e10 | super_unleaded | premium_diesel
  */
-export async function searchStations(q) {
-  const resp = await api.get('/api/v1/stations/search', {
-    params: { q },
-  });
+export async function searchStations(q, { fuelType, lat, lon } = {}) {
+  const params = { q };
+  if (fuelType) params.fuel_type = fuelType;
+  if (lat != null) params.lat = lat;
+  if (lon != null) params.lon = lon;
+  const resp = await api.get('/api/v1/stations/search', { params });
   return resp.data;
 }
 

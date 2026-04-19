@@ -5,32 +5,12 @@
  *
  * Pure helpers for ranking brands by cheapness + coverage across the
  * currently-loaded nearby stations. Used by BrandHeader / BrandFilter
- * to surface „current cheapest brand” style insight.
+ * to surface „current cheapest brand" style insight.
  *
  * No I/O, no side effects.
  */
 
-function toNum(v) {
-  if (v == null) return null;
-  const n = typeof v === 'number' ? v : parseFloat(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function priceOf(station, fuelType) {
-  const fromMap = toNum(station?.prices?.[fuelType]);
-  if (fromMap !== null) return fromMap;
-  const flatKey =
-    fuelType === 'diesel'
-      ? 'diesel_price'
-      : fuelType === 'e10'
-      ? 'e10_price'
-      : fuelType === 'super_unleaded'
-      ? 'super_unleaded_price'
-      : fuelType === 'premium_diesel'
-      ? 'premium_diesel_price'
-      : 'petrol_price';
-  return toNum(station?.[flatKey]);
-}
+import { resolvePrice } from './quarantine';
 
 function brandKey(station) {
   const b = station?.brand;
@@ -61,7 +41,7 @@ export function rankBrands(stations, fuelType) {
     bucket.count += 1;
     bucket.stations.push(s);
     if (s?.is_quarantined) continue;
-    const p = priceOf(s, fuelType);
+    const p = resolvePrice(s, fuelType);
     if (p !== null) bucket.prices.push(p);
   }
   const out = [];
@@ -87,7 +67,7 @@ export function rankBrands(stations, fuelType) {
 }
 
 /**
- * Return the “cheapest brand” summary object, or null if none can be ranked.
+ * Return the "cheapest brand" summary object, or null if none can be ranked.
  *   { brand, avgPpl, minPpl, count, leadByPence }
  * where leadByPence = runnerUp.avgPpl - winner.avgPpl (pence, clamped >=0).
  */
@@ -110,4 +90,3 @@ export default {
   rankBrands,
   cheapestBrand,
 };
-
