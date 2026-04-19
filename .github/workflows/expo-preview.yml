@@ -47,6 +47,6 @@ jobs:
         run: npx expo export --platform web --output-dir dist
       - uses: actions/upload-artifact@v4
         with:
-          name: web-preview-${{ github.ref_name }}-${{ github.sha }}
+          name: web-preview-${{ github.sha }}
           path: dist
           retention-days: 14
