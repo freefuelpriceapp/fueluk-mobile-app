@@ -49,8 +49,8 @@ const StationMarker = ({ station, cheapestPrice, fuelType, onPress, isCheapest, 
   return (
     <Marker
       coordinate={{
-        latitude: station.latitude,
-        longitude: station.longitude,
+        latitude: station.lat ?? station.latitude,
+        longitude: station.lon ?? station.longitude,
       }}
       onPress={() => onPress && onPress(station)}
       tracksViewChanges={false}

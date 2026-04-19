@@ -100,7 +100,7 @@ export default function MapScreen({ navigation }) {
     loading: stationsLoading,
     error: stationsError,
     refetch,
-  } = useStations(stationLocation, { fuelType, mode, radiusKm: location?.radiusKm ?? 5 });
+  } = useStations(stationLocation, { fuelType, mode, radiusKm: 15 });
 
   // Derive initial map region from user location. Falls back to UK default
   // (Birmingham) if location is not yet available. The map animates to the
@@ -111,8 +111,8 @@ export default function MapScreen({ navigation }) {
     return {
       latitude: lat,
       longitude: lng,
-      latitudeDelta: 0.06,
-      longitudeDelta: 0.06,
+      latitudeDelta: 0.15,
+      longitudeDelta: 0.15,
     };
   }, [location]);
 
@@ -124,7 +124,7 @@ export default function MapScreen({ navigation }) {
     const lng = location?.coords?.longitude;
     if (lat == null || lng == null) return;
     mapRef.current.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: 0.06, longitudeDelta: 0.06 },
+      { latitude: lat, longitude: lng, latitudeDelta: 0.15, longitudeDelta: 0.15 },
       600
     );
   }, [location?.coords?.latitude, location?.coords?.longitude]);
