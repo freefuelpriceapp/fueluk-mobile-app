@@ -70,6 +70,7 @@ const DARK_MAP_STYLE = [
 ];
 
 const BOTTOM_SHEET_HEIGHT = 180;
+const MAP_BUILD = 'M6'; // bump this to verify OTA delivery
 
 export default function MapScreen({ navigation }) {
   const [fuelType, setFuelType] = useState('petrol');
@@ -317,7 +318,15 @@ export default function MapScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         )}
+
       </SafeAreaView>
+
+      {/* Debug overlay — remove after markers are confirmed working */}
+      <View style={styles.debugBadge}>
+        <Text style={styles.debugText}>
+          {MAP_BUILD} | {stations.length} stations{stationsLoading ? ' (loading)' : ''}
+        </Text>
+      </View>
 
       {/* Bottom sheet: selected station detail */}
       <Animated.View
@@ -523,4 +532,15 @@ const styles = StyleSheet.create({
   errorText: { color: '#DC3545', fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
   retryBtn: { backgroundColor: '#2ECC71', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
   retryText: { color: '#0D1117', fontWeight: '700' },
+  debugBadge: {
+    position: 'absolute',
+    top: 120,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    zIndex: 999,
+  },
+  debugText: { color: '#F39C12', fontSize: 11, fontWeight: '700' },
 });
