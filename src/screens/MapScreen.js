@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -76,6 +76,8 @@ export default function MapScreen({ navigation }) {
   const [mode, setMode] = useState('nearby'); // 'nearby' | 'cheapest'
   const [selectedStation, setSelectedStation] = useState(null);
 
+  // Map imperative ref — used to animate to the user's location once resolved.
+  const mapRef = useRef(null);
   // Bottom sheet slide animation
   const sheetAnim = useRef(new Animated.Value(BOTTOM_SHEET_HEIGHT)).current;
 
@@ -100,10 +102,12 @@ export default function MapScreen({ navigation }) {
     refetch,
   } = useStations(stationLocation, { fuelType, mode, radiusKm: location?.radiusKm ?? 5 });
 
-  // Derive initial map region from user location.
+  // Derive initial map region from user location. Falls back to UK default
+  // (Birmingham) if location is not yet available. The map animates to the
+  // user's real position via mapRef once coords resolve (see effect below).
   const initialRegion = useMemo(() => {
-    const lat = location?.coords?.latitude ?? 51.5074;
-    const lng = location?.coords?.longitude ?? -0.1278;
+    const lat = location?.coords?.latitude ?? 52.4862;
+    const lng = location?.coords?.longitude ?? -1.8904;
     return {
       latitude: lat,
       longitude: lng,
@@ -111,6 +115,19 @@ export default function MapScreen({ navigation }) {
       longitudeDelta: 0.06,
     };
   }, [location]);
+
+  // When the user's real coordinates arrive after mount, animate the map to them.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    if (!mapRef.current) return;
+    const lat = location?.coords?.latitude;
+    const lng = location?.coords?.longitude;
+    if (lat == null || lng == null) return;
+    mapRef.current.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: 0.06, longitudeDelta: 0.06 },
+      600
+    );
+  }, [location?.coords?.latitude, location?.coords?.longitude]);
 
   // Cheapest station for marker highlighting.
   const cheapestStationId = useMemo(() => {
@@ -168,7 +185,8 @@ export default function MapScreen({ navigation }) {
     );
   }
 
-  if (locationError) {
+  // Only block the map on a hard location error with no usable fallback.
+  if (locationError && !location) {
     return (
       <View style={styles.center}>
         <Ionicons name="alert-circle-outline" size={40} color="#DC3545" />
@@ -191,6 +209,7 @@ export default function MapScreen({ navigation }) {
         </View>
       ) : (
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={initialRegion}
         showsUserLocation

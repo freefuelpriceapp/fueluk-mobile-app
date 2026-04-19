@@ -13,8 +13,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StationCard from '../components/StationCard';
-import { searchStations } from '../api/fuelApi';
+import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
+import useLocation from '../hooks/useLocation';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -28,25 +29,55 @@ const FUEL_TYPES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// API flat-price field names keyed by fuel type.
+const PRICE_FIELD = {
+  petrol: 'petrol_price',
+  diesel: 'diesel_price',
+  e10: 'e10_price',
+  super_unleaded: 'super_unleaded_price',
+  premium_diesel: 'premium_diesel_price',
+};
+
 /**
- * Filter stations client-side to only those that have a price entry for the
- * selected fuel type. Handles both flat arrays and nested price objects.
+ * Normalize an API station row so it renders correctly in StationCard:
+ *  - distance_km derived from distance_miles when present
+ *  - prices object built from the flat <fuel>_price fields
+ */
+function normalizeStation(s) {
+  const km =
+    typeof s.distance_km === 'number'
+      ? s.distance_km
+      : typeof s.distance_miles === 'number'
+        ? s.distance_miles * 1.60934
+        : undefined;
+  return {
+    ...s,
+    distance_km: km,
+    prices: {
+      petrol: s.petrol_price ?? null,
+      diesel: s.diesel_price ?? null,
+      e10: s.e10_price ?? null,
+      super_unleaded: s.super_unleaded_price ?? null,
+      premium_diesel: s.premium_diesel_price ?? null,
+    },
+  };
+}
+
+/**
+ * Keep stations that have a resolvable price for the selected fuel. Falls
+ * back to returning the full list if no station in the batch has a price for
+ * that fuel — so users never see a mysteriously empty result set when the
+ * API simply doesn't carry that fuel's price for these rows.
  */
 function filterByFuel(stations, fuelKey) {
-  if (!fuelKey || !Array.isArray(stations)) return stations;
-  return stations.filter((station) => {
-    // Prices may be in station.prices (array) or station.fuels (object)
-    if (Array.isArray(station.prices)) {
-      return station.prices.some((p) => p.fuel_type === fuelKey);
-    }
-    if (station.fuels && typeof station.fuels === 'object') {
-      return fuelKey in station.fuels && station.fuels[fuelKey] != null;
-    }
-    // If the station carries a top-level price keyed by fuel type
-    if (station[fuelKey] != null) return true;
-    // No price data — keep the station so the user sees results exist
-    return true;
+  if (!fuelKey || !Array.isArray(stations) || stations.length === 0) return stations;
+  const field = PRICE_FIELD[fuelKey];
+  const withPrice = stations.filter((station) => {
+    if (station.prices && station.prices[fuelKey] != null) return true;
+    if (field && station[field] != null) return true;
+    return false;
   });
+  return withPrice.length > 0 ? withPrice : stations;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -54,11 +85,13 @@ function filterByFuel(stations, fuelKey) {
 const SearchScreen = ({ navigation }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [nearbyResults, setNearbyResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
   const [selectedFuel, setSelectedFuel] = useState('petrol');
   const debounceRef = useRef(null);
+  const { location } = useLocation();
 
   // ─── Search handler ──────────────────────────────────────────────────────────
 
@@ -71,14 +104,8 @@ const SearchScreen = ({ navigation }) => {
       setSearched(true);
       trackSearchPerformed({ query: searchQ, fuelType: selectedFuel });
       try {
-        // Pass selectedFuel as fuelType query param. The API endpoint at
-        // /api/v1/stations/search accepts an optional `fuelType` param.
-        // If the API ignores it, we still filter client-side below.
         const data = await searchStations(searchQ, { fuelType: selectedFuel });
-        const raw = data.stations || [];
-
-        // Client-side filter as a belt-and-braces fallback in case the API
-        // doesn't support the fuelType param yet.
+        const raw = (data.stations || []).map(normalizeStation);
         setResults(filterByFuel(raw, selectedFuel));
       } catch (err) {
         setError('Search failed. Please try again.');
@@ -89,7 +116,34 @@ const SearchScreen = ({ navigation }) => {
     [query, selectedFuel]
   );
 
-  // Re-filter (or re-search) when the fuel type changes while results are shown
+  // ─── Default to nearby stations (user location) when query is empty ──────────
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!location?.coords) return undefined;
+    if (query.trim()) return undefined;
+    const lat = location.coords.latitude;
+    const lon = location.coords.longitude;
+    if (lat == null || lon == null) return undefined;
+    (async () => {
+      try {
+        const data = await getNearbyStations({
+          lat,
+          lng: lon,
+          radiusKm: location.radiusKm || 5,
+          fuel: selectedFuel,
+        });
+        if (cancelled) return;
+        const raw = (data.stations || []).map(normalizeStation);
+        setNearbyResults(filterByFuel(raw, selectedFuel));
+      } catch (_err) {
+        if (!cancelled) setNearbyResults([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [location?.coords?.latitude, location?.coords?.longitude, location?.radiusKm, selectedFuel, query]);
+
+  // Re-search when fuel type changes while a query is active.
   useEffect(() => {
     if (searched && query.trim()) {
       handleSearch(query.trim());
@@ -200,7 +254,7 @@ const SearchScreen = ({ navigation }) => {
           </View>
         ) : (
           <FlatList
-            data={results}
+            data={searched ? results : nearbyResults}
             keyExtractor={(item) => item.id?.toString()}
             renderItem={({ item }) => (
               <StationCard
@@ -211,6 +265,11 @@ const SearchScreen = ({ navigation }) => {
             )}
             contentContainerStyle={styles.list}
             keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              !searched && nearbyResults.length > 0 ? (
+                <Text style={styles.sectionHeading}>Nearby stations</Text>
+              ) : null
+            }
             ListEmptyComponent={
               searched ? (
                 <View style={styles.emptyState}>
@@ -289,6 +348,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   retryBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 14 },
+  sectionHeading: {
+    fontSize: 12,
+    color: '#8B949E',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
   emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32 },
   emptyText: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 12 },
   emptySubtext: { fontSize: 13, color: '#555', textAlign: 'center', marginTop: 6 },
