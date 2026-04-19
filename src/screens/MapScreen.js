@@ -11,11 +11,19 @@ import {
   Easing,
   Platform,
 } from 'react-native';
-import MapView from 'react-native-maps';
+// Conditional import — react-native-maps doesn't support web
+let MapView;
+if (Platform.OS !== 'web') {
+  MapView = require('react-native-maps').default;
+}
 import { Ionicons } from '@expo/vector-icons';
 import useLocation from '../hooks/useLocation';
 import useStations from '../hooks/useStations';
-import StationMarker from '../components/StationMarker';
+// StationMarker also depends on react-native-maps
+let StationMarker;
+if (Platform.OS !== 'web') {
+  StationMarker = require('../components/StationMarker').default;
+}
 import { resolvePrice } from '../lib/quarantine';
 
 /**
@@ -175,7 +183,13 @@ export default function MapScreen({ navigation }) {
   // ── Render ────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Map fills the whole screen */}
+      {/* Map fills the whole screen — web fallback shows a message */}
+      {!MapView ? (
+        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }]}>
+          <Ionicons name="map-outline" size={48} color="#8B949E" />
+          <Text style={{ color: '#8B949E', marginTop: 12, fontSize: 14 }}>Map view is available on iOS and Android</Text>
+        </View>
+      ) : (
       <MapView
         style={StyleSheet.absoluteFill}
         initialRegion={initialRegion}
@@ -199,6 +213,7 @@ export default function MapScreen({ navigation }) {
           );
         })}
       </MapView>
+      )}
 
       {/* Safe-area overlay container — positioned at top */}
       <SafeAreaView style={styles.overlayTop} pointerEvents="box-none">
