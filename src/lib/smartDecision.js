@@ -16,6 +16,12 @@ const DEFAULT_MPG = 40;
 const LITRES_PER_GALLON = 4.54609;
 // Typical tank fill size (litres) used to scale savings.
 const DEFAULT_FILL_LITRES = 40;
+// Distance penalty per mile applied to the effective price so that local
+// results rank meaningfully higher.  0.5 means each extra mile adds the
+// equivalent of 0.5 price-units per litre to the score — enough to push
+// a station 7 miles away below a moderately pricier one nearby, while
+// still rewarding genuinely large savings.
+const DISTANCE_PENALTY_PER_MILE = 0.5;
 
 function toNum(v) {
   if (v == null) return null;
@@ -117,10 +123,12 @@ export function rankStationsByValue(stations, {
   fuelKey = 'petrol_price',
   mpg = DEFAULT_MPG,
   fillLitres = DEFAULT_FILL_LITRES,
+  distancePenalty = DISTANCE_PENALTY_PER_MILE,
 } = {}) {
   if (!Array.isArray(stations)) return [];
   const effMpg = toNum(mpg) || DEFAULT_MPG;
   const effFill = toNum(fillLitres) || DEFAULT_FILL_LITRES;
+  const penalty = toNum(distancePenalty) ?? DISTANCE_PENALTY_PER_MILE;
 
   return stations
     .map((station) => {
@@ -131,13 +139,19 @@ export function rankStationsByValue(stations, {
         return { ...station, _effectivePrice: Infinity, _hasPrice: false };
       }
 
+      // Fuel cost of the round-trip, amortised over a full tank
       const rtMiles = (miles || 0) * 2;
       const gallonsUsed = rtMiles / effMpg;
       const litresUsed = gallonsUsed * LITRES_PER_GALLON;
       const driveCost = litresUsed * price;
       const effectivePrice = price + driveCost / effFill;
 
-      return { ...station, _effectivePrice: effectivePrice, _hasPrice: true };
+      // Locality penalty: each mile adds `penalty` to the score so that
+      // nearby stations rank higher unless the price gap is large enough
+      // to justify the drive.
+      const score = effectivePrice + (miles || 0) * penalty;
+
+      return { ...station, _effectivePrice: score, _hasPrice: true };
     })
     .sort((a, b) => {
       if (a._hasPrice !== b._hasPrice) return a._hasPrice ? -1 : 1;
@@ -149,6 +163,7 @@ export const __constants = {
   DEFAULT_MPG,
   LITRES_PER_GALLON,
   DEFAULT_FILL_LITRES,
+  DISTANCE_PENALTY_PER_MILE,
 };
 
 export default {
