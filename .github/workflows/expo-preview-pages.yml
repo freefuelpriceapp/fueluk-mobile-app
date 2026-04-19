@@ -1,0 +1,44 @@
+name: Expo Web Preview -> GitHub Pages
+
+on:
+  push:
+    branches:
+      - 'ui/**'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Export web
+        run: npx expo export --platform web --output-dir dist
+      - name: Scope to branch/sha prefix
+        run: |
+          mkdir -p _publish/previews/${GITHUB_REF_NAME//\//__}-${GITHUB_SHA:0:7}
+          cp -r dist/. _publish/previews/${GITHUB_REF_NAME//\//__}-${GITHUB_SHA:0:7}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _publish
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -25,7 +25,9 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -35,7 +37,12 @@
       },
       "package": "com.freefuelpriceapp.uk",
       "versionCode": 1,
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "plugins": [
       [
@@ -56,7 +63,7 @@
     "extra": {
       "apiBaseUrl": "https://api.freefuelpriceapp.com",
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "__SET_BY_EAS_INIT__"
       }
     }
   }
