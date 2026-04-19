@@ -16,6 +16,7 @@ import StationCard from '../components/StationCard';
 import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 import useLocation from '../hooks/useLocation';
+import { rankStationsByValue } from '../lib/smartDecision';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,9 @@ const PRICE_FIELD = {
   super_unleaded: 'super_unleaded_price',
   premium_diesel: 'premium_diesel_price',
 };
+
+// Alias used by the smart-ranking helper.
+const FUEL_PRICE_KEY = PRICE_FIELD;
 
 /**
  * Normalize an API station row so it renders correctly in StationCard:
@@ -64,20 +68,15 @@ function normalizeStation(s) {
 }
 
 /**
- * Keep stations that have a resolvable price for the selected fuel. Falls
- * back to returning the full list if no station in the batch has a price for
- * that fuel — so users never see a mysteriously empty result set when the
- * API simply doesn't carry that fuel's price for these rows.
+ * Rank a list of raw stations for the currently selected fuel by effective
+ * price (pump price + amortised round-trip fuel cost). Stations without a
+ * price for that fuel are kept but pushed to the bottom.
  */
-function filterByFuel(stations, fuelKey) {
-  if (!fuelKey || !Array.isArray(stations) || stations.length === 0) return stations;
-  const field = PRICE_FIELD[fuelKey];
-  const withPrice = stations.filter((station) => {
-    if (station.prices && station.prices[fuelKey] != null) return true;
-    if (field && station[field] != null) return true;
-    return false;
-  });
-  return withPrice.length > 0 ? withPrice : stations;
+function rankForFuel(stations, fuelKey) {
+  if (!Array.isArray(stations) || stations.length === 0) return stations;
+  const field = FUEL_PRICE_KEY[fuelKey];
+  if (!field) return stations;
+  return rankStationsByValue(stations, { fuelKey: field });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,7 +105,7 @@ const SearchScreen = ({ navigation }) => {
       try {
         const data = await searchStations(searchQ, { fuelType: selectedFuel });
         const raw = (data.stations || []).map(normalizeStation);
-        setResults(filterByFuel(raw, selectedFuel));
+        setResults(rankForFuel(raw, selectedFuel));
       } catch (err) {
         setError('Search failed. Please try again.');
       } finally {
@@ -135,7 +134,7 @@ const SearchScreen = ({ navigation }) => {
         });
         if (cancelled) return;
         const raw = (data.stations || []).map(normalizeStation);
-        setNearbyResults(filterByFuel(raw, selectedFuel));
+        setNearbyResults(rankForFuel(raw, selectedFuel));
       } catch (_err) {
         if (!cancelled) setNearbyResults([]);
       }

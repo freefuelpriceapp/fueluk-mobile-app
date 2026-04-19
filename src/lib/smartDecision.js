@@ -100,6 +100,51 @@ export function worthTheDrive({
   };
 }
 
+/**
+ * Rank stations by "effective price" = pump price plus the fuel cost of
+ * driving there (round-trip), amortised over a typical fill volume.
+ *
+ * For each station:
+ *   rtMiles    = distance_miles * 2
+ *   litresUsed = (rtMiles / mpg) * LITRES_PER_GALLON
+ *   driveCost  = litresUsed * stationPrice       (same price-unit as input)
+ *   effective  = stationPrice + (driveCost / fillLitres)
+ *
+ * Stations with no price for `fuelKey` are kept but pushed to the bottom.
+ * Input array is not mutated.
+ */
+export function rankStationsByValue(stations, {
+  fuelKey = 'petrol_price',
+  mpg = DEFAULT_MPG,
+  fillLitres = DEFAULT_FILL_LITRES,
+} = {}) {
+  if (!Array.isArray(stations)) return [];
+  const effMpg = toNum(mpg) || DEFAULT_MPG;
+  const effFill = toNum(fillLitres) || DEFAULT_FILL_LITRES;
+
+  return stations
+    .map((station) => {
+      const price = toNum(station && station[fuelKey]);
+      const miles = toNum(station && station.distance_miles);
+
+      if (price === null) {
+        return { ...station, _effectivePrice: Infinity, _hasPrice: false };
+      }
+
+      const rtMiles = (miles || 0) * 2;
+      const gallonsUsed = rtMiles / effMpg;
+      const litresUsed = gallonsUsed * LITRES_PER_GALLON;
+      const driveCost = litresUsed * price;
+      const effectivePrice = price + driveCost / effFill;
+
+      return { ...station, _effectivePrice: effectivePrice, _hasPrice: true };
+    })
+    .sort((a, b) => {
+      if (a._hasPrice !== b._hasPrice) return a._hasPrice ? -1 : 1;
+      return a._effectivePrice - b._effectivePrice;
+    });
+}
+
 export const __constants = {
   DEFAULT_MPG,
   LITRES_PER_GALLON,
@@ -110,5 +155,6 @@ export default {
   driveCostPence,
   grossSavingsPence,
   worthTheDrive,
+  rankStationsByValue,
 };
 
