@@ -46,14 +46,22 @@ const StationMarker = ({ station, cheapestPrice, fuelType, onPress, isCheapest, 
   const markerBg = isCheapest ? '#16a34a' : isSelected ? fuelColor : '#1C2128';
   const arrowColor = isCheapest ? '#16a34a' : isSelected ? fuelColor : '#1C2128';
 
+  // Ensure coordinates are valid numbers — API may return strings.
+  const markerLat = Number(station.lat ?? station.latitude);
+  const markerLng = Number(station.lon ?? station.lng ?? station.longitude);
+
+  // Skip rendering if coordinates are not valid numbers.
+  if (!Number.isFinite(markerLat) || !Number.isFinite(markerLng)) {
+    return null;
+  }
+
   return (
     <Marker
       coordinate={{
-        latitude: station.lat ?? station.latitude,
-        longitude: station.lon ?? station.longitude,
+        latitude: markerLat,
+        longitude: markerLng,
       }}
       onPress={() => onPress && onPress(station)}
-      tracksViewChanges={false}
     >
       <View style={[styles.marker, { backgroundColor: markerBg, borderColor: isCheapest || isSelected ? markerBg : '#30363D' }]}>
         <Text style={[styles.priceText, { color: isCheapest || isSelected ? '#ffffff' : '#E6EDF3' }]}>
