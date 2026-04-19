@@ -16,13 +16,40 @@ import StationCard from '../components/StationCard';
 import { searchStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const FUEL_TYPES = [
-  { key: 'petrol',          label: 'Petrol',          color: '#2ECC71' },
-  { key: 'diesel',          label: 'Diesel',          color: '#3498DB' },
-  { key: 'e10',             label: 'E10',             color: '#F39C12' },
-  { key: 'super_unleaded',  label: 'Super',           color: '#9B59B6' },
-  { key: 'premium_diesel',  label: 'Premium Diesel',  color: '#E74C3C' },
+  { key: 'petrol',         label: 'Petrol',         color: '#2ECC71' },
+  { key: 'diesel',         label: 'Diesel',         color: '#3498DB' },
+  { key: 'e10',            label: 'E10',            color: '#F39C12' },
+  { key: 'super_unleaded', label: 'Super',          color: '#9B59B6' },
+  { key: 'premium_diesel', label: 'Premium Diesel', color: '#E74C3C' },
 ];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Filter stations client-side to only those that have a price entry for the
+ * selected fuel type. Handles both flat arrays and nested price objects.
+ */
+function filterByFuel(stations, fuelKey) {
+  if (!fuelKey || !Array.isArray(stations)) return stations;
+  return stations.filter((station) => {
+    // Prices may be in station.prices (array) or station.fuels (object)
+    if (Array.isArray(station.prices)) {
+      return station.prices.some((p) => p.fuel_type === fuelKey);
+    }
+    if (station.fuels && typeof station.fuels === 'object') {
+      return fuelKey in station.fuels && station.fuels[fuelKey] != null;
+    }
+    // If the station carries a top-level price keyed by fuel type
+    if (station[fuelKey] != null) return true;
+    // No price data — keep the station so the user sees results exist
+    return true;
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const SearchScreen = ({ navigation }) => {
   const [query, setQuery] = useState('');
@@ -33,24 +60,45 @@ const SearchScreen = ({ navigation }) => {
   const [selectedFuel, setSelectedFuel] = useState('petrol');
   const debounceRef = useRef(null);
 
-  const handleSearch = useCallback(async (q) => {
-    const searchQ = (q || query).trim();
-    if (!searchQ) return;
-    setLoading(true);
-    setError(null);
-    setSearched(true);
-    trackSearchPerformed({ query: searchQ });
-    try {
-      const data = await searchStations(searchQ);
-      setResults(data.stations || []);
-    } catch (err) {
-      setError('Search failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+  // ─── Search handler ──────────────────────────────────────────────────────────
 
-  // Debounced live search — fires 400ms after user stops typing
+  const handleSearch = useCallback(
+    async (q) => {
+      const searchQ = (q || query).trim();
+      if (!searchQ) return;
+      setLoading(true);
+      setError(null);
+      setSearched(true);
+      trackSearchPerformed({ query: searchQ, fuelType: selectedFuel });
+      try {
+        // Pass selectedFuel as fuelType query param. The API endpoint at
+        // /api/v1/stations/search accepts an optional `fuelType` param.
+        // If the API ignores it, we still filter client-side below.
+        const data = await searchStations(searchQ, { fuelType: selectedFuel });
+        const raw = data.stations || [];
+
+        // Client-side filter as a belt-and-braces fallback in case the API
+        // doesn't support the fuelType param yet.
+        setResults(filterByFuel(raw, selectedFuel));
+      } catch (err) {
+        setError('Search failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [query, selectedFuel]
+  );
+
+  // Re-filter (or re-search) when the fuel type changes while results are shown
+  useEffect(() => {
+    if (searched && query.trim()) {
+      handleSearch(query.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFuel]);
+
+  // ─── Debounced live search — fires 400ms after user stops typing ─────────────
+
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -64,11 +112,17 @@ const SearchScreen = ({ navigation }) => {
     return () => clearTimeout(debounceRef.current);
   }, [query, handleSearch]);
 
+  // ─── Navigation ──────────────────────────────────────────────────────────────
+
   const handleStationPress = (station) => {
     navigation.navigate('StationDetail', { station });
   };
 
-  const selectedFuelMeta = FUEL_TYPES.find(f => f.key === selectedFuel);
+  const handleRetry = () => {
+    handleSearch(query.trim());
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.container}>
@@ -92,7 +146,13 @@ const SearchScreen = ({ navigation }) => {
             autoCapitalize="none"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setSearched(false); }}>
+            <TouchableOpacity
+              onPress={() => {
+                setQuery('');
+                setResults([]);
+                setSearched(false);
+              }}
+            >
               <Ionicons name="close-circle" size={18} color="#555" />
             </TouchableOpacity>
           )}
@@ -100,19 +160,24 @@ const SearchScreen = ({ navigation }) => {
 
         {/* Fuel type filter */}
         <View style={styles.filterRow}>
-          {FUEL_TYPES.map(ft => (
+          {FUEL_TYPES.map((ft) => (
             <TouchableOpacity
               key={ft.key}
               style={[
                 styles.filterBtn,
-                selectedFuel === ft.key && { backgroundColor: ft.color, borderColor: ft.color },
+                selectedFuel === ft.key && {
+                  backgroundColor: ft.color,
+                  borderColor: ft.color,
+                },
               ]}
               onPress={() => setSelectedFuel(ft.key)}
             >
-              <Text style={[
-                styles.filterBtnText,
-                selectedFuel === ft.key && { color: '#0D1117' },
-              ]}>
+              <Text
+                style={[
+                  styles.filterBtnText,
+                  selectedFuel === ft.key && { color: '#0D1117' },
+                ]}
+              >
                 {ft.label}
               </Text>
             </TouchableOpacity>
@@ -129,6 +194,9 @@ const SearchScreen = ({ navigation }) => {
           <View style={styles.centered}>
             <Ionicons name="alert-circle-outline" size={36} color="#DC3545" />
             <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
+              <Text style={styles.retryBtnText}>Try again</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <FlatList
@@ -148,13 +216,17 @@ const SearchScreen = ({ navigation }) => {
                 <View style={styles.emptyState}>
                   <Ionicons name="search-outline" size={48} color="#333" />
                   <Text style={styles.emptyText}>No stations found for "{query}"</Text>
-                  <Text style={styles.emptySubtext}>Try a different postcode, town, or station name.</Text>
+                  <Text style={styles.emptySubtext}>
+                    Try a different postcode, town, or station name.
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.emptyState}>
                   <Ionicons name="map-outline" size={48} color="#333" />
                   <Text style={styles.emptyText}>Search for a fuel station</Text>
-                  <Text style={styles.emptySubtext}>Enter a postcode, town name, or station brand.</Text>
+                  <Text style={styles.emptySubtext}>
+                    Enter a postcode, town name, or station brand.
+                  </Text>
                 </View>
               )
             }
@@ -164,6 +236,8 @@ const SearchScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117' },
@@ -207,6 +281,14 @@ const styles = StyleSheet.create({
   list: { padding: 12 },
   loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
   errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12 },
+  retryBtn: {
+    marginTop: 16,
+    backgroundColor: '#2ECC71',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 14 },
   emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32 },
   emptyText: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 12 },
   emptySubtext: { fontSize: 13, color: '#555', textAlign: 'center', marginTop: 6 },

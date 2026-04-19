@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { getAlerts, deleteAlert } from '../api/fuelApi';
+import { COLORS } from '../lib/theme';
 import * as Notifications from 'expo-notifications';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
@@ -99,7 +100,7 @@ const AlertsScreen = () => {
 
   const formatPrice = (pence) => {
     if (pence == null) return 'N/A';
-    return `${(pence / 100).toFixed(1)}p`;
+    return `${Number(pence).toFixed(1)}p`;
   };
 
   const renderAlert = ({ item }) => (
@@ -178,7 +179,7 @@ const AlertsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   loader: { marginTop: 60 },
   listHeader: { padding: 20, paddingBottom: 8 },
   listHeaderTitle: { fontSize: 20, fontWeight: '700', color: '#E6EDF3', marginBottom: 4 },

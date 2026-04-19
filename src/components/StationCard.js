@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolvePrice } from '../lib/quarantine';
+import { getFreshness, FRESHNESS_COLOR, formatSource } from '../lib/trust';
+import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -13,59 +16,10 @@ const FUEL_LABELS = {
   premium_diesel: 'Premium Diesel',
 };
 
-const FUEL_COLORS = {
-  petrol: '#2ECC71',
-  diesel: '#3498DB',
-  e10: '#F39C12',
-  super_unleaded: '#9B59B6',
-  premium_diesel: '#E74C3C',
-};
-
-/** Safely coerce a value to a number, returning null if not numeric. */
-function toNum(v) {
-  if (v == null) return null;
-  const n = typeof v === 'number' ? v : parseFloat(v);
-  return isNaN(n) ? null : n;
-}
-
-/** Map from fuelType key to the flat API field name */
-const PRICE_FIELD = {
-  petrol: 'petrol_price',
-  diesel: 'diesel_price',
-  e10: 'e10_price',
-  super_unleaded: 'super_unleaded_price',
-  premium_diesel: 'premium_diesel_price',
-};
-
-function formatFreshness(updatedAt) {
-  if (!updatedAt) return null;
-  const diffMs = Date.now() - new Date(updatedAt).getTime();
-  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-  if (diffHrs < 1) return 'Updated just now';
-  if (diffHrs < 24) return `Updated ${diffHrs}h ago`;
-  const diffDays = Math.floor(diffHrs / 24);
-    if (diffDays >= 7) return 'Price may be outdated';
-  return `Updated ${diffDays}d ago`;
-}
-
 function formatDistance(km) {
   if (km == null) return null;
   if (km < 1) return `${Math.round(km * 1000)}m`;
   return `${km.toFixed(1)}km`;
-}
-
-/**
- * Resolve price for a given fuel type from a station object.
- * Checks prices[fuelType] first (normalised object), then falls back to
- * the flat API field (e.g. station.petrol_price).
- */
-function resolvePrice(station, fuelType) {
-  const prices = station.prices || {};
-  const fromPrices = toNum(prices[fuelType]);
-  if (fromPrices !== null) return fromPrices;
-  const field = PRICE_FIELD[fuelType];
-  if (field) return toNum(station[field]);
-  return null;
 }
 
 const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
@@ -76,6 +30,8 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
     address,
     distance_km,
     last_updated,
+    updated_at,
+    source,
   } = station;
 
   const [isFavourite, setIsFavourite] = useState(false);
@@ -104,9 +60,16 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
   };
 
   const selectedPrice = resolvePrice(station, fuelType);
-  const selectedColor = FUEL_COLORS[fuelType] ?? '#2ECC71';
-  const freshnessLabel = formatFreshness(last_updated);
+  const selectedColor = FUEL_COLORS[fuelType] ?? COLORS.accent;
   const distanceLabel = formatDistance(distance_km);
+
+  // Trust / freshness
+  const freshness = getFreshness(last_updated || updated_at);
+  const freshnessColor = FRESHNESS_COLOR[freshness.tier] ?? FRESHNESS_COLOR.unknown;
+  const sourceLabel = source ? formatSource(source) : null;
+  const trustLine = sourceLabel
+    ? `${freshness.label} · ${sourceLabel}`
+    : freshness.label;
 
   // Build other-fuel entries
   const otherFuels = Object.keys(FUEL_LABELS)
@@ -123,7 +86,7 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
         <View style={styles.topRight}>
           {distanceLabel ? (
             <View style={styles.distanceBadge}>
-              <Ionicons name="navigate-outline" size={11} color="#888" />
+              <Ionicons name="navigate-outline" size={11} color={COLORS.textSecondary} />
               <Text style={styles.distanceText}>{distanceLabel}</Text>
             </View>
           ) : null}
@@ -135,7 +98,7 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
             <Ionicons
               name={isFavourite ? 'heart' : 'heart-outline'}
               size={18}
-              color={isFavourite ? '#E74C3C' : '#555'}
+              color={isFavourite ? COLORS.error : '#555'}
             />
           </TouchableOpacity>
         </View>
@@ -161,46 +124,44 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
         {/* Other fuel prices at smaller size */}
         <View style={styles.otherPrices}>
           {otherFuels.map(({ ft, ppl }) => (
-              <View key={ft} style={styles.otherChip}>
-                <Text style={styles.otherFuelLabel}>{FUEL_LABELS[ft] ?? ft}</Text>
-                <Text style={styles.otherPrice}>
-                  {ppl !== null ? `${ppl.toFixed(1)}p` : 'N/A'}
-                </Text>
-              </View>
-            ))}
+            <View key={ft} style={styles.otherChip}>
+              <Text style={styles.otherFuelLabel}>{FUEL_LABELS[ft] ?? ft}</Text>
+              <Text style={styles.otherPrice}>
+                {ppl !== null ? `${ppl.toFixed(1)}p` : 'N/A'}
+              </Text>
+            </View>
+          ))}
         </View>
       </View>
 
-      {/* Freshness signal */}
-      {freshnessLabel ? (
-        <View style={styles.freshnessRow}>
-          <Ionicons name="time-outline" size={11} color="#555" />
-          <Text style={styles.freshnessText}>{freshnessLabel}</Text>
-        </View>
-      ) : null}
+      {/* Trust line: freshness + source */}
+      <View style={styles.freshnessRow}>
+        <Ionicons name="time-outline" size={11} color={freshnessColor} />
+        <Text style={[styles.freshnessText, { color: freshnessColor }]}>{trustLine}</Text>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.card,
     borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    padding: SPACING.lg,
+    marginBottom: SPACING.sm + 2,
     borderWidth: 1,
-    borderColor: '#2a2a45',
+    borderColor: COLORS.border,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   brand: {
-    fontSize: 11,
+    fontSize: FONT_SIZES.xs,
     fontWeight: '700',
-    color: '#888',
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     flex: 1,
@@ -216,46 +177,46 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   distanceText: {
-    fontSize: 11,
-    color: '#888',
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
   },
   favBtn: {
     padding: 2,
   },
   name: {
-    fontSize: 15,
+    fontSize: FONT_SIZES.lg - 1,
     fontWeight: '700',
-    color: '#ffffff',
+    color: COLORS.text,
     marginBottom: 2,
   },
   address: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.sm,
     color: '#666',
-    marginBottom: 10,
+    marginBottom: SPACING.sm + 2,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   primaryPriceBadge: {
     borderRadius: 10,
     borderWidth: 1.5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm - 2,
     alignItems: 'center',
     minWidth: 72,
   },
   primaryFuelLabel: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#888',
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   primaryPrice: {
-    fontSize: 20,
+    fontSize: FONT_SIZES.xl,
     fontWeight: '800',
     marginTop: 1,
   },
@@ -266,10 +227,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   otherChip: {
-    backgroundColor: '#0d0d1a',
+    backgroundColor: COLORS.background,
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
     alignItems: 'center',
   },
   otherFuelLabel: {
@@ -279,7 +240,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   otherPrice: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.md - 1,
     fontWeight: '600',
     color: '#aaa',
     marginTop: 1,
@@ -290,8 +251,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   freshnessText: {
-    fontSize: 11,
-    color: '#555',
+    fontSize: FONT_SIZES.xs,
   },
 });
 

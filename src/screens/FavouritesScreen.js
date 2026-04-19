@@ -8,9 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS, FUEL_COLORS } from '../lib/theme';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -60,66 +62,88 @@ export default function FavouritesScreen({ navigation }) {
     );
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('StationDetail', { station: item })}
-      activeOpacity={0.85}
-    >
-      <View style={styles.cardLeft}>
-        <Text style={styles.stationName} numberOfLines={1}>
-          {item.brand || 'Station'}
-        </Text>
-        <Text style={styles.stationAddress} numberOfLines={2}>
-          {item.address || item.postcode || 'Address unavailable'}
-        </Text>
-        <View style={styles.priceRow}>
-          {item.petrol_price_pence ? (
-            <View style={styles.priceBadge}>
-              <Text style={styles.priceLabel}>Petrol</Text>
-              <Text style={styles.priceValue}>{(item.petrol_price_pence / 100).toFixed(2)}p</Text>
-            </View>
-          ) : null}
-          {item.diesel_price_pence ? (
-            <View style={[styles.priceBadge, styles.dieselBadge]}>
-              <Text style={styles.priceLabel}>Diesel</Text>
-              <Text style={styles.priceValue}>{(item.diesel_price_pence / 100).toFixed(2)}p</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
+  const renderItem = ({ item }) => {
+    // Prices are stored in item.prices.{petrol,diesel,e10} (set by HomeScreen)
+    const petrolPrice = item.prices?.petrol ?? null;
+    const dieselPrice = item.prices?.diesel ?? null;
+    const e10Price    = item.prices?.e10    ?? null;
+
+    // Prefer station name; fall back to brand if name is absent
+    const displayName = item.name || item.brand || 'Station';
+
+    return (
       <TouchableOpacity
-        style={styles.removeBtn}
-        onPress={() => removeFavourite(item.id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={styles.card}
+        onPress={() => navigation.navigate('StationDetail', { station: item })}
+        activeOpacity={0.85}
       >
-        <Ionicons name="heart" size={24} color="#e74c3c" />
+        <View style={styles.cardLeft}>
+          <Text style={styles.stationName} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.stationAddress} numberOfLines={2}>
+            {item.address || item.postcode || 'Address unavailable'}
+          </Text>
+          <View style={styles.priceRow}>
+            {petrolPrice != null ? (
+              <View style={[styles.priceBadge, { borderColor: FUEL_COLORS.petrol }]}>
+                <Text style={styles.priceLabel}>Petrol</Text>
+                <Text style={[styles.priceValue, { color: FUEL_COLORS.petrol }]}>
+                  {petrolPrice.toFixed(1)}p
+                </Text>
+              </View>
+            ) : null}
+            {dieselPrice != null ? (
+              <View style={[styles.priceBadge, { borderColor: FUEL_COLORS.diesel }]}>
+                <Text style={styles.priceLabel}>Diesel</Text>
+                <Text style={[styles.priceValue, { color: FUEL_COLORS.diesel }]}>
+                  {dieselPrice.toFixed(1)}p
+                </Text>
+              </View>
+            ) : null}
+            {e10Price != null ? (
+              <View style={[styles.priceBadge, { borderColor: FUEL_COLORS.e10 }]}>
+                <Text style={styles.priceLabel}>E10</Text>
+                <Text style={[styles.priceValue, { color: FUEL_COLORS.e10 }]}>
+                  {e10Price.toFixed(1)}p
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.removeBtn}
+          onPress={() => removeFavourite(item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="heart" size={24} color={COLORS.error} />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2ECC71" />
-      </View>
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.accent} />
+      </SafeAreaView>
     );
   }
 
   if (favourites.length === 0) {
     return (
-      <View style={styles.emptyState}>
+      <SafeAreaView style={styles.emptyState}>
         <Ionicons name="heart-outline" size={64} color="#444" />
         <Text style={styles.emptyTitle}>No Favourites Yet</Text>
         <Text style={styles.emptySubtext}>
           Save stations you visit often by tapping the heart icon on any station.
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={favourites}
         keyExtractor={(item) => String(item.id)}
@@ -132,24 +156,24 @@ export default function FavouritesScreen({ navigation }) {
               setRefreshing(true);
               loadFavourites();
             }}
-            tintColor="#2ECC71"
+            tintColor={COLORS.accent}
           />
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d1a',
+    backgroundColor: COLORS.background,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0d0d1a',
+    backgroundColor: COLORS.background,
   },
   list: {
     padding: 12,
@@ -170,7 +194,7 @@ const styles = StyleSheet.create({
   stationName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#ffffff',
+    color: COLORS.text,
     marginBottom: 4,
   },
   stationAddress: {
@@ -181,29 +205,24 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   priceBadge: {
-    backgroundColor: '#0d2d1a',
+    backgroundColor: COLORS.background,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2ECC71',
-  },
-  dieselBadge: {
-    backgroundColor: '#1a1a0d',
-    borderColor: '#f39c12',
   },
   priceLabel: {
     fontSize: 10,
-    color: '#888',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   priceValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2ECC71',
   },
   removeBtn: {
     padding: 8,
@@ -212,19 +231,19 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d0d1a',
+    backgroundColor: COLORS.background,
     paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
+    color: COLORS.text,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#888',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 21,
   },
