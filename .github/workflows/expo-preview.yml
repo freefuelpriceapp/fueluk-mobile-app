@@ -1,0 +1,50 @@
+name: Expo Preview (ui/** branches)
+
+on:
+  push:
+    branches:
+      - 'ui/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: expo-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Publish EAS Update + Web Export
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'ui/'))
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Publish EAS Update (OTA)
+        uses: expo/expo-github-action/preview@v8
+        with:
+          command: update --branch ${{ github.head_ref || github.ref_name }} --message "${{ github.event.head_commit.message || github.event.pull_request.title }}" --non-interactive
+          comment: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Export web
+        run: npx expo export --platform web --output-dir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-preview-${{ github.ref_name }}-${{ github.sha }}
+          path: dist
+          retention-days: 14
