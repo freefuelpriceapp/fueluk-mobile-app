@@ -12,18 +12,30 @@
 export const COLORS = {
   background:      '#0D1117',
   surface:         '#161B22',
+  surfaceAlt:      '#1a1a2e',   // legacy header surface colour
   card:            '#1C2128',
   border:          '#30363D',
+  borderSubtle:    '#21262D',
+  borderAlt:       '#2a2a45',
   text:            '#E6EDF3',
   textSecondary:   '#8B949E',
+  textMuted:       '#555',
+  textDisabled:    '#444',
+  white:           '#FFFFFF',
   accent:          '#2ECC71',
-  warning:         '#F59E0B',
+  warning:         '#F39C12',
+  warningAlt:      '#F59E0B',
   error:           '#E74C3C',
+  danger:          '#DC3545',
+  dangerAlt:       '#F85149',
   petrol:          '#2ECC71',
   diesel:          '#3498DB',
-  e10:             '#f39c12',
+  e10:             '#F39C12',
   superUnleaded:   '#9B59B6',
   premiumDiesel:   '#E74C3C',
+  overlay:         'rgba(0,0,0,0.7)',
+  bannerWarning:   '#2a2200',
+  bannerDanger:    '#220000',
 };
 
 // ─── Fuel color map (keyed by fuel type string) ───────────────────────────────

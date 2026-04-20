@@ -26,18 +26,21 @@ import { NetworkErrorState } from '../components/TrustStates';
 import { FEATURES } from '../lib/featureFlags';
 import { getFreshness, FRESHNESS_COLOR, formatSource } from '../lib/trust';
 import { worthTheDrive } from '../lib/smartDecision';
+import { lightHaptic, mediumHaptic, successHaptic } from '../lib/haptics';
+import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Alias that preserves the original field names used throughout this file.
 const COLORS = {
-  background: '#0D1117',
-  surface: '#161B22',
-  card: '#1C2128',
-  text: '#E6EDF3',
-  accent: '#2ECC71',
-  border: '#21262D',
-  muted: '#8B949E',
-  danger: '#E74C3C',
+  background: THEME_COLORS.background,
+  surface: THEME_COLORS.surface,
+  card: THEME_COLORS.card,
+  text: THEME_COLORS.text,
+  accent: THEME_COLORS.accent,
+  border: THEME_COLORS.borderSubtle,
+  muted: THEME_COLORS.textSecondary,
+  danger: THEME_COLORS.error,
 };
 
 // Fuel display config — drives which rows render in the fuel section and the
@@ -48,10 +51,10 @@ const COLORS = {
 //   B7         → diesel_price          (Diesel)
 //   B7_PREMIUM → premium_diesel_price  (Premium Diesel)
 const FUEL_DISPLAY = [
-  { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Unleaded (E10)', color: '#2ECC71' },
-  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Super Unleaded (E5)', color: '#9B59B6' },
-  { key: 'diesel', field: 'diesel_price', sourceField: 'diesel_source', label: 'Diesel', color: '#3498DB' },
-  { key: 'premiumDiesel', field: 'premium_diesel_price', sourceField: 'premium_diesel_source', label: 'Premium Diesel', color: '#E74C3C' },
+  { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Unleaded (E10)', color: THEME_FUEL_COLORS.e10 },
+  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Super Unleaded (E5)', color: THEME_FUEL_COLORS.super_unleaded },
+  { key: 'diesel', field: 'diesel_price', sourceField: 'diesel_source', label: 'Diesel', color: THEME_FUEL_COLORS.diesel },
+  { key: 'premiumDiesel', field: 'premium_diesel_price', sourceField: 'premium_diesel_source', label: 'Premium Diesel', color: THEME_FUEL_COLORS.premium_diesel },
 ];
 
 const FUEL_LABELS = FUEL_DISPLAY.reduce((acc, f) => { acc[f.key] = f.label; return acc; }, {});
@@ -67,10 +70,10 @@ const FAVOURITES_KEY = 'user_favourites';
 
 // Verdict colours for "Worth the Drive?" card
 const VERDICT_COLORS = {
-  save: '#2ECC71',
-  lose: '#E74C3C',
-  break_even: '#F39C12',
-  unknown: '#8B949E',
+  save: THEME_COLORS.accent,
+  lose: THEME_COLORS.error,
+  break_even: THEME_COLORS.warning,
+  unknown: THEME_COLORS.textSecondary,
 };
 
 const VERDICT_ICONS = {
@@ -254,7 +257,10 @@ export default function StationDetailScreen({ route }) {
       try {
         const raw = await AsyncStorage.getItem(FAVOURITES_KEY);
         const saved = raw ? JSON.parse(raw) : [];
-        setIsFavourite(Array.isArray(saved) && saved.includes(station.id));
+        if (!Array.isArray(saved)) { setIsFavourite(false); return; }
+        setIsFavourite(
+          saved.some((s) => (typeof s === 'object' ? s?.id === station.id : s === station.id))
+        );
       } catch {
         // Non-critical — default to not favourited
       }
@@ -266,6 +272,7 @@ export default function StationDetailScreen({ route }) {
   const toggleFavourite = async () => {
     const next = !isFavourite;
     setIsFavourite(next);
+    mediumHaptic();
 
     // Scale bounce
     Animated.sequence([
@@ -276,9 +283,33 @@ export default function StationDetailScreen({ route }) {
     try {
       const raw = await AsyncStorage.getItem(FAVOURITES_KEY);
       const saved = raw ? JSON.parse(raw) : [];
-      const updated = next
-        ? [...new Set([...saved, station.id])]
-        : saved.filter((id) => id !== station.id);
+      // Normalise: strip legacy ID-only entries; keep only objects.
+      const normalised = Array.isArray(saved)
+        ? saved.filter((s) => s && typeof s === 'object' && s.id != null)
+        : [];
+      const stationSnapshot = {
+        id: station.id,
+        name: station.name,
+        brand: station.brand,
+        address: station.address,
+        postcode: station.postcode,
+        petrol_price: station.petrol_price,
+        diesel_price: station.diesel_price,
+        e10_price: station.e10_price,
+        super_unleaded_price: station.super_unleaded_price,
+        premium_diesel_price: station.premium_diesel_price,
+        distance_km: station.distance_km,
+        last_updated: station.last_updated,
+        prices: station.prices || {
+          petrol: station.petrol_price ?? null,
+          diesel: station.diesel_price ?? null,
+          e10: station.e10_price ?? null,
+          super_unleaded: station.super_unleaded_price ?? null,
+          premium_diesel: station.premium_diesel_price ?? null,
+        },
+      };
+      const withoutCurrent = normalised.filter((s) => s.id !== station.id);
+      const updated = next ? [...withoutCurrent, stationSnapshot] : withoutCurrent;
       await AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify(updated));
     } catch {
       // Revert optimistic update on storage failure
@@ -318,7 +349,7 @@ export default function StationDetailScreen({ route }) {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadData().then(lightHaptic);
   };
 
   // ─── Alert modal ─────────────────────────────────────────────────────────────
@@ -353,6 +384,7 @@ export default function StationDetailScreen({ route }) {
         platform: Platform.OS,
       });
       setAlertModalVisible(false);
+      successHaptic();
       Alert.alert(
         'Alert set!',
         `You'll be notified when ${FUEL_LABELS[alertFuelType]} drops below ${threshold}p at this station.`
@@ -495,12 +527,12 @@ export default function StationDetailScreen({ route }) {
         {/* Closure banners */}
         {station?.permanent_closure ? (
           <View style={styles.closureBanner}>
-            <Ionicons name="close-circle" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+            <Ionicons name="close-circle" size={18} color={THEME_COLORS.white} style={{ marginRight: 8 }} />
             <Text style={styles.closureText}>Permanently Closed</Text>
           </View>
         ) : station?.temporary_closure ? (
           <View style={styles.closureBanner}>
-            <Ionicons name="warning" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+            <Ionicons name="warning" size={18} color={THEME_COLORS.white} style={{ marginRight: 8 }} />
             <Text style={styles.closureText}>Temporarily Closed</Text>
           </View>
         ) : null}
@@ -540,7 +572,7 @@ export default function StationDetailScreen({ route }) {
             onPress={() => openDirections(station)}
             activeOpacity={0.82}
           >
-            <Ionicons name="navigate-outline" size={18} color="#ffffff" style={styles.directionsIcon} />
+            <Ionicons name="navigate-outline" size={18} color={THEME_COLORS.white} style={styles.directionsIcon} />
             <Text style={styles.directionsBtnText}>Get Directions</Text>
           </TouchableOpacity>
         </View>
@@ -722,7 +754,7 @@ const styles = StyleSheet.create({
   },
   directionsIcon: { marginRight: 8 },
   directionsBtnText: {
-    color: '#ffffff',
+    color: THEME_COLORS.white,
     fontWeight: '700',
     fontSize: 15,
   },
@@ -795,12 +827,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   historyDate: { fontSize: 12, color: COLORS.muted },
-  historyPrice: { fontSize: 12, color: '#aaa' },
+  historyPrice: { fontSize: 12, color: THEME_COLORS.textSecondary },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: THEME_COLORS.overlay,
     justifyContent: 'flex-end',
   },
   modalCard: {
@@ -833,7 +865,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: THEME_COLORS.border,
     alignItems: 'center',
     marginRight: 6,
   },
@@ -844,7 +876,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: THEME_COLORS.border,
     alignItems: 'center',
     marginRight: 8,
   },
@@ -872,7 +904,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   closureText: {
-    color: '#ffffff',
+    color: THEME_COLORS.white,
     fontWeight: '700',
     fontSize: 14,
   },

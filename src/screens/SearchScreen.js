@@ -5,7 +5,6 @@ import {
   TextInput,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
   SafeAreaView,
   KeyboardAvoidingView,
@@ -13,19 +12,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StationCard from '../components/StationCard';
+import { SkeletonList } from '../components/SkeletonCard';
 import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 import useLocation from '../hooks/useLocation';
 import { rankStationsByValue } from '../lib/smartDecision';
+import { COLORS, FUEL_COLORS } from '../lib/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FUEL_TYPES = [
-  { key: 'petrol',         label: 'Petrol',         color: '#2ECC71' },
-  { key: 'diesel',         label: 'Diesel',         color: '#3498DB' },
-  { key: 'e10',            label: 'E10',            color: '#F39C12' },
-  { key: 'super_unleaded', label: 'Super',          color: '#9B59B6' },
-  { key: 'premium_diesel', label: 'Premium Diesel', color: '#E74C3C' },
+  { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
+  { key: 'diesel',         label: 'Diesel',         color: FUEL_COLORS.diesel },
+  { key: 'e10',            label: 'E10',            color: FUEL_COLORS.e10 },
+  { key: 'super_unleaded', label: 'Super',          color: FUEL_COLORS.super_unleaded },
+  { key: 'premium_diesel', label: 'Premium Diesel', color: FUEL_COLORS.premium_diesel },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ const SearchScreen = ({ navigation }) => {
           <TextInput
             style={styles.searchInput}
             placeholder="Town, postcode or station name..."
-            placeholderTextColor="#555"
+            placeholderTextColor={COLORS.textMuted}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => handleSearch()}
@@ -206,7 +207,7 @@ const SearchScreen = ({ navigation }) => {
                 setSearched(false);
               }}
             >
-              <Ionicons name="close-circle" size={18} color="#555" />
+              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -228,7 +229,7 @@ const SearchScreen = ({ navigation }) => {
               <Text
                 style={[
                   styles.filterBtnText,
-                  selectedFuel === ft.key && { color: '#0D1117' },
+                  selectedFuel === ft.key && { color: COLORS.background },
                 ]}
               >
                 {ft.label}
@@ -239,13 +240,10 @@ const SearchScreen = ({ navigation }) => {
 
         {/* Results */}
         {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#2ECC71" />
-            <Text style={styles.loadingText}>Searching...</Text>
-          </View>
+          <SkeletonList count={4} />
         ) : error ? (
           <View style={styles.centered}>
-            <Ionicons name="alert-circle-outline" size={36} color="#DC3545" />
+            <Ionicons name="alert-circle-outline" size={36} color={COLORS.danger} />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
               <Text style={styles.retryBtnText}>Try again</Text>
@@ -272,7 +270,7 @@ const SearchScreen = ({ navigation }) => {
             ListEmptyComponent={
               searched ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="search-outline" size={48} color="#333" />
+                  <Ionicons name="search-outline" size={48} color={COLORS.textDisabled} />
                   <Text style={styles.emptyText}>No stations found for "{query}"</Text>
                   <Text style={styles.emptySubtext}>
                     Try a different postcode, town, or station name.
@@ -280,7 +278,7 @@ const SearchScreen = ({ navigation }) => {
                 </View>
               ) : (
                 <View style={styles.emptyState}>
-                  <Ionicons name="map-outline" size={48} color="#333" />
+                  <Ionicons name="map-outline" size={48} color={COLORS.textDisabled} />
                   <Text style={styles.emptyText}>Search for a fuel station</Text>
                   <Text style={styles.emptySubtext}>
                     Enter a postcode, town name, or station brand.
@@ -298,12 +296,12 @@ const SearchScreen = ({ navigation }) => {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.surfaceAlt,
     margin: 12,
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -315,14 +313,14 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#ffffff',
+    color: COLORS.white,
   },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 12,
     paddingBottom: 10,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.surfaceAlt,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
@@ -337,19 +335,18 @@ const styles = StyleSheet.create({
   },
   filterBtnText: { fontSize: 12, fontWeight: '600', color: '#888' },
   list: { padding: 12 },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#888' },
-  errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12 },
+  errorText: { fontSize: 14, color: COLORS.danger, textAlign: 'center', marginTop: 12 },
   retryBtn: {
     marginTop: 16,
-    backgroundColor: '#2ECC71',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  retryBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 14 },
+  retryBtnText: { color: COLORS.background, fontWeight: '700', fontSize: 14 },
   sectionHeading: {
     fontSize: 12,
-    color: '#8B949E',
+    color: COLORS.textSecondary,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -358,7 +355,7 @@ const styles = StyleSheet.create({
   },
   emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32 },
   emptyText: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 12 },
-  emptySubtext: { fontSize: 13, color: '#555', textAlign: 'center', marginTop: 6 },
+  emptySubtext: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 6 },
 });
 
 export default SearchScreen;

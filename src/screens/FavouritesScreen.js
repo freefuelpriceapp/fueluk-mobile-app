@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
+import { lightHaptic, mediumHaptic } from '../lib/haptics';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -25,7 +26,11 @@ export default function FavouritesScreen({ navigation }) {
     try {
       const stored = await AsyncStorage.getItem(FAVOURITES_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
-      setFavourites(parsed);
+      // Filter out legacy ID-only entries (pre-bugfix) — they lack price/name data.
+      const normalised = Array.isArray(parsed)
+        ? parsed.filter((s) => s && typeof s === 'object' && s.id != null)
+        : [];
+      setFavourites(normalised);
     } catch (err) {
       console.error('Failed to load favourites:', err);
     } finally {
@@ -53,6 +58,7 @@ export default function FavouritesScreen({ navigation }) {
               const updated = favourites.filter((s) => s.id !== stationId);
               await AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify(updated));
               setFavourites(updated);
+              mediumHaptic();
             } catch (err) {
               Alert.alert('Error', 'Could not remove favourite.');
             }
@@ -133,10 +139,11 @@ export default function FavouritesScreen({ navigation }) {
   if (favourites.length === 0) {
     return (
       <SafeAreaView style={styles.emptyState}>
-        <Ionicons name="heart-outline" size={64} color="#444" />
+        <Ionicons name="heart-outline" size={64} color={COLORS.textDisabled} />
         <Text style={styles.emptyTitle}>No Favourites Yet</Text>
         <Text style={styles.emptySubtext}>
           Save stations you visit often by tapping the heart icon on any station.
+          Favourites stay in sync on this device, even when you're offline.
         </Text>
       </SafeAreaView>
     );
@@ -154,7 +161,7 @@ export default function FavouritesScreen({ navigation }) {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              loadFavourites();
+              loadFavourites().then(lightHaptic);
             }}
             tintColor={COLORS.accent}
           />
@@ -179,14 +186,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   card: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a2a45',
+    borderColor: COLORS.borderAlt,
   },
   cardLeft: {
     flex: 1,
@@ -199,7 +206,7 @@ const styles = StyleSheet.create({
   },
   stationAddress: {
     fontSize: 13,
-    color: '#aaa',
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   priceRow: {

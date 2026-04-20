@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolvePrice, evaluateStation } from '../lib/quarantine';
@@ -10,6 +10,7 @@ import {
   getSourceDotColor,
 } from '../lib/trust';
 import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
+import { mediumHaptic } from '../lib/haptics';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -56,8 +57,9 @@ function getSourceShortLabel(rawSource) {
 
 function formatDistance(km) {
   if (km == null) return null;
-  if (km < 1) return `${Math.round(km * 1000)}m`;
-  return `${km.toFixed(1)}km`;
+  const miles = km * 0.621371;
+  if (miles < 0.1) return null;
+  return `${miles.toFixed(1)} mi`;
 }
 
 const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
@@ -73,13 +75,17 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
   } = station;
 
   const [isFavourite, setIsFavourite] = useState(false);
+  const pressScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let mounted = true;
     AsyncStorage.getItem(FAVOURITES_KEY).then((stored) => {
       if (!mounted) return;
       const favs = stored ? JSON.parse(stored) : [];
-      setIsFavourite(favs.some((s) => s.id === id));
+      setIsFavourite(
+        Array.isArray(favs) &&
+        favs.some((s) => (typeof s === 'object' ? s?.id === id : s === id))
+      );
     });
     return () => { mounted = false; };
   }, [id]);
@@ -87,14 +93,36 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
   const toggleFavourite = async (e) => {
     e.stopPropagation?.();
     const stored = await AsyncStorage.getItem(FAVOURITES_KEY);
-    let favs = stored ? JSON.parse(stored) : [];
+    const parsed = stored ? JSON.parse(stored) : [];
+    // Strip legacy ID-only entries; keep objects.
+    let favs = Array.isArray(parsed)
+      ? parsed.filter((s) => s && typeof s === 'object' && s.id != null)
+      : [];
     if (isFavourite) {
       favs = favs.filter((s) => s.id !== id);
     } else {
-      favs.push(station);
+      favs = [...favs.filter((s) => s.id !== id), station];
     }
     await AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify(favs));
     setIsFavourite(!isFavourite);
+    mediumHaptic();
+  };
+
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 0,
+    }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 6,
+    }).start();
   };
 
   const selectedPrice = resolvePrice(station, fuelType);
@@ -152,10 +180,16 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
       borderLeftWidth: 3,
       borderLeftColor: freshnessColor,
     },
+    { transform: [{ scale: pressScale }] },
   ];
 
   return (
-    <TouchableOpacity style={cardStyle} onPress={onPress} activeOpacity={0.78}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+    <Animated.View style={cardStyle}>
       {/* Top row: brand + distance + favourite */}
       <View style={styles.topRow}>
         <Text style={styles.brand}>{brand ?? 'Unknown'}</Text>
@@ -174,7 +208,7 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
             <Ionicons
               name={isFavourite ? 'heart' : 'heart-outline'}
               size={18}
-              color={isFavourite ? COLORS.error : '#555'}
+              color={isFavourite ? COLORS.error : COLORS.textMuted}
             />
           </TouchableOpacity>
         </View>
@@ -254,7 +288,8 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
           {trustLine}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Animated.View>
+    </Pressable>
   );
 };
 
@@ -306,7 +341,7 @@ const styles = StyleSheet.create({
   },
   address: {
     fontSize: FONT_SIZES.sm,
-    color: '#666',
+    color: COLORS.textMuted,
     marginBottom: SPACING.sm + 2,
   },
   priceRow: {
@@ -357,7 +392,7 @@ const styles = StyleSheet.create({
   },
   quarantineLabel: {
     fontSize: 9,
-    color: '#F39C12',
+    color: COLORS.warning,
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -385,14 +420,14 @@ const styles = StyleSheet.create({
   },
   otherFuelLabel: {
     fontSize: 9,
-    color: '#666',
+    color: COLORS.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   otherPrice: {
     fontSize: FONT_SIZES.md - 1,
     fontWeight: '600',
-    color: '#aaa',
+    color: COLORS.textSecondary,
     marginTop: 1,
   },
   freshnessRow: {

@@ -15,8 +15,10 @@ import FavouritesScreen from './src/screens/FavouritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MapScreen from './src/screens/MapScreen';
 import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
+import MoreScreen from './src/screens/MoreScreen';
 import { FEATURES } from './src/lib/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
+import { COLORS } from './src/lib/theme';
 // DEFERRED: monetization — import PremiumScreen from './src/screens/PremiumScreen';
 
 // Install global crash handlers (uncaught JS errors + unhandled promise rejections)
@@ -28,9 +30,6 @@ const Stack = createStackNavigator();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ErrorBoundary
-// Catches React render errors in the component tree below it and displays a
-// friendly recovery screen instead of a blank crash. Logs the error via the
-// app's structured logger.
 // ─────────────────────────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -45,9 +44,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, info) {
     try {
       logger.fatal('react_render_error', { componentStack: info?.componentStack?.slice(0, 500) }, error);
-    } catch (_) {
-      // Logger must never interfere with error boundary behaviour.
-    }
+    } catch (_) {}
   }
 
   handleReload = () => {
@@ -58,7 +55,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <View style={errorStyles.container}>
-          <Ionicons name="warning-outline" size={56} color="#F39C12" />
+          <Ionicons name="warning-outline" size={56} color={COLORS.warning} />
           <Text style={errorStyles.title}>Something went wrong</Text>
           <Text style={errorStyles.message}>
             {this.state.errorMessage}
@@ -79,7 +76,7 @@ class ErrorBoundary extends React.Component {
 const errorStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D1117',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -87,31 +84,31 @@ const errorStyles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#E6EDF3',
+    color: COLORS.text,
     marginTop: 20,
     marginBottom: 10,
   },
   message: {
     fontSize: 14,
-    color: '#8B949E',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 20,
   },
   hint: {
     fontSize: 12,
-    color: '#555',
+    color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: 28,
   },
   btn: {
-    backgroundColor: '#2ECC71',
+    backgroundColor: COLORS.accent,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 10,
   },
   btnText: {
-    color: '#0D1117',
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -120,15 +117,15 @@ const errorStyles = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 // Stack navigators
 // ─────────────────────────────────────────────────────────────────────────────
+const stackHeader = {
+  headerStyle: { backgroundColor: COLORS.surfaceAlt },
+  headerTintColor: COLORS.white,
+  headerTitleStyle: { fontWeight: '700' },
+};
+
 function HomeStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#1a1a2e' },
-        headerTintColor: '#ffffff',
-        headerTitleStyle: { fontWeight: '700' },
-      }}
-    >
+    <Stack.Navigator screenOptions={stackHeader}>
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
@@ -145,13 +142,7 @@ function HomeStack() {
 
 function FavouritesStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#1a1a2e' },
-        headerTintColor: '#ffffff',
-        headerTitleStyle: { fontWeight: '700' },
-      }}
-    >
+    <Stack.Navigator screenOptions={stackHeader}>
       <Stack.Screen
         name="FavouritesMain"
         component={FavouritesScreen}
@@ -166,14 +157,43 @@ function FavouritesStack() {
   );
 }
 
+function MoreStack() {
+  return (
+    <Stack.Navigator screenOptions={stackHeader}>
+      <Stack.Screen
+        name="MoreMain"
+        component={MoreScreen}
+        options={{ title: 'More' }}
+      />
+      {FEATURES.tripCalculator && (
+        <Stack.Screen
+          name="TripCalculator"
+          component={TripCalculatorScreen}
+          options={{ title: 'Trip Calculator' }}
+        />
+      )}
+      <Stack.Screen
+        name="Alerts"
+        component={AlertsScreen}
+        options={{ title: 'My Price Alerts' }}
+      />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#1a1a2e' },
-        headerTintColor: '#ffffff',
-        tabBarStyle: { backgroundColor: '#1a1a2e' },
-        tabBarActiveTintColor: '#2ECC71',
+        headerStyle: { backgroundColor: COLORS.surfaceAlt },
+        headerTintColor: COLORS.white,
+        tabBarStyle: { backgroundColor: COLORS.surfaceAlt },
+        tabBarActiveTintColor: COLORS.accent,
         tabBarInactiveTintColor: '#888',
         headerShown: false,
       }}
@@ -194,8 +214,8 @@ function TabNavigator() {
         options={{
           tabBarLabel: 'Map',
           headerShown: true,
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#ffffff',
+          headerStyle: { backgroundColor: COLORS.surfaceAlt },
+          headerTintColor: COLORS.white,
           headerTitle: 'Fuel Map',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map-outline" color={color} size={size} />
@@ -208,8 +228,8 @@ function TabNavigator() {
         options={{
           tabBarLabel: 'Search',
           headerShown: true,
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#ffffff',
+          headerStyle: { backgroundColor: COLORS.surfaceAlt },
+          headerTintColor: COLORS.white,
           headerTitle: 'Search Stations',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" color={color} size={size} />
@@ -226,66 +246,16 @@ function TabNavigator() {
           ),
         }}
       />
-      {FEATURES.tripCalculator && (
-        <Tab.Screen
-          name="Tools"
-          component={TripCalculatorScreen}
-          options={{
-            tabBarLabel: 'Tools',
-            headerShown: true,
-            headerStyle: { backgroundColor: '#1a1a2e' },
-            headerTintColor: '#ffffff',
-            headerTitle: 'Trip Calculator',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="construct-outline" color={color} size={size} />
-            ),
-          }}
-        />
-      )}
       <Tab.Screen
-        name="Alerts"
-        component={AlertsScreen}
+        name="More"
+        component={MoreStack}
         options={{
-          tabBarLabel: 'Alerts',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#ffffff',
-          headerTitle: 'My Price Alerts',
+          tabBarLabel: 'More',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" color={color} size={size} />
+            <Ionicons name="ellipsis-horizontal" color={color} size={size} />
           ),
         }}
       />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarLabel: 'Settings',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#ffffff',
-          headerTitle: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      {/* DEFERRED: monetization — Premium tab hidden for launch
-      <Tab.Screen
-        name="Premium"
-        component={PremiumScreen}
-        options={{
-          tabBarLabel: 'Premium',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#ffffff',
-          headerTitle: 'FreeFuelPrice Premium',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="star-outline" color={color} size={size} />
-          ),
-        }}
-      />
-            */}
     </Tab.Navigator>
   );
 }
