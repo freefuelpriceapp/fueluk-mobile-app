@@ -99,7 +99,13 @@ const HomeScreen = ({ navigation }) => {
       const list = (data.stations || []).map(s => ({
         ...s,
         distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined),
-        prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null },
+        prices: {
+          petrol: s.petrol_price ?? null,
+          diesel: s.diesel_price ?? null,
+          e10: s.e10_price ?? null,
+          super_unleaded: s.super_unleaded_price ?? null,
+          premium_diesel: s.premium_diesel_price ?? null,
+        },
       }));
       setStations(list);
       try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch (_e) {}
