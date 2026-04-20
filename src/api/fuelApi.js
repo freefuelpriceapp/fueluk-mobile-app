@@ -59,14 +59,6 @@ export async function getPriceHistory(stationId, days = 30, fuel = null) {
   return resp.data;
 }
 
-/**
- * Get API status
- */
-export async function getApiStatus() {
-  const resp = await api.get('/health');
-  return resp.data;
-}
-
 // ---- Sprint 4: Price Alert API functions ----
 
 /**
@@ -115,27 +107,6 @@ export async function getPricesByStation(stationId, fuelType = null) {
 }
 
 /**
- * Sprint 6: Submit a user-reported fuel price
- * @param {object} priceData - { station_id, fuel_type, price_pence }
- */
-export async function submitPrice(priceData) {
-  const resp = await api.post('/api/v1/prices', priceData);
-  return resp.data;
-}
-
-/**
- * Sprint 6: Get latest prices across all stations
- * @param {string} fuelType - Optional filter
- * @param {number} limit - Max results (default 50)
- */
-export async function getLatestPrices(fuelType = null, limit = 50) {
-  const params = { limit };
-  if (fuelType) params.fuel_type = fuelType;
-  const resp = await api.get('/api/v1/prices/latest', { params });
-  return resp.data;
-}
-
-/**
  * Sprint 6: Get cheapest nearby stations
  * @param {number} lat
  * @param {number} lon
@@ -146,14 +117,6 @@ export async function getCheapestStations({ lat, lon, radiusKm = 10, fuelType = 
   const resp = await api.get('/api/v1/stations/cheapest', {
     params: { lat, lon, radius: radiusKm, fuel_type: fuelType },
   });
-  return resp.data;
-}
-
-/**
- * Sprint 7: Get premium tier status for the current user
- */
-export async function getPremiumStatus() {
-  const resp = await api.get('/api/v1/premium/status');
   return resp.data;
 }
 

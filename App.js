@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,6 +7,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeScreen from './src/screens/HomeScreen';
 import StationDetailScreen from './src/screens/StationDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
@@ -17,10 +18,12 @@ import MapScreen from './src/screens/MapScreen';
 import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
 import MoreScreen from './src/screens/MoreScreen';
 import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
+import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import { FEATURES } from './src/lib/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
 import { COLORS } from './src/lib/theme';
-// DEFERRED: monetization — import PremiumScreen from './src/screens/PremiumScreen';
+
+const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
 
 // Install global crash handlers (uncaught JS errors + unhandled promise rejections)
 // before any React tree is mounted. Safe to call multiple times — idempotent.
@@ -267,13 +270,43 @@ function TabNavigator() {
 }
 
 export default function App() {
+  const [permissionGateChecked, setPermissionGateChecked] = useState(false);
+  const [showPermissionGate, setShowPermissionGate] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const flag = await AsyncStorage.getItem(LOCATION_PERMISSION_SHOWN_KEY);
+        setShowPermissionGate(!flag);
+      } catch (_e) {
+        setShowPermissionGate(false);
+      } finally {
+        setPermissionGateChecked(true);
+      }
+    })();
+  }, []);
+
+  const dismissPermissionGate = async () => {
+    try {
+      await AsyncStorage.setItem(LOCATION_PERMISSION_SHOWN_KEY, '1');
+    } catch (_e) {}
+    setShowPermissionGate(false);
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <TabNavigator />
-        </NavigationContainer>
+        <StatusBar style="light" />
+        {permissionGateChecked && showPermissionGate ? (
+          <LocationPermissionScreen
+            onGranted={dismissPermissionGate}
+            onSkip={dismissPermissionGate}
+          />
+        ) : permissionGateChecked ? (
+          <NavigationContainer>
+            <TabNavigator />
+          </NavigationContainer>
+        ) : null}
       </SafeAreaProvider>
     </ErrorBoundary>
   );

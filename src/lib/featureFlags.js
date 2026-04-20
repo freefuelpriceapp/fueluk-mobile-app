@@ -46,6 +46,12 @@ export const FEATURES = {
   // User-submitted price confirmations and station updates
   communityContributions: false,
 
+  // Price Reports (Sprint 9+)
+  // User-submitted price corrections from the Station Detail screen.
+  // Referenced in StationDetailScreen.js; registered here so the flag
+  // resolves cleanly via isEnabled().
+  priceReports: false,
+
   // Rewards & Gamification (Sprint 10+)
   // Contribution points, streaks, leaderboards
   rewards: false,
