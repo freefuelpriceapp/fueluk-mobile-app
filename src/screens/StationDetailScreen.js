@@ -17,8 +17,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { getPriceHistory, createAlert, getPricesByStation } from '../api/fuelApi';
 import FacilitiesPills from '../components/FacilitiesPills';
+import PriceHistoryChart from '../components/PriceHistoryChart';
 import ReportPriceButton from '../components/ReportPriceButton';
 import { NetworkErrorState } from '../components/TrustStates';
 import { FEATURES } from '../lib/featureFlags';
@@ -223,6 +225,27 @@ export default function StationDetailScreen({ route }) {
   const [alertFuelType, setAlertFuelType] = useState('petrol');
   const [alertThreshold, setAlertThreshold] = useState('');
   const [alertSaving, setAlertSaving] = useState(false);
+  const [deviceToken, setDeviceToken] = useState(null);
+
+  // ─── Request push permission and obtain Expo push token ─────────────────────
+  useEffect(() => {
+    if (!FEATURES.priceAlerts) return;
+    (async () => {
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') return;
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        setDeviceToken(tokenData.data);
+      } catch (err) {
+        // Non-fatal — alerts just can't be created without a token
+      }
+    })();
+  }, []);
 
   // ─── Load favourite state on mount ──────────────────────────────────────────
 
@@ -313,12 +336,21 @@ export default function StationDetailScreen({ route }) {
       Alert.alert('Invalid price', 'Please enter a valid price threshold (e.g. 149.9)');
       return;
     }
+    if (!deviceToken) {
+      Alert.alert(
+        'Notifications required',
+        'Please enable push notifications to set price alerts.'
+      );
+      return;
+    }
     setAlertSaving(true);
     try {
       await createAlert({
         station_id: station.id,
         fuel_type: alertFuelType,
         threshold_pence: threshold,
+        device_token: deviceToken,
+        platform: Platform.OS,
       });
       setAlertModalVisible(false);
       Alert.alert(
@@ -399,17 +431,10 @@ export default function StationDetailScreen({ route }) {
         {/* Trust line */}
         <Text style={[styles.trustLine, { color: freshnessColor }]}>{trustLine}</Text>
 
-        {entries.length > 0 && (
-          <View style={styles.historyList}>
-            <Text style={styles.historyHeader}>Price History</Text>
-            {entries.slice(0, 5).map((entry, i) => (
-              <View key={i} style={styles.historyRow}>
-                <Text style={styles.historyDate}>
-                  {new Date(entry.recorded_at).toLocaleDateString()}
-                </Text>
-                <Text style={styles.historyPrice}>{entry.price_ppl}p</Text>
-              </View>
-            ))}
+        {FEATURES.priceHistoryCharts && (
+          <View style={styles.chartWrap}>
+            <Text style={styles.historyHeader}>30-Day Price History</Text>
+            <PriceHistoryChart entries={entries} color={color} height={180} />
           </View>
         )}
       </View>
@@ -745,6 +770,12 @@ const styles = StyleSheet.create({
   },
 
   // History
+  chartWrap: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.background,
+    paddingTop: 10,
+  },
   historyList: {
     marginTop: 12,
     borderTopWidth: 1,

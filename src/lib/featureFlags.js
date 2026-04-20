@@ -18,7 +18,9 @@ export const FEATURES = {
   search: true,              // Postcode / location search screen
   stationDetail: true,       // Individual station detail screen
   favourites: true,          // Save favourite stations locally
-  priceAlerts: false,         // Set price-drop alerts by station // LAUNCH-SAFE: gated OFF until Sprint 4 approval
+  priceAlerts: true,         // Set price-drop alerts by station (Sprint 2)
+  priceHistoryCharts: true,  // Visual 30-day price history charts (Sprint 2)
+  tripCalculator: true,      // Trip cost calculator with reg-plate lookup (Sprint 2)
   settings: true,            // Settings, privacy, support links
 
   // ─────────────────────────────────────────────────

@@ -14,6 +14,8 @@ import SearchScreen from './src/screens/SearchScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MapScreen from './src/screens/MapScreen';
+import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
+import { FEATURES } from './src/lib/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
 // DEFERRED: monetization — import PremiumScreen from './src/screens/PremiumScreen';
 
@@ -224,6 +226,22 @@ function TabNavigator() {
           ),
         }}
       />
+      {FEATURES.tripCalculator && (
+        <Tab.Screen
+          name="Tools"
+          component={TripCalculatorScreen}
+          options={{
+            tabBarLabel: 'Tools',
+            headerShown: true,
+            headerStyle: { backgroundColor: '#1a1a2e' },
+            headerTintColor: '#ffffff',
+            headerTitle: 'Trip Calculator',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="construct-outline" color={color} size={size} />
+            ),
+          }}
+        />
+      )}
       <Tab.Screen
         name="Alerts"
         component={AlertsScreen}
