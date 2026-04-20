@@ -77,18 +77,21 @@ export default function SettingsScreen() {
     );
   };
 
-  const clearAlerts = () => {
+  const clearLocalData = () => {
     Alert.alert(
-      'Clear All Alerts',
-      'This will remove all your price alerts.',
+      'Clear Local Data',
+      'This clears cached data on this device. Your price alerts live on our servers — to remove those, open the Alerts screen and swipe each one individually.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Clear All',
+          text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.removeItem('price_alerts');
-            Alert.alert('Done', 'Your alerts have been cleared.');
+            await AsyncStorage.multiRemove([
+              'price_alerts',
+              'cached_nearby_stations',
+            ]);
+            Alert.alert('Done', 'Local cached data has been cleared.');
           },
         },
       ]
@@ -143,9 +146,10 @@ export default function SettingsScreen() {
         />
         <View style={styles.divider} />
         <SettingsRow
-          icon="notifications-off-outline"
-          label="Clear All Alerts"
-          onPress={clearAlerts}
+          icon="trash-outline"
+          label="Clear Local Data"
+          sublabel="Remove cached stations on this device. Server alerts stay — delete them from the Alerts screen."
+          onPress={clearLocalData}
           danger
         />
       </View>

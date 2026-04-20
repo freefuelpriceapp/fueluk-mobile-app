@@ -200,11 +200,11 @@ const HomeScreen = ({ navigation }) => {
         onSearchPress={() => navigation.navigate('Search')}
       />
 
-      {usingFallback && (
+      {(usingFallback || location?.isFallback) && (
         <View style={styles.fallbackBanner}>
           <Ionicons name="navigate-outline" size={14} color={COLORS.warning} />
           <Text style={styles.fallbackText}>
-            Precise location is off \u2014 showing results for your default area.
+            Showing stations near Birmingham (default). Enable location for local results.
           </Text>
           <TouchableOpacity onPress={openSettings}>
             <Text style={styles.settingsLink}>Open Settings</Text>
