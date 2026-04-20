@@ -26,8 +26,22 @@ function formatStation(raw) {
     petrol_price: raw.petrol_price != null ? parseFloat(raw.petrol_price) : null,
     diesel_price: raw.diesel_price != null ? parseFloat(raw.diesel_price) : null,
     e10_price: raw.e10_price != null ? parseFloat(raw.e10_price) : null,
+    super_unleaded_price: raw.super_unleaded_price != null ? parseFloat(raw.super_unleaded_price) : null,
+    premium_diesel_price: raw.premium_diesel_price != null ? parseFloat(raw.premium_diesel_price) : null,
+    petrol_source: raw.petrol_source || null,
+    diesel_source: raw.diesel_source || null,
+    e10_source: raw.e10_source || null,
+    super_unleaded_source: raw.super_unleaded_source || null,
+    premium_diesel_source: raw.premium_diesel_source || null,
     last_updated: raw.last_updated || null,
     distance_miles: raw.distance_miles != null ? parseFloat(raw.distance_miles) : null,
+    opening_hours: raw.opening_hours || null,
+    amenities: raw.amenities || [],
+    is_motorway: raw.is_motorway || false,
+    is_supermarket: raw.is_supermarket || false,
+    temporary_closure: raw.temporary_closure || false,
+    permanent_closure: raw.permanent_closure || false,
+    fuel_types: raw.fuel_types || [],
   };
 }
 
