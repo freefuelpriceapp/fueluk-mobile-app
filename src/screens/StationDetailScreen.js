@@ -38,20 +38,27 @@ const COLORS = {
   danger: '#E74C3C',
 };
 
-const FUEL_TYPES = ['petrol', 'diesel', 'e10'];
+// Fuel display config — drives which rows render in the fuel section and the
+// alert modal. Only rows with a non-null price for the station are shown.
+// Field mapping per spec:
+//   E10        → e10_price             (Unleaded E10)
+//   E5         → petrol_price          (Super Unleaded E5)
+//   B7         → diesel_price          (Diesel)
+//   B7_PREMIUM → premium_diesel_price  (Premium Diesel)
+const FUEL_DISPLAY = [
+  { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Unleaded (E10)', color: '#2ECC71' },
+  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Super Unleaded (E5)', color: '#9B59B6' },
+  { key: 'diesel', field: 'diesel_price', sourceField: 'diesel_source', label: 'Diesel', color: '#3498DB' },
+  { key: 'premiumDiesel', field: 'premium_diesel_price', sourceField: 'premium_diesel_source', label: 'Premium Diesel', color: '#E74C3C' },
+];
 
-const FUEL_LABELS = {
-  petrol: 'Petrol',
-  diesel: 'Diesel',
-  e10: 'E10',
-};
+const FUEL_LABELS = FUEL_DISPLAY.reduce((acc, f) => { acc[f.key] = f.label; return acc; }, {});
+const FUEL_COLORS = FUEL_DISPLAY.reduce((acc, f) => { acc[f.key] = f.color; return acc; }, {});
 
-const FUEL_COLORS = {
-  petrol: '#2ECC71',
-  diesel: '#3498DB',
-  e10: '#F39C12',
-  superUnleaded: '#9B59B6',
-  premiumDiesel: '#E74C3C',
+const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_SHORT = {
+  monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu',
+  friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
 };
 
 const FAVOURITES_KEY = 'user_favourites';
@@ -123,6 +130,79 @@ async function openDirections(station) {
   } else {
     await Linking.openURL(fallbackUrl);
   }
+}
+
+function dayLabel(day) {
+  if (!day) return '';
+  if (day.is_24_hours) return '24 Hours';
+  if (day.closed) return 'Closed';
+  if (day.open && day.close) return `${day.open} - ${day.close}`;
+  return '';
+}
+
+function sameDay(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    !!a.is_24_hours === !!b.is_24_hours &&
+    !!a.closed === !!b.closed &&
+    (a.open || '') === (b.open || '') &&
+    (a.close || '') === (b.close || '')
+  );
+}
+
+function groupOpeningHours(usualDays) {
+  if (!usualDays || typeof usualDays !== 'object') return [];
+  const groups = [];
+  for (const key of DAY_ORDER) {
+    const day = usualDays[key];
+    const label = dayLabel(day);
+    if (!label) continue;
+    const last = groups[groups.length - 1];
+    if (last && sameDay(last.day, day)) {
+      last.end = key;
+    } else {
+      groups.push({ start: key, end: key, day, label });
+    }
+  }
+  return groups.map((g) => ({
+    range: g.start === g.end ? DAY_SHORT[g.start] : `${DAY_SHORT[g.start]}-${DAY_SHORT[g.end]}`,
+    label: g.label,
+  }));
+}
+
+function todayKey() {
+  // JS Date: Sunday=0 ... Saturday=6. DAY_ORDER starts on Monday.
+  const js = new Date().getDay();
+  return DAY_ORDER[(js + 6) % 7];
+}
+
+function parseHHMM(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (isNaN(h) || isNaN(mm)) return null;
+  return h * 60 + mm;
+}
+
+function todayStatus(usualDays) {
+  if (!usualDays) return null;
+  const key = todayKey();
+  const today = usualDays[key];
+  if (!today) return null;
+  if (today.is_24_hours) {
+    return { open: true, text: 'Open now · 24 Hours' };
+  }
+  const now = new Date();
+  const minsNow = now.getHours() * 60 + now.getMinutes();
+  const open = parseHHMM(today.open);
+  const close = parseHHMM(today.close);
+  if (open == null || close == null) return null;
+  const isOpen = minsNow >= open && minsNow < close;
+  if (isOpen) return { open: true, text: `Open now · Closes ${today.close}` };
+  return { open: false, text: `Closed · Opens ${today.open}` };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -254,7 +334,9 @@ export default function StationDetailScreen({ route }) {
 
   // ─── Render fuel price card ───────────────────────────────────────────────────
 
-  const renderPriceRow = (fuelType) => {
+  const renderPriceRow = (fuelMeta) => {
+    const { key: fuelType, field, sourceField, label, color } = fuelMeta;
+    const stationPrice = station?.[field];
     const entries = history[fuelType] || [];
     const live = (Array.isArray(livePrices) ? livePrices : []).find(
       (p) => p.fuel_type === fuelType
@@ -268,7 +350,11 @@ export default function StationDetailScreen({ route }) {
       station?.last_updated ||
       null;
     const trustSource =
-      live?.source || entries[0]?.source || station?.source || null;
+      live?.source ||
+      entries[0]?.source ||
+      station?.[sourceField] ||
+      station?.source ||
+      null;
 
     const freshness = getFreshness(trustTimestamp);
     const freshnessColor = FRESHNESS_COLOR[freshness.tier] || COLORS.muted;
@@ -278,16 +364,20 @@ export default function StationDetailScreen({ route }) {
     return (
       <View key={fuelType} style={styles.fuelCard}>
         <View style={styles.fuelHeader}>
-          <View style={[styles.fuelDot, { backgroundColor: FUEL_COLORS[fuelType] }]} />
-          <Text style={styles.fuelLabel}>{FUEL_LABELS[fuelType]}</Text>
+          <View style={[styles.fuelDot, { backgroundColor: color }]} />
+          <Text style={styles.fuelLabel}>{label}</Text>
 
           {live ? (
             <View style={styles.priceContainer}>
-              <Text style={[styles.fuelPrice, { color: FUEL_COLORS[fuelType] }]}>
+              <Text style={[styles.fuelPrice, { color }]}>
                 {live.price_pence}p
               </Text>
               <Text style={styles.liveTag}>LIVE</Text>
             </View>
+          ) : stationPrice != null ? (
+            <Text style={[styles.fuelPrice, { color }]}>
+              {stationPrice}p
+            </Text>
           ) : entries[0] ? (
             <Text style={[styles.fuelPrice, { color: COLORS.muted }]}>
               {entries[0].price_ppl}p
@@ -348,6 +438,28 @@ export default function StationDetailScreen({ route }) {
 
   // ─── Main render ─────────────────────────────────────────────────────────────
 
+  const availableFuels = FUEL_DISPLAY.filter((f) => station?.[f.field] != null);
+  const fuelsToRender = availableFuels.length > 0 ? availableFuels : FUEL_DISPLAY;
+
+  const usualDays = station?.opening_hours?.usual_days || null;
+  const hoursGroups = groupOpeningHours(usualDays);
+  const hoursStatus = todayStatus(usualDays);
+
+  const baseFacilities = Array.isArray(station?.facilities)
+    ? station.facilities
+    : Array.isArray(station?.amenities)
+      ? station.amenities
+      : [];
+  const combinedFacilities = [...baseFacilities];
+  if (station?.is_motorway) combinedFacilities.push('Motorway');
+  if (station?.is_supermarket) combinedFacilities.push('Supermarket');
+  if (
+    usualDays &&
+    DAY_ORDER.every((d) => usualDays[d]?.is_24_hours)
+  ) {
+    combinedFacilities.push('24h');
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -355,6 +467,19 @@ export default function StationDetailScreen({ route }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
       >
+        {/* Closure banners */}
+        {station?.permanent_closure ? (
+          <View style={styles.closureBanner}>
+            <Ionicons name="close-circle" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+            <Text style={styles.closureText}>Permanently Closed</Text>
+          </View>
+        ) : station?.temporary_closure ? (
+          <View style={styles.closureBanner}>
+            <Ionicons name="warning" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+            <Text style={styles.closureText}>Temporarily Closed</Text>
+          </View>
+        ) : null}
+
         {/* Station header */}
         <View style={styles.stationHeader}>
           <View style={styles.stationTitleRow}>
@@ -398,13 +523,38 @@ export default function StationDetailScreen({ route }) {
         {/* Prices & Trends */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Prices & Trends</Text>
-          {FUEL_TYPES.map(renderPriceRow)}
+          {fuelsToRender.map(renderPriceRow)}
         </View>
+
+        {/* Opening Hours */}
+        {hoursGroups.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Opening Hours</Text>
+            <View style={styles.hoursCard}>
+              {hoursStatus && (
+                <Text
+                  style={[
+                    styles.hoursStatus,
+                    { color: hoursStatus.open ? COLORS.accent : COLORS.danger },
+                  ]}
+                >
+                  {hoursStatus.text}
+                </Text>
+              )}
+              {hoursGroups.map((g, i) => (
+                <View key={i} style={styles.hoursRow}>
+                  <Text style={styles.hoursDay}>{g.range}</Text>
+                  <Text style={styles.hoursValue}>{g.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Facilities */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Facilities</Text>
-          <FacilitiesPills facilities={station.facilities || station.amenities || []} />
+          <FacilitiesPills facilities={combinedFacilities} />
         </View>
 
         {/* Worth the Drive? — gated behind feature flag */}
@@ -456,22 +606,22 @@ export default function StationDetailScreen({ route }) {
               <Text style={styles.pplLabel}>p/litre</Text>
             </View>
             <View style={styles.fuelTypeRow}>
-              {FUEL_TYPES.map((ft) => (
+              {fuelsToRender.map((f) => (
                 <TouchableOpacity
-                  key={ft}
+                  key={f.key}
                   style={[
                     styles.fuelTypeBtn,
-                    alertFuelType === ft && { backgroundColor: FUEL_COLORS[ft] },
+                    alertFuelType === f.key && { backgroundColor: f.color },
                   ]}
-                  onPress={() => setAlertFuelType(ft)}
+                  onPress={() => setAlertFuelType(f.key)}
                 >
                   <Text
                     style={[
                       styles.fuelTypeBtnText,
-                      alertFuelType === ft && { color: COLORS.background },
+                      alertFuelType === f.key && { color: COLORS.background },
                     ]}
                   >
-                    {FUEL_LABELS[ft]}
+                    {f.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -680,6 +830,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
   },
+
+  // Closure banner
+  closureBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.danger,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  closureText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  // Opening hours
+  hoursCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 14,
+  },
+  hoursStatus: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  hoursDay: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  hoursValue: { fontSize: 13, color: COLORS.text },
 
   // Worth the Drive card
   worthCard: {

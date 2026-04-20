@@ -23,6 +23,7 @@ export function formatSource(rawSource) {
   if (!rawSource || typeof rawSource !== 'string') return DEFAULT_SOURCE;
   const s = rawSource.trim().toLowerCase();
   if (!s) return DEFAULT_SOURCE;
+  if (s.includes('fuel_finder')) return 'UK Fuel Finder';
   if (s.includes('gov')) return 'GOV data';
   if (s.includes('partner')) return 'Partner feed';
   if (s.includes('user') || s.includes('community')) return 'User report';
