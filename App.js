@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -21,6 +21,7 @@ import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import { FEATURES } from './src/lib/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
+import { initNotifications, registerNotificationResponseHandler } from './src/lib/notifications';
 import { COLORS } from './src/lib/theme';
 
 const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
@@ -28,6 +29,11 @@ const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
 // Install global crash handlers (uncaught JS errors + unhandled promise rejections)
 // before any React tree is mounted. Safe to call multiple times — idempotent.
 installCrashHandlers();
+
+// Configure notification handler (foreground display) and Android channel.
+// Handler is registered at module import; channel setup is async and kicked
+// off here so it's ready before any alert is scheduled.
+initNotifications();
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -272,6 +278,7 @@ function TabNavigator() {
 export default function App() {
   const [permissionGateChecked, setPermissionGateChecked] = useState(false);
   const [showPermissionGate, setShowPermissionGate] = useState(false);
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -284,6 +291,11 @@ export default function App() {
         setPermissionGateChecked(true);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = registerNotificationResponseHandler(navigationRef);
+    return unsubscribe;
   }, []);
 
   const dismissPermissionGate = async () => {
@@ -303,7 +315,7 @@ export default function App() {
             onSkip={dismissPermissionGate}
           />
         ) : permissionGateChecked ? (
-          <NavigationContainer>
+          <NavigationContainer ref={navigationRef}>
             <TabNavigator />
           </NavigationContainer>
         ) : null}
