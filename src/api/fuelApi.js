@@ -164,3 +164,49 @@ export async function getLastUpdated() {
   const resp = await api.get('/api/v1/meta/last-updated');
   return resp.data;
 }
+
+// ---- Sprint 2: Trip Calculator + Vehicle Lookup ----
+
+/**
+ * Look up UK vehicle details by registration plate (DVLA / MOT service backed).
+ * @param {string} reg - UK reg plate (spaces/case tolerated; backend normalises)
+ * @returns {Promise<{ make, model, fuel_type, estimated_mpg, year, co2_g_per_km }>}
+ */
+export async function lookupVehicle(reg) {
+  const cleaned = String(reg || '').replace(/\s+/g, '').toUpperCase();
+  const resp = await api.get('/api/v1/vehicles/lookup', { params: { reg: cleaned } });
+  return resp.data;
+}
+
+/**
+ * Calculate the cost of a trip given origin, destination and vehicle info.
+ * Uses cheapest fuel on route where available.
+ * @param {object} params
+ * @param {number} params.origin_lat
+ * @param {number} params.origin_lon
+ * @param {number} params.destination_lat
+ * @param {number} params.destination_lon
+ * @param {number} params.vehicle_mpg
+ * @param {string} params.fuel_type - petrol | diesel | e10
+ * @param {number} [params.tank_size_litres]
+ */
+export async function calculateTrip({
+  origin_lat,
+  origin_lon,
+  destination_lat,
+  destination_lon,
+  vehicle_mpg,
+  fuel_type,
+  tank_size_litres,
+}) {
+  const resp = await api.post('/api/v1/trip/calculate', {
+    origin_lat,
+    origin_lon,
+    destination_lat,
+    destination_lon,
+    vehicle_mpg,
+    fuel_type,
+    ...(tank_size_litres != null ? { tank_size_litres } : {}),
+  });
+  return resp.data;
+}
