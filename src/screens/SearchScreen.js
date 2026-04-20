@@ -214,28 +214,34 @@ const SearchScreen = ({ navigation }) => {
 
         {/* Fuel type filter */}
         <View style={styles.filterRow}>
-          {FUEL_TYPES.map((ft) => (
-            <TouchableOpacity
-              key={ft.key}
-              style={[
-                styles.filterBtn,
-                selectedFuel === ft.key && {
-                  backgroundColor: ft.color,
-                  borderColor: ft.color,
-                },
-              ]}
-              onPress={() => setSelectedFuel(ft.key)}
-            >
-              <Text
+          {FUEL_TYPES.map((ft) => {
+            const isActive = selectedFuel === ft.key;
+            return (
+              <TouchableOpacity
+                key={ft.key}
                 style={[
-                  styles.filterBtnText,
-                  selectedFuel === ft.key && { color: COLORS.background },
+                  styles.filterBtn,
+                  isActive && {
+                    backgroundColor: ft.color,
+                    borderColor: ft.color,
+                  },
                 ]}
+                onPress={() => setSelectedFuel(ft.key)}
+                accessibilityLabel={`Filter by ${ft.label}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
               >
-                {ft.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.filterBtnText,
+                    isActive && { color: COLORS.background },
+                  ]}
+                >
+                  {ft.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Results */}

@@ -201,7 +201,11 @@ const HomeScreen = ({ navigation }) => {
       />
 
       {(usingFallback || location?.isFallback) && (
-        <View style={styles.fallbackBanner}>
+        <View
+          style={styles.fallbackBanner}
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+        >
           <Ionicons name="navigate-outline" size={14} color={COLORS.warning} />
           <Text style={styles.fallbackText}>
             Showing stations near Birmingham (default). Enable location for local results.
@@ -213,7 +217,11 @@ const HomeScreen = ({ navigation }) => {
       )}
 
       {offline && !error && (
-        <View style={styles.offlineBanner}>
+        <View
+          style={styles.offlineBanner}
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+        >
           <Ionicons name="cloud-offline-outline" size={14} color={COLORS.danger} />
           <Text style={styles.offlineText}>You\u2019re offline \u2014 showing cached prices.</Text>
         </View>
@@ -221,23 +229,29 @@ const HomeScreen = ({ navigation }) => {
 
       {/* Fuel type filter */}
       <View style={styles.filterRow}>
-        {FUEL_TYPES.map(ft => (
-          <TouchableOpacity
-            key={ft.key}
-            style={[
-              styles.filterBtn,
-              selectedFuel === ft.key && { backgroundColor: ft.color, borderColor: ft.color },
-            ]}
-            onPress={() => setSelectedFuel(ft.key)}
-          >
-            <Text style={[
-              styles.filterBtnText,
-              selectedFuel === ft.key && { color: COLORS.background },
-            ]}>
-              {ft.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {FUEL_TYPES.map(ft => {
+          const isActive = selectedFuel === ft.key;
+          return (
+            <TouchableOpacity
+              key={ft.key}
+              style={[
+                styles.filterBtn,
+                isActive && { backgroundColor: ft.color, borderColor: ft.color },
+              ]}
+              onPress={() => setSelectedFuel(ft.key)}
+              accessibilityLabel={`Filter by ${ft.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[
+                styles.filterBtnText,
+                isActive && { color: COLORS.background },
+              ]}>
+                {ft.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Sort toggle — Nearest / Cheapest */}
@@ -252,6 +266,7 @@ const HomeScreen = ({ navigation }) => {
                 active && styles.sortBtnActive,
               ]}
               onPress={() => setSortMode(sm.key)}
+              accessibilityLabel={`Sort by ${sm.label.toLowerCase()}`}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >

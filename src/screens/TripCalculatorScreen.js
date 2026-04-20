@@ -27,18 +27,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { lookupVehicle, calculateTrip } from '../api/fuelApi';
+import { COLORS as THEME_COLORS } from '../lib/theme';
 
+// Local alias preserves the short field names used throughout this file.
 const COLORS = {
-  background: '#0D1117',
-  surface: '#161B22',
-  card: '#1C2128',
-  text: '#E6EDF3',
-  accent: '#2ECC71',
-  border: '#21262D',
-  muted: '#8B949E',
-  danger: '#E74C3C',
-  plateYellow: '#F5D300',
-  plateText: '#111111',
+  background:  THEME_COLORS.background,
+  surface:     THEME_COLORS.surface,
+  card:        THEME_COLORS.card,
+  text:        THEME_COLORS.text,
+  accent:      THEME_COLORS.accent,
+  border:      THEME_COLORS.borderSubtle,
+  muted:       THEME_COLORS.textSecondary,
+  danger:      THEME_COLORS.error,
+  plateYellow: THEME_COLORS.plateYellow,
+  plateText:   THEME_COLORS.plateText,
 };
 
 // Postcodes.io — free UK postcode → lat/lon geocoding (no auth required)
@@ -168,7 +170,7 @@ export default function TripCalculatorScreen() {
                 value={regInput}
                 onChangeText={(t) => setRegInput(t.toUpperCase())}
                 placeholder="AB12 CDE"
-                placeholderTextColor="#777"
+                placeholderTextColor={THEME_COLORS.placeholderMuted}
                 maxLength={8}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -229,8 +231,8 @@ export default function TripCalculatorScreen() {
                 <Switch
                   value={useCurrentLocation}
                   onValueChange={setUseCurrentLocation}
-                  trackColor={{ false: '#333', true: COLORS.accent }}
-                  thumbColor="#fff"
+                  trackColor={{ false: THEME_COLORS.inputBorderDark, true: COLORS.accent }}
+                  thumbColor={THEME_COLORS.white}
                 />
               </View>
             </View>
@@ -386,7 +388,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginRight: 10,
     borderWidth: 2,
-    borderColor: '#b8a000',
+    borderColor: THEME_COLORS.plateBorder,
   },
   plateInput: {
     color: COLORS.plateText,

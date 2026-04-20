@@ -14,6 +14,7 @@ import { getAlerts, deleteAlert } from '../api/fuelApi';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import * as Notifications from 'expo-notifications';
+import { ensurePushPermission } from '../lib/pushPermission';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
 const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
@@ -31,16 +32,13 @@ const AlertsScreen = () => {
   const [error, setError] = useState(null);
   const [deviceToken, setDeviceToken] = useState(null);
 
-  // Request push permission and obtain Expo push token
+  // Request push permission and obtain Expo push token.
+  // ensurePushPermission shows a pre-prompt explaining why when the OS
+  // permission state is still "undetermined".
   useEffect(() => {
     (async () => {
       try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
+        const finalStatus = await ensurePushPermission();
         if (finalStatus !== 'granted') {
           console.log('[AlertsScreen] Push permission not granted');
           return;

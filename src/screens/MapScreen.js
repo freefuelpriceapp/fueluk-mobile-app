@@ -28,32 +28,33 @@ if (Platform.OS !== 'web') {
   StationMarker = require('../components/StationMarker').default;
 }
 import { resolvePrice } from '../lib/quarantine';
+import { COLORS, FUEL_COLORS } from '../lib/theme';
 
 const FUEL_TYPES = [
-  { key: 'petrol',         label: 'Petrol',         color: '#2ECC71' },
-  { key: 'diesel',         label: 'Diesel',         color: '#3498DB' },
-  { key: 'e10',            label: 'E10',            color: '#F39C12' },
-  { key: 'super_unleaded', label: 'Super',          color: '#9B59B6' },
-  { key: 'premium_diesel', label: 'Prem. Diesel',   color: '#E74C3C' },
+  { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
+  { key: 'diesel',         label: 'Diesel',         color: FUEL_COLORS.diesel },
+  { key: 'e10',            label: 'E10',            color: FUEL_COLORS.e10 },
+  { key: 'super_unleaded', label: 'Super',          color: FUEL_COLORS.super_unleaded },
+  { key: 'premium_diesel', label: 'Prem. Diesel',   color: FUEL_COLORS.premium_diesel },
 ];
 
 const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0D1117' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0D1117' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8B949E' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#161B22' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#30363D' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#1C2128' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#30363D' }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#E6EDF3' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#161B22' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0f1a0f' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1520' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3498DB' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#161B22' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#30363D' }] },
-  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#8B949E' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#E6EDF3' }] },
+  { elementType: 'geometry', stylers: [{ color: COLORS.background }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: COLORS.background }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: COLORS.textSecondary }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: COLORS.border }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: COLORS.card }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: COLORS.border }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: COLORS.text }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: COLORS.mapParkGreen }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: COLORS.mapWaterBlue }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: FUEL_COLORS.diesel }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: COLORS.border }] },
+  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: COLORS.textSecondary }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: COLORS.text }] },
 ];
 
 const BOTTOM_SHEET_HEIGHT = 180;
@@ -195,7 +196,7 @@ export default function MapScreen({ navigation }) {
   if (locationLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2ECC71" />
+        <ActivityIndicator size="large" color={COLORS.accent} />
         <Text style={styles.loadingText}>Getting your location...</Text>
       </View>
     );
@@ -204,7 +205,7 @@ export default function MapScreen({ navigation }) {
   if (locationError && !location) {
     return (
       <View style={styles.center}>
-        <Ionicons name="alert-circle-outline" size={40} color="#DC3545" />
+        <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger} />
         <Text style={styles.errorText}>Location error: {locationError}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={refetch}>
           <Text style={styles.retryText}>Retry</Text>
@@ -216,9 +217,9 @@ export default function MapScreen({ navigation }) {
   return (
     <View style={styles.container}>
       {!MapView ? (
-        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }]}>
-          <Ionicons name="map-outline" size={48} color="#8B949E" />
-          <Text style={{ color: '#8B949E', marginTop: 12, fontSize: 14 }}>Map view is available on iOS and Android</Text>
+        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }]}>
+          <Ionicons name="map-outline" size={48} color={COLORS.textSecondary} />
+          <Text style={{ color: COLORS.textSecondary, marginTop: 12, fontSize: 14 }}>Map view is available on iOS and Android</Text>
         </View>
       ) : (
       <MapView
@@ -229,8 +230,8 @@ export default function MapScreen({ navigation }) {
         showsMyLocationButton={Platform.OS === 'android'}
         customMapStyle={DARK_MAP_STYLE}
         onPress={dismissSheet}
-        clusterColor="#2ECC71"
-        clusterTextColor="#0D1117"
+        clusterColor={COLORS.accent}
+        clusterTextColor={COLORS.background}
         clusterFontFamily={undefined}
         radius={50}
         minZoom={1}
@@ -262,23 +263,29 @@ export default function MapScreen({ navigation }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScroll}
           >
-            {FUEL_TYPES.map((ft) => (
-              <TouchableOpacity
-                key={ft.key}
-                style={[
-                  styles.filterChip,
-                  fuelType === ft.key && { backgroundColor: ft.color, borderColor: ft.color },
-                ]}
-                onPress={() => setFuelType(ft.key)}
-              >
-                <Text style={[
-                  styles.filterChipText,
-                  fuelType === ft.key && { color: '#0D1117' },
-                ]}>
-                  {ft.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {FUEL_TYPES.map((ft) => {
+              const isActive = fuelType === ft.key;
+              return (
+                <TouchableOpacity
+                  key={ft.key}
+                  style={[
+                    styles.filterChip,
+                    isActive && { backgroundColor: ft.color, borderColor: ft.color },
+                  ]}
+                  onPress={() => setFuelType(ft.key)}
+                  accessibilityLabel={`Filter by ${ft.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    isActive && { color: COLORS.background },
+                  ]}>
+                    {ft.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -323,7 +330,7 @@ export default function MapScreen({ navigation }) {
             <Ionicons
               name="navigate-outline"
               size={14}
-              color={mode === 'nearby' ? selectedFuelMeta.color : '#8B949E'}
+              color={mode === 'nearby' ? selectedFuelMeta.color : COLORS.textSecondary}
               style={{ marginRight: 4 }}
             />
             <Text style={[styles.modeBtnText, mode === 'nearby' && { color: selectedFuelMeta.color }]}>
@@ -340,7 +347,7 @@ export default function MapScreen({ navigation }) {
             <Ionicons
               name="trending-down-outline"
               size={14}
-              color={mode === 'cheapest' ? selectedFuelMeta.color : '#8B949E'}
+              color={mode === 'cheapest' ? selectedFuelMeta.color : COLORS.textSecondary}
               style={{ marginRight: 4 }}
             />
             <Text style={[styles.modeBtnText, mode === 'cheapest' && { color: selectedFuelMeta.color }]}>
@@ -351,13 +358,13 @@ export default function MapScreen({ navigation }) {
 
         {stationsLoading && (
           <View style={styles.loadingBanner}>
-            <ActivityIndicator size="small" color="#2ECC71" />
+            <ActivityIndicator size="small" color={COLORS.accent} />
             <Text style={styles.loadingBannerText}>Loading stations...</Text>
           </View>
         )}
         {stationsError && !stationsLoading && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle-outline" size={14} color="#DC3545" />
+            <Ionicons name="alert-circle-outline" size={14} color={COLORS.danger} />
             <Text style={styles.errorBannerText}>{stationsError}</Text>
             <TouchableOpacity onPress={refetch} style={{ marginLeft: 8 }}>
               <Text style={styles.retryInline}>Retry</Text>
@@ -374,7 +381,7 @@ export default function MapScreen({ navigation }) {
           onPress={recenterMap}
           accessibilityLabel="Re-center on my location"
         >
-          <Ionicons name="locate-outline" size={22} color="#2ECC71" />
+          <Ionicons name="locate-outline" size={22} color={COLORS.accent} />
         </TouchableOpacity>
       )}
 
@@ -425,7 +432,7 @@ export default function MapScreen({ navigation }) {
                 onPress={navigateToDetail}
               >
                 <Text style={styles.detailBtnText}>View Details</Text>
-                <Ionicons name="chevron-forward" size={14} color="#0D1117" />
+                <Ionicons name="chevron-forward" size={14} color={COLORS.background} />
               </TouchableOpacity>
             </View>
           </View>
@@ -436,13 +443,13 @@ export default function MapScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#0D1117',
+    backgroundColor: COLORS.background,
   },
   overlayTop: {
     position: 'absolute',
@@ -452,9 +459,9 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   filterRow: {
-    backgroundColor: 'rgba(13,17,23,0.92)',
+    backgroundColor: COLORS.mapOverlayStrong,
     borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
+    borderBottomColor: COLORS.border,
   },
   filterScroll: {
     paddingHorizontal: 10,
@@ -465,16 +472,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#161B22',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#30363D',
+    borderColor: COLORS.border,
     marginRight: 6,
   },
-  filterChipText: { fontSize: 12, color: '#8B949E', fontWeight: '600' },
+  filterChipText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   brandFilterRow: {
-    backgroundColor: 'rgba(13,17,23,0.88)',
+    backgroundColor: COLORS.mapOverlayMedium,
     borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
+    borderBottomColor: COLORS.border,
   },
   brandFilterScroll: {
     paddingHorizontal: 10,
@@ -485,28 +492,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 14,
-    backgroundColor: '#1C2128',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: '#30363D',
+    borderColor: COLORS.border,
     marginRight: 4,
   },
   brandChipActive: {
-    backgroundColor: '#2ECC71',
-    borderColor: '#2ECC71',
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   brandChipText: {
     fontSize: 11,
-    color: '#8B949E',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   brandChipTextActive: {
-    color: '#0D1117',
+    color: COLORS.background,
   },
   modeRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(22,27,34,0.92)',
+    backgroundColor: COLORS.mapOverlaySurface,
     borderBottomWidth: 1,
-    borderBottomColor: '#30363D',
+    borderBottomColor: COLORS.border,
   },
   modeBtn: {
     flex: 1,
@@ -518,11 +525,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   modeBtnActive: { borderBottomWidth: 2 },
-  modeBtnText: { fontSize: 14, color: '#8B949E', fontWeight: '600' },
+  modeBtnText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
   loadingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(13,17,23,0.88)',
+    backgroundColor: COLORS.mapOverlayMedium,
     paddingHorizontal: 14,
     paddingVertical: 8,
     margin: 10,
@@ -530,28 +537,28 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: 8,
   },
-  loadingBannerText: { color: '#8B949E', fontSize: 13 },
+  loadingBannerText: { color: COLORS.textSecondary, fontSize: 13 },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(40,0,0,0.92)',
+    backgroundColor: COLORS.mapOverlayError,
     paddingHorizontal: 14,
     paddingVertical: 8,
     margin: 10,
     borderRadius: 8,
     alignSelf: 'stretch',
   },
-  errorBannerText: { color: '#DC3545', fontSize: 12, flex: 1, marginLeft: 6 },
-  retryInline: { color: '#2ECC71', fontSize: 12, fontWeight: '700' },
+  errorBannerText: { color: COLORS.danger, fontSize: 12, flex: 1, marginLeft: 6 },
+  retryInline: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   cluster: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2ECC71',
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0D1117',
+    borderColor: COLORS.background,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -562,12 +569,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#27AE60',
+    backgroundColor: COLORS.clusterLarge,
   },
   clusterText: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0D1117',
+    color: COLORS.background,
   },
   clusterTextLarge: {
     fontSize: 16,
@@ -579,9 +586,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#161B22',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#30363D',
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -595,11 +602,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#161B22',
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: 1,
-    borderColor: '#30363D',
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.5,
@@ -611,15 +618,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#30363D',
+    backgroundColor: COLORS.border,
     alignSelf: 'center',
     marginBottom: 12,
   },
   sheetRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
-  sheetName: { fontSize: 16, fontWeight: '700', color: '#E6EDF3' },
+  sheetName: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   sheetBrand: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  sheetAddress: { fontSize: 13, color: '#8B949E', marginTop: 2 },
-  sheetDistance: { fontSize: 12, color: '#555', marginTop: 2 },
+  sheetAddress: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
+  sheetDistance: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
   sheetPriceBadge: {
     marginLeft: 12,
     borderWidth: 1.5,
@@ -627,9 +634,9 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: 'center',
     minWidth: 64,
-    backgroundColor: '#0D1117',
+    backgroundColor: COLORS.background,
   },
-  sheetPriceLabel: { fontSize: 10, color: '#8B949E', fontWeight: '600', marginBottom: 2 },
+  sheetPriceLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 2 },
   sheetPrice: { fontSize: 20, fontWeight: '800' },
   sheetActions: { flexDirection: 'row', gap: 10 },
   dismissBtn: {
@@ -637,10 +644,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#30363D',
+    borderColor: COLORS.border,
     alignItems: 'center',
   },
-  dismissBtnText: { color: '#8B949E', fontWeight: '600' },
+  dismissBtnText: { color: COLORS.textSecondary, fontWeight: '600' },
   detailBtn: {
     flex: 2,
     paddingVertical: 12,
@@ -650,9 +657,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
-  detailBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 15 },
-  loadingText: { marginTop: 12, color: '#8B949E', fontSize: 14 },
-  errorText: { color: '#DC3545', fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
-  retryBtn: { backgroundColor: '#2ECC71', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
-  retryText: { color: '#0D1117', fontWeight: '700' },
+  detailBtnText: { color: COLORS.background, fontWeight: '700', fontSize: 15 },
+  loadingText: { marginTop: 12, color: COLORS.textSecondary, fontSize: 14 },
+  errorText: { color: COLORS.danger, fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
+  retryBtn: { backgroundColor: COLORS.accent, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
+  retryText: { color: COLORS.background, fontWeight: '700' },
 });
