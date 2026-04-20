@@ -179,6 +179,16 @@ export async function lookupVehicle(reg) {
 }
 
 /**
+ * Get insurance-check metadata (MIB Navigate URL, terms, disclaimer).
+ * Kept server-side so the URL can change without an app release.
+ * @returns {Promise<{ provider, url, description, terms, disclaimer, contactUrl, checkTypes }>}
+ */
+export async function getInsuranceCheckInfo() {
+  const resp = await api.get('/api/v1/vehicles/insurance-check');
+  return resp.data;
+}
+
+/**
  * Calculate the cost of a trip given origin, destination and vehicle info.
  * Uses cheapest fuel on route where available.
  * @param {object} params

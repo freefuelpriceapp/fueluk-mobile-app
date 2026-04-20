@@ -16,6 +16,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import MapScreen from './src/screens/MapScreen';
 import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
 import MoreScreen from './src/screens/MoreScreen';
+import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
 import { FEATURES } from './src/lib/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
 import { COLORS } from './src/lib/theme';
@@ -176,6 +177,11 @@ function MoreStack() {
         name="Alerts"
         component={AlertsScreen}
         options={{ title: 'My Price Alerts' }}
+      />
+      <Stack.Screen
+        name="VehicleCheck"
+        component={VehicleCheckScreen}
+        options={{ title: 'Vehicle Check' }}
       />
       <Stack.Screen
         name="Settings"
