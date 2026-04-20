@@ -11,10 +11,13 @@ import {
   Easing,
   Platform,
 } from 'react-native';
-// Conditional import — react-native-maps doesn't support web
+// Conditional imports — react-native-maps + clustering don't support web
 let MapView;
+let Marker;
 if (Platform.OS !== 'web') {
-  MapView = require('react-native-maps').default;
+  // ClusteredMapView wraps react-native-maps' MapView with built-in supercluster.
+  MapView = require('react-native-map-clustering').default;
+  Marker = require('react-native-maps').Marker;
 }
 import { Ionicons } from '@expo/vector-icons';
 import useLocation from '../hooks/useLocation';
@@ -26,21 +29,6 @@ if (Platform.OS !== 'web') {
 }
 import { resolvePrice } from '../lib/quarantine';
 
-/**
- * MapScreen — Phase 4 rebuild
- *
- * Changes from Sprint 2 stub:
- *  - Real MapView with custom dark map style
- *  - StationMarker components for each station
- *  - User's current location via showsUserLocation
- *  - Coordinate mismatch fix: transforms useLocation { coords: { latitude, longitude } }
- *    output into the { lat, lng } shape expected by useStations
- *  - Fuel type filter chips overlaid on the map
- *  - Nearby / Cheapest toggle preserved from Sprint 2
- *  - Bottom sheet detail card slides up when a marker is tapped
- *  - Callout "Tap for details" navigates to StationDetail
- */
-
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: '#2ECC71' },
   { key: 'diesel',         label: 'Diesel',         color: '#3498DB' },
@@ -49,7 +37,6 @@ const FUEL_TYPES = [
   { key: 'premium_diesel', label: 'Prem. Diesel',   color: '#E74C3C' },
 ];
 
-// Google Maps-compatible dark style that matches the app's dark theme.
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#0D1117' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#0D1117' }] },
@@ -70,21 +57,16 @@ const DARK_MAP_STYLE = [
 ];
 
 const BOTTOM_SHEET_HEIGHT = 180;
-const MAP_BUILD = 'M6'; // bump this to verify OTA delivery
 
 export default function MapScreen({ navigation }) {
   const [fuelType, setFuelType] = useState('petrol');
-  const [mode, setMode] = useState('nearby'); // 'nearby' | 'cheapest'
+  const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
 
-  // Map imperative ref — used to animate to the user's location once resolved.
   const mapRef = useRef(null);
-  // Bottom sheet slide animation
   const sheetAnim = useRef(new Animated.Value(BOTTOM_SHEET_HEIGHT)).current;
 
-  // ── Location ──────────────────────────────────────────────────────
-  // useLocation returns { coords: { latitude, longitude }, postcode, radiusKm }
-  // useStations expects { lat, lng }  — transform here to fix the mismatch.
   const { location, loading: locationLoading, error: locationError } = useLocation();
 
   const stationLocation = useMemo(() => {
@@ -95,17 +77,23 @@ export default function MapScreen({ navigation }) {
     return { lat, lng };
   }, [location]);
 
-  // ── Stations ──────────────────────────────────────────────────────
   const {
     stations,
     loading: stationsLoading,
     error: stationsError,
     refetch,
-  } = useStations(stationLocation, { fuelType, mode, radiusKm: 15 });
+  } = useStations(stationLocation, { fuelType, mode, radiusKm: 25 });
 
-  // Derive initial map region from user location. Falls back to UK default
-  // (Birmingham) if location is not yet available. The map animates to the
-  // user's real position via mapRef once coords resolve (see effect below).
+  const brands = useMemo(
+    () => [...new Set(stations.map(s => s.brand).filter(Boolean))].sort(),
+    [stations]
+  );
+
+  const filteredStations = useMemo(() => {
+    if (!selectedBrand) return stations;
+    return stations.filter(s => s.brand === selectedBrand);
+  }, [stations, selectedBrand]);
+
   const initialRegion = useMemo(() => {
     const lat = location?.coords?.latitude ?? 52.4862;
     const lng = location?.coords?.longitude ?? -1.8904;
@@ -117,7 +105,6 @@ export default function MapScreen({ navigation }) {
     };
   }, [location]);
 
-  // When the user's real coordinates arrive after mount, animate the map to them.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     if (!mapRef.current) return;
@@ -130,12 +117,11 @@ export default function MapScreen({ navigation }) {
     );
   }, [location?.coords?.latitude, location?.coords?.longitude]);
 
-  // Cheapest station for marker highlighting.
   const cheapestStationId = useMemo(() => {
-    if (!stations.length) return null;
+    if (!filteredStations.length) return null;
     let best = null;
     let bestPrice = Infinity;
-    for (const s of stations) {
+    for (const s of filteredStations) {
       const p = resolvePrice(s, fuelType);
       if (p !== null && p < bestPrice) {
         bestPrice = p;
@@ -143,11 +129,10 @@ export default function MapScreen({ navigation }) {
       }
     }
     return best;
-  }, [stations, fuelType]);
+  }, [filteredStations, fuelType]);
 
   const selectedFuelMeta = FUEL_TYPES.find(f => f.key === fuelType) || FUEL_TYPES[0];
 
-  // ── Marker tap → show bottom sheet ───────────────────────────────
   const handleMarkerPress = useCallback((station) => {
     setSelectedStation(station);
     Animated.timing(sheetAnim, {
@@ -170,13 +155,43 @@ export default function MapScreen({ navigation }) {
   const navigateToDetail = useCallback(() => {
     if (!selectedStation) return;
     dismissSheet();
-    // Small delay so the sheet dismiss animation plays cleanly
     setTimeout(() => {
       navigation.navigate('StationDetail', { station: selectedStation });
     }, 230);
   }, [selectedStation, navigation, dismissSheet]);
 
-  // ── Loading / error states ────────────────────────────────────────
+  const recenterMap = useCallback(() => {
+    const lat = location?.coords?.latitude;
+    const lng = location?.coords?.longitude;
+    if (lat == null || lng == null || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: 0.1, longitudeDelta: 0.1 },
+      400
+    );
+  }, [location]);
+
+  const renderCluster = useCallback((cluster) => {
+    const { id, geometry, onPress, properties } = cluster;
+    const points = properties.point_count;
+    const isLarge = points > 20;
+    return (
+      <Marker
+        key={`cluster-${id}`}
+        coordinate={{
+          latitude: geometry.coordinates[1],
+          longitude: geometry.coordinates[0],
+        }}
+        onPress={onPress}
+      >
+        <View style={[styles.cluster, isLarge && styles.clusterLarge]}>
+          <Text style={[styles.clusterText, isLarge && styles.clusterTextLarge]}>
+            {points}
+          </Text>
+        </View>
+      </Marker>
+    );
+  }, []);
+
   if (locationLoading) {
     return (
       <View style={styles.center}>
@@ -186,7 +201,6 @@ export default function MapScreen({ navigation }) {
     );
   }
 
-  // Only block the map on a hard location error with no usable fallback.
   if (locationError && !location) {
     return (
       <View style={styles.center}>
@@ -199,10 +213,8 @@ export default function MapScreen({ navigation }) {
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Map fills the whole screen — web fallback shows a message */}
       {!MapView ? (
         <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }]}>
           <Ionicons name="map-outline" size={48} color="#8B949E" />
@@ -217,8 +229,16 @@ export default function MapScreen({ navigation }) {
         showsMyLocationButton={Platform.OS === 'android'}
         customMapStyle={DARK_MAP_STYLE}
         onPress={dismissSheet}
+        clusterColor="#2ECC71"
+        clusterTextColor="#0D1117"
+        clusterFontFamily={undefined}
+        radius={50}
+        minZoom={1}
+        maxZoom={16}
+        extent={256}
+        renderCluster={renderCluster}
       >
-        {stations.map((station) => {
+        {filteredStations.map((station) => {
           const price = resolvePrice(station, fuelType);
           return (
             <StationMarker
@@ -235,9 +255,7 @@ export default function MapScreen({ navigation }) {
       </MapView>
       )}
 
-      {/* Safe-area overlay container — positioned at top */}
       <SafeAreaView style={styles.overlayTop} pointerEvents="box-none">
-        {/* Fuel type filter chips */}
         <View style={styles.filterRow}>
           <ScrollView
             horizontal
@@ -264,7 +282,36 @@ export default function MapScreen({ navigation }) {
           </ScrollView>
         </View>
 
-        {/* Mode toggle: Nearby vs Cheapest */}
+        {brands.length > 0 && (
+          <View style={styles.brandFilterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandFilterScroll}
+            >
+              <TouchableOpacity
+                style={[styles.brandChip, !selectedBrand && styles.brandChipActive]}
+                onPress={() => setSelectedBrand(null)}
+              >
+                <Text style={[styles.brandChipText, !selectedBrand && styles.brandChipTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              {brands.map((brand) => (
+                <TouchableOpacity
+                  key={brand}
+                  style={[styles.brandChip, selectedBrand === brand && styles.brandChipActive]}
+                  onPress={() => setSelectedBrand(prev => prev === brand ? null : brand)}
+                >
+                  <Text style={[styles.brandChipText, selectedBrand === brand && styles.brandChipTextActive]}>
+                    {brand}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.modeRow}>
           <TouchableOpacity
             style={[
@@ -302,7 +349,6 @@ export default function MapScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Loading / error banner */}
         {stationsLoading && (
           <View style={styles.loadingBanner}>
             <ActivityIndicator size="small" color="#2ECC71" />
@@ -321,14 +367,17 @@ export default function MapScreen({ navigation }) {
 
       </SafeAreaView>
 
-      {/* Debug overlay — remove after markers are confirmed working */}
-      <View style={styles.debugBadge}>
-        <Text style={styles.debugText}>
-          {MAP_BUILD} | {stations.length} stations{stationsLoading ? ' (loading)' : ''}
-        </Text>
-      </View>
+      {/* Re-center on user location */}
+      {MapView && (
+        <TouchableOpacity
+          style={styles.recenterBtn}
+          onPress={recenterMap}
+          accessibilityLabel="Re-center on my location"
+        >
+          <Ionicons name="locate-outline" size={22} color="#2ECC71" />
+        </TouchableOpacity>
+      )}
 
-      {/* Bottom sheet: selected station detail */}
       <Animated.View
         style={[
           styles.bottomSheet,
@@ -358,7 +407,6 @@ export default function MapScreen({ navigation }) {
                   </Text>
                 )}
               </View>
-              {/* Price badge */}
               {resolvePrice(selectedStation, fuelType) !== null && (
                 <View style={[styles.sheetPriceBadge, { borderColor: selectedFuelMeta.color }]}>
                   <Text style={styles.sheetPriceLabel}>{selectedFuelMeta.label}</Text>
@@ -396,7 +444,6 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#0D1117',
   },
-  // Top overlay
   overlayTop: {
     position: 'absolute',
     top: 0,
@@ -424,6 +471,37 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   filterChipText: { fontSize: 12, color: '#8B949E', fontWeight: '600' },
+  brandFilterRow: {
+    backgroundColor: 'rgba(13,17,23,0.88)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#30363D',
+  },
+  brandFilterScroll: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  brandChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: '#1C2128',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    marginRight: 4,
+  },
+  brandChipActive: {
+    backgroundColor: '#2ECC71',
+    borderColor: '#2ECC71',
+  },
+  brandChipText: {
+    fontSize: 11,
+    color: '#8B949E',
+    fontWeight: '600',
+  },
+  brandChipTextActive: {
+    color: '#0D1117',
+  },
   modeRow: {
     flexDirection: 'row',
     backgroundColor: 'rgba(22,27,34,0.92)',
@@ -465,7 +543,53 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: '#DC3545', fontSize: 12, flex: 1, marginLeft: 6 },
   retryInline: { color: '#2ECC71', fontSize: 12, fontWeight: '700' },
-  // Bottom sheet
+  cluster: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2ECC71',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0D1117',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  clusterLarge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#27AE60',
+  },
+  clusterText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0D1117',
+  },
+  clusterTextLarge: {
+    fontSize: 16,
+  },
+  recenterBtn: {
+    position: 'absolute',
+    bottom: 200,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#161B22',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
@@ -527,20 +651,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 15 },
-  // Misc
   loadingText: { marginTop: 12, color: '#8B949E', fontSize: 14 },
   errorText: { color: '#DC3545', fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
   retryBtn: { backgroundColor: '#2ECC71', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
   retryText: { color: '#0D1117', fontWeight: '700' },
-  debugBadge: {
-    position: 'absolute',
-    top: 120,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    zIndex: 999,
-  },
-  debugText: { color: '#F39C12', fontSize: 11, fontWeight: '700' },
 });
