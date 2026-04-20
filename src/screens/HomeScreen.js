@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,18 +14,35 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StationCard from '../components/StationCard';
 import BrandHeader from '../components/BrandHeader';
-import ScanningLoader from '../components/ScanningLoader';
 import BestOptionCard from '../components/BestOptionCard';
 import BrandFilter from '../components/BrandFilter';
+import { SkeletonList } from '../components/SkeletonCard';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
+import { resolvePrice } from '../lib/quarantine';
+import { rankStationsByValue } from '../lib/smartDecision';
+import { COLORS, FUEL_COLORS } from '../lib/theme';
+import { lightHaptic } from '../lib/haptics';
 
 const FUEL_TYPES = [
-  { key: 'petrol', label: 'Petrol', color: '#2ECC71' },
-  { key: 'diesel', label: 'Diesel', color: '#3498DB' },
-  { key: 'e10',    label: 'E10',    color: '#F39C12' },
+  { key: 'petrol', label: 'Petrol', color: FUEL_COLORS.petrol },
+  { key: 'diesel', label: 'Diesel', color: FUEL_COLORS.diesel },
+  { key: 'e10',    label: 'E10',    color: FUEL_COLORS.e10 },
 ];
+
+const SORT_MODES = [
+  { key: 'nearest',  label: 'Nearest',  icon: 'navigate-outline' },
+  { key: 'cheapest', label: 'Best Value', icon: 'trending-down-outline' },
+];
+
+const FUEL_PRICE_KEY = {
+  petrol: 'petrol_price',
+  diesel: 'diesel_price',
+  e10: 'e10_price',
+  super_unleaded: 'super_unleaded_price',
+  premium_diesel: 'premium_diesel_price',
+};
 
 const STATIONS_CACHE_KEY = 'cached_nearby_stations';
 
@@ -56,6 +73,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [sortMode, setSortMode] = useState('nearest'); // 'nearest' | 'cheapest'
   const { location } = useLocation();
 
   useEffect(() => { trackNearbyScreenView(); }, []);
@@ -83,7 +101,13 @@ const HomeScreen = ({ navigation }) => {
       const list = (data.stations || []).map(s => ({
         ...s,
         distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined),
-        prices: { petrol: s.petrol_price ?? null, diesel: s.diesel_price ?? null, e10: s.e10_price ?? null },
+        prices: {
+          petrol: s.petrol_price ?? null,
+          diesel: s.diesel_price ?? null,
+          e10: s.e10_price ?? null,
+          super_unleaded: s.super_unleaded_price ?? null,
+          premium_diesel: s.premium_diesel_price ?? null,
+        },
       }));
       setStations(list);
       try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch (_e) {}
@@ -119,7 +143,10 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = () => {
     setRefreshing(true);
     trackRefreshInitiated();
-    fetchStations().then(() => trackRefreshCompleted());
+    fetchStations().then(() => {
+      trackRefreshCompleted();
+      lightHaptic();
+    });
     fetchLastUpdated();
   };
 
@@ -131,6 +158,17 @@ const HomeScreen = ({ navigation }) => {
     if (Platform.OS === 'ios') Linking.openURL('app-settings:');
     else Linking.openSettings();
   };
+
+  // Sort the stations array based on the current sortMode.
+  // 'nearest' — preserve API order (already sorted by distance ascending).
+  // 'cheapest' — rank by effective price (pump price + amortised drive cost)
+  //              so that nearby stations rank higher unless a distant one is
+  //              genuinely cheaper after accounting for fuel to get there.
+  const sortedStations = useMemo(() => {
+    if (sortMode === 'nearest') return stations;
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    return rankStationsByValue(stations, { fuelKey });
+  }, [stations, sortMode, selectedFuel]);
 
   const headerSub = loading
     ? 'Scanning for the best prices near you'
@@ -146,7 +184,7 @@ const HomeScreen = ({ navigation }) => {
           onSearchPress={() => navigation.navigate('Search')}
           pulse
         />
-        <ScanningLoader />
+        <SkeletonList count={4} />
       </SafeAreaView>
     );
   }
@@ -157,12 +195,14 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <BrandHeader
         subtitle={headerSub}
+        stations={stations}
+        fuelType={selectedFuel}
         onSearchPress={() => navigation.navigate('Search')}
       />
 
       {usingFallback && (
         <View style={styles.fallbackBanner}>
-          <Ionicons name="navigate-outline" size={14} color="#F39C12" />
+          <Ionicons name="navigate-outline" size={14} color={COLORS.warning} />
           <Text style={styles.fallbackText}>
             Precise location is off \u2014 showing results for your default area.
           </Text>
@@ -174,7 +214,7 @@ const HomeScreen = ({ navigation }) => {
 
       {offline && !error && (
         <View style={styles.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color="#DC3545" />
+          <Ionicons name="cloud-offline-outline" size={14} color={COLORS.danger} />
           <Text style={styles.offlineText}>You\u2019re offline \u2014 showing cached prices.</Text>
         </View>
       )}
@@ -192,7 +232,7 @@ const HomeScreen = ({ navigation }) => {
           >
             <Text style={[
               styles.filterBtnText,
-              selectedFuel === ft.key && { color: '#0D1117' },
+              selectedFuel === ft.key && { color: COLORS.background },
             ]}>
               {ft.label}
             </Text>
@@ -200,12 +240,41 @@ const HomeScreen = ({ navigation }) => {
         ))}
       </View>
 
+      {/* Sort toggle — Nearest / Cheapest */}
+      <View style={styles.sortRow}>
+        {SORT_MODES.map(sm => {
+          const active = sortMode === sm.key;
+          return (
+            <TouchableOpacity
+              key={sm.key}
+              style={[
+                styles.sortBtn,
+                active && styles.sortBtnActive,
+              ]}
+              onPress={() => setSortMode(sm.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Ionicons
+                name={sm.icon}
+                size={13}
+                color={active ? COLORS.background : COLORS.textSecondary}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.sortBtnText, active && styles.sortBtnTextActive]}>
+                {sm.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Brand filter */}
       <BrandFilter selectedBrand={selectedBrand} onSelectBrand={setSelectedBrand} />
 
       {error ? (
         <View style={styles.centered}>
-          <Ionicons name="alert-circle-outline" size={40} color="#DC3545" />
+          <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
             <Text style={styles.retryBtnText}>Retry</Text>
@@ -213,7 +282,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       ) : (
         <FlatList
-          data={stations}
+          data={sortedStations}
           keyExtractor={(item) => item.id?.toString()}
           renderItem={({ item }) => (
             <StationCard
@@ -223,7 +292,7 @@ const HomeScreen = ({ navigation }) => {
             />
           )}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2ECC71" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
           }
           contentContainerStyle={styles.list}
           ListHeaderComponent={
@@ -235,7 +304,7 @@ const HomeScreen = ({ navigation }) => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color="#2ECC71" />
+              <Ionicons name="search-outline" size={48} color={COLORS.accent} />
               <Text style={styles.emptyTitle}>No stations found</Text>
               <Text style={styles.emptyText}>No {FUEL_TYPES.find(f => f.key === selectedFuel)?.label} stations found nearby.</Text>
               <Text style={styles.emptySubtext}>Try switching fuel type or searching a different area.</Text>
@@ -255,38 +324,63 @@ const HomeScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117', padding: 24 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, padding: 24 },
   fallbackBanner: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#2a2200',
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: COLORS.bannerWarning,
   },
-  fallbackText: { fontSize: 12, color: '#F39C12', marginLeft: 6, flex: 1 },
-  settingsLink: { fontSize: 12, color: '#2ECC71', fontWeight: '600', textDecorationLine: 'underline' },
+  fallbackText: { fontSize: 12, color: COLORS.warning, marginLeft: 6, flex: 1 },
+  settingsLink: { fontSize: 12, color: COLORS.accent, fontWeight: '600', textDecorationLine: 'underline' },
   offlineBanner: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#220000',
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: COLORS.bannerDanger,
   },
-  offlineText: { fontSize: 12, color: '#DC3545', marginLeft: 6 },
+  offlineText: { fontSize: 12, color: COLORS.danger, marginLeft: 6 },
   filterRow: {
     flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#0D1117', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1E2634',
+    backgroundColor: COLORS.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
   },
   filterBtn: {
     flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
-    borderColor: '#333', alignItems: 'center', marginHorizontal: 3,
+    borderColor: COLORS.border, alignItems: 'center', marginHorizontal: 3,
   },
-  filterBtnText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  filterBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+    gap: 8,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  sortBtnActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  sortBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  sortBtnTextActive: { color: COLORS.background },
   list: { paddingBottom: 12 },
-  errorText: { fontSize: 14, color: '#DC3545', textAlign: 'center', marginTop: 12, marginBottom: 16 },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2ECC71', borderRadius: 8 },
-  retryBtnText: { color: '#0D1117', fontWeight: '700' },
+  errorText: { fontSize: 14, color: COLORS.danger, textAlign: 'center', marginTop: 12, marginBottom: 16 },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: COLORS.accent, borderRadius: 8 },
+  retryBtnText: { color: COLORS.background, fontWeight: '700' },
   emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: '#2ECC71', marginTop: 12 },
-  emptyText: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 6 },
-  emptySubtext: { fontSize: 13, color: '#555', textAlign: 'center', marginTop: 6 },
-  footerText: { fontSize: 11, color: '#555', textAlign: 'center', paddingVertical: 16 },
-  footerStale: { color: '#F39C12' },
+  emptyTitle: { fontSize: 17, fontWeight: '600', color: COLORS.accent, marginTop: 12 },
+  emptyText: { fontSize: 15, color: COLORS.textSecondary, textAlign: 'center', marginTop: 6 },
+  emptySubtext: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 6 },
+  footerText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', paddingVertical: 16 },
+  footerStale: { color: COLORS.warning },
 });
 
 export default HomeScreen;

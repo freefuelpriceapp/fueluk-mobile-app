@@ -2,6 +2,8 @@
  * PriceCard.js
  * Displays fuel price information for a single fuel type.
  * Sprint 9 — MVP price display component
+ *
+ * Phase 1 fix: prices are in pence-per-litre; no /100 division needed.
  */
 
 import React from 'react';
@@ -15,8 +17,8 @@ import { View, Text, StyleSheet } from 'react-native';
  * @param {boolean} props.isCheapest - Highlight if cheapest nearby
  */
 const PriceCard = ({ fuelType, pricePerLitre, updatedAt, isCheapest }) => {
-  const formattedPrice = pricePerLitre
-    ? `${(pricePerLitre / 100).toFixed(1)}p`
+  const formattedPrice = pricePerLitre != null
+    ? `${pricePerLitre.toFixed(1)}p`
     : 'N/A';
 
   const formattedDate = updatedAt

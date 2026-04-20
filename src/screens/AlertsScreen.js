@@ -11,10 +11,12 @@ import {
   Alert,
 } from 'react-native';
 import { getAlerts, deleteAlert } from '../api/fuelApi';
+import { COLORS, FUEL_COLORS } from '../lib/theme';
+import { lightHaptic } from '../lib/haptics';
 import * as Notifications from 'expo-notifications';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
-const FUEL_COLOURS = { petrol: '#2ECC71', diesel: '#3498DB', e10: '#F39C12' };
+const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
 
 /**
  * AlertsScreen — Sprint 4
@@ -72,7 +74,7 @@ const AlertsScreen = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchAlerts();
+    fetchAlerts().then(lightHaptic);
   };
 
   const handleDelete = (alert) => {
@@ -99,7 +101,7 @@ const AlertsScreen = () => {
 
   const formatPrice = (pence) => {
     if (pence == null) return 'N/A';
-    return `${(pence / 100).toFixed(1)}p`;
+    return `${Number(pence).toFixed(1)}p`;
   };
 
   const renderAlert = ({ item }) => (
@@ -137,7 +139,7 @@ const AlertsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       {loading ? (
-        <ActivityIndicator size="large" color="#2ECC71" style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.accent} style={styles.loader} />
       ) : error ? (
         <View style={styles.emptyState}>
           <Text style={styles.errorText}>{error}</Text>
@@ -151,7 +153,7 @@ const AlertsScreen = () => {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderAlert}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2ECC71" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
@@ -178,37 +180,37 @@ const AlertsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   loader: { marginTop: 60 },
   listHeader: { padding: 20, paddingBottom: 8 },
-  listHeaderTitle: { fontSize: 20, fontWeight: '700', color: '#E6EDF3', marginBottom: 4 },
-  listHeaderSubtitle: { fontSize: 13, color: '#8B949E' },
+  listHeaderTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  listHeaderSubtitle: { fontSize: 13, color: COLORS.textSecondary },
   alertCard: {
     margin: 12,
     marginBottom: 0,
-    backgroundColor: '#161B22',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#21262D',
+    borderColor: COLORS.borderSubtle,
   },
   alertHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   fuelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  fuelBadgeText: { fontSize: 12, fontWeight: '700', color: '#0D1117' },
-  deleteBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#F85149' },
-  deleteBtnText: { fontSize: 12, color: '#F85149', fontWeight: '600' },
-  stationName: { fontSize: 16, fontWeight: '600', color: '#E6EDF3', marginBottom: 2 },
-  stationAddress: { fontSize: 12, color: '#8B949E', marginBottom: 12 },
-  alertDetails: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#21262D', paddingTop: 10 },
-  alertLabel: { fontSize: 13, color: '#8B949E' },
-  alertThreshold: { fontSize: 20, fontWeight: '700', color: '#2ECC71' },
+  fuelBadgeText: { fontSize: 12, fontWeight: '700', color: COLORS.background },
+  deleteBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: COLORS.dangerAlt },
+  deleteBtnText: { fontSize: 12, color: COLORS.dangerAlt, fontWeight: '600' },
+  stationName: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  stationAddress: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 },
+  alertDetails: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.borderSubtle, paddingTop: 10 },
+  alertLabel: { fontSize: 13, color: COLORS.textSecondary },
+  alertThreshold: { fontSize: 20, fontWeight: '700', color: COLORS.accent },
   emptyContainer: { flex: 1 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#E6EDF3', marginBottom: 8, textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, color: '#8B949E', textAlign: 'center', lineHeight: 20 },
-  errorText: { color: '#F85149', fontSize: 14, textAlign: 'center', marginBottom: 16 },
-  retryBtn: { backgroundColor: '#2ECC71', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  retryBtnText: { color: '#0D1117', fontWeight: '700', fontSize: 14 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 8, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 20 },
+  errorText: { color: COLORS.dangerAlt, fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  retryBtn: { backgroundColor: COLORS.accent, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  retryBtnText: { color: COLORS.background, fontWeight: '700', fontSize: 14 },
 });
 
 export default AlertsScreen;

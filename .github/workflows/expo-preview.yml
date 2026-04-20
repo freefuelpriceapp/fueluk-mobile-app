@@ -38,13 +38,15 @@ jobs:
       - name: Publish EAS Update (OTA)
         uses: expo/expo-github-action/preview@v8
         with:
-          command: update --branch ${{ github.head_ref || github.ref_name }} --message "${{ github.event.head_commit.message || github.event.pull_request.title }}" --non-interactive
+          command: eas update --branch ${{ github.head_ref || github.ref_name }} --message "Preview for ${{ github.head_ref || github.ref_name }}" --non-interactive
           comment: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install web dependencies
+        run: npx expo install react-dom react-native-web
       - name: Export web
         run: npx expo export --platform web --output-dir dist
       - uses: actions/upload-artifact@v4
         with:
-          name: web-preview-${{ github.ref_name }}-${{ github.sha }}
+          name: web-preview-${{ github.sha }}
           path: dist
           retention-days: 14

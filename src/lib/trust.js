@@ -23,6 +23,7 @@ export function formatSource(rawSource) {
   if (!rawSource || typeof rawSource !== 'string') return DEFAULT_SOURCE;
   const s = rawSource.trim().toLowerCase();
   if (!s) return DEFAULT_SOURCE;
+  if (s.includes('fuel_finder')) return 'UK Fuel Finder';
   if (s.includes('gov')) return 'GOV data';
   if (s.includes('partner')) return 'Partner feed';
   if (s.includes('user') || s.includes('community')) return 'User report';
@@ -54,6 +55,24 @@ export const FRESHNESS_COLOR = {
   unknown: '#555555',
 };
 
+export const SOURCE_DOT_COLOR = {
+  fuel_finder: '#2ECC71',
+  gov: '#3498DB',
+  partner: '#9B59B6',
+  user: '#F39C12',
+  community: '#F39C12',
+};
+
+export function getSourceDotColor(rawSource) {
+  if (!rawSource || typeof rawSource !== 'string') return null;
+  const s = rawSource.trim().toLowerCase();
+  if (!s) return null;
+  for (const [key, color] of Object.entries(SOURCE_DOT_COLOR)) {
+    if (s.includes(key)) return color;
+  }
+  return '#555';
+}
+
 export function buildTrustState(station, fuelType, quarantineFn) {
   const freshness = getFreshness(station?.last_updated);
   const source = formatSource(station?.source);
@@ -78,4 +97,12 @@ export function buildTrustState(station, fuelType, quarantineFn) {
   };
 }
 
-export default { buildTrustState, getFreshness, formatSource, FRESHNESS_COLOR, DEFAULT_SOURCE };
+export default {
+  buildTrustState,
+  getFreshness,
+  formatSource,
+  FRESHNESS_COLOR,
+  DEFAULT_SOURCE,
+  SOURCE_DOT_COLOR,
+  getSourceDotColor,
+};

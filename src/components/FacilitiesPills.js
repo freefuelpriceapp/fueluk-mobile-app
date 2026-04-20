@@ -62,7 +62,7 @@ function normalise(raw) {
   return out;
 }
 
-export default function FacilitiesPills({ facilities, max = 4 }) {
+export default function FacilitiesPills({ facilities, max = 8 }) {
   const pills = normalise(facilities).slice(0, Math.max(0, max));
   if (!pills.length) return null;
   return (

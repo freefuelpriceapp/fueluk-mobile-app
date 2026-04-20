@@ -1,28 +1,36 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { cheapestBrand } from '../lib/brandLeadership';
 
 /**
  * BrandHeader
  * Premium app header with a custom logo mark (fuel-drop + map-pin fusion),
- * a clean wordmark, and a calm dynamic subheading.
+ * a clean wordmark, and a dynamic subheading that surfaces brand leadership
+ * insights when station data is available.
+ *
+ * Props:
+ *   subtitle    - Fallback subtitle string (used when no brand data available)
+ *   stations    - Array of station objects (passed from HomeScreen)
+ *   fuelType    - Currently selected fuel type (e.g. 'petrol')
+ *   onSearchPress
+ *   theme
+ *   showSearch
+ *   pulse       - Activates loading breathing animation on the logo halo
  *
  * Pure RN primitives + @expo/vector-icons — no new dependencies.
- * Works in both light/dark themes; colours come from the `theme` prop.
  */
 const DEFAULT_THEME = {
   bg: '#0D1117',
   surface: '#12172040',
   text: '#F5F7FA',
-  muted: '#8B95A7',
+  muted: '#8B949E',
   accent: '#2ECC71',
   accentSoft: '#2ECC7122',
-  border: '#1E2634',
+  border: '#30363D',
 };
 
 function LogoMark({ size = 36, accent = '#2ECC71' }) {
-  // A fuel-drop silhouette combined with a pin bottom-point, drawn with
-  // nested Views for zero-dependency vector feel.
   const dropSize = size;
   const innerPin = size * 0.42;
   return (
@@ -78,14 +86,37 @@ function LogoMark({ size = 36, accent = '#2ECC71' }) {
   );
 }
 
+/**
+ * Build the dynamic subtitle string from brand leadership data.
+ * Returns null when no meaningful brand insight is available.
+ */
+function buildBrandSubtitle(stations, fuelType) {
+  if (!Array.isArray(stations) || stations.length === 0) return null;
+  const brand = cheapestBrand(stations, fuelType);
+  if (!brand) return null;
+  if (brand.leadByPence >= 0.5) {
+    return `${brand.brand} leads by ${brand.leadByPence.toFixed(1)}p`;
+  }
+  return `${brand.brand} cheapest nearby`;
+}
+
 export default function BrandHeader({
   subtitle = 'Finding the best nearby fuel prices',
+  stations,
+  fuelType = 'petrol',
   onSearchPress,
   theme = DEFAULT_THEME,
   showSearch = true,
   pulse = false,
 }) {
-  // Subtle breathing pulse on the logo halo when loading.
+  // Derive brand-leadership subtitle when station data is available.
+  const brandSubtitle = useMemo(
+    () => buildBrandSubtitle(stations, fuelType),
+    [stations, fuelType]
+  );
+  const displaySubtitle = brandSubtitle || subtitle;
+
+  // ── Logo halo pulse (loading state) ──────────────────────────────
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!pulse) { anim.setValue(0); return; }
@@ -101,6 +132,30 @@ export default function BrandHeader({
 
   const haloScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
   const haloOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.0] });
+
+  // ── Subtitle fade transition ──────────────────────────────────────
+  // Each time displaySubtitle changes we fade out → update → fade in.
+  const subtitleOpacity = useRef(new Animated.Value(1)).current;
+  const prevSubtitle = useRef(displaySubtitle);
+
+  useEffect(() => {
+    if (prevSubtitle.current === displaySubtitle) return;
+    Animated.sequence([
+      Animated.timing(subtitleOpacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+    prevSubtitle.current = displaySubtitle;
+  }, [displaySubtitle, subtitleOpacity]);
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
@@ -124,9 +179,12 @@ export default function BrandHeader({
           <Text style={[styles.wordmark, { color: theme.text }]} numberOfLines={1}>
             FreeFuel<Text style={{ color: theme.accent }}>Price</Text>
           </Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]} numberOfLines={1}>
-            {subtitle}
-          </Text>
+          <Animated.Text
+            style={[styles.subtitle, { color: theme.muted, opacity: subtitleOpacity }]}
+            numberOfLines={1}
+          >
+            {displaySubtitle}
+          </Animated.Text>
         </View>
         {showSearch && (
           <TouchableOpacity

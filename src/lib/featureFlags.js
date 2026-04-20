@@ -18,12 +18,20 @@ export const FEATURES = {
   search: true,              // Postcode / location search screen
   stationDetail: true,       // Individual station detail screen
   favourites: true,          // Save favourite stations locally
-  priceAlerts: false,         // Set price-drop alerts by station // LAUNCH-SAFE: gated OFF until Sprint 4 approval
+  priceAlerts: true,         // Set price-drop alerts by station (Sprint 2)
+  priceHistoryCharts: true,  // Visual 30-day price history charts (Sprint 2)
+  tripCalculator: true,      // Trip cost calculator with reg-plate lookup (Sprint 2)
   settings: true,            // Settings, privacy, support links
 
   // ─────────────────────────────────────────────────
   // FUTURE FEATURES — DISABLED (do not enable without Sprint approval)
   // ─────────────────────────────────────────────────
+
+  // Smart Decisions (Sprint 5+)
+  // "Worth the Drive?" analysis — calculates whether driving to a cheaper
+  // station saves money once fuel cost of the detour is factored in.
+  // REQUIRES: user distance baseline, MPG preference UI
+  smartDecisions: false,
 
   // Route Intelligence (Sprint 8+)
   // Fuel-aware route planning and savings estimator
