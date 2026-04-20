@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { resolvePrice } from '../lib/quarantine';
-import { getFreshness, FRESHNESS_COLOR, formatSource } from '../lib/trust';
+import { resolvePrice, evaluateStation } from '../lib/quarantine';
+import {
+  getFreshness,
+  FRESHNESS_COLOR,
+  formatSource,
+  getSourceDotColor,
+} from '../lib/trust';
 import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 
 const FAVOURITES_KEY = 'user_favourites';
@@ -15,6 +20,39 @@ const FUEL_LABELS = {
   super_unleaded: 'Super Unleaded',
   premium_diesel: 'Premium Diesel',
 };
+
+const SOURCE_FIELD = {
+  petrol: 'petrol_source',
+  diesel: 'diesel_source',
+  e10: 'e10_source',
+  super_unleaded: 'super_unleaded_source',
+  premium_diesel: 'premium_diesel_source',
+};
+
+const SOURCE_SHORT_LABEL = {
+  fuel_finder: 'Fuel Finder',
+  gov: 'GOV',
+  partner: 'Partner',
+  user: 'Community',
+  community: 'Community',
+};
+
+const QUARANTINE_LABEL = {
+  out_of_range: '\u26A0 Unverified',
+  too_old: '\u26A0 Old data',
+  deviates_from_cohort: '\u26A0 Check price',
+  flagged_upstream: '\u26A0 Under review',
+};
+
+function getSourceShortLabel(rawSource) {
+  if (!rawSource || typeof rawSource !== 'string') return null;
+  const s = rawSource.trim().toLowerCase();
+  if (!s) return null;
+  for (const key of Object.keys(SOURCE_SHORT_LABEL)) {
+    if (s.includes(key)) return SOURCE_SHORT_LABEL[key];
+  }
+  return null;
+}
 
 function formatDistance(km) {
   if (km == null) return null;
@@ -63,23 +101,61 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
   const selectedColor = FUEL_COLORS[fuelType] ?? COLORS.accent;
   const distanceLabel = formatDistance(distance_km);
 
-  // Trust / freshness
+  // Quarantine evaluation for the primary fuel
+  const evalResult = evaluateStation(station, fuelType) || {};
+  const isQuarantined = !!evalResult.quarantined;
+  const quarantineReason = evalResult.reason;
+  const quarantineLabel =
+    isQuarantined && quarantineReason && quarantineReason !== 'missing_price'
+      ? QUARANTINE_LABEL[quarantineReason] || null
+      : null;
+  const primaryDimmed =
+    isQuarantined && quarantineReason && quarantineReason !== 'missing_price';
+
+  // Freshness
   const freshness = getFreshness(last_updated || updated_at);
   const freshnessColor = FRESHNESS_COLOR[freshness.tier] ?? FRESHNESS_COLOR.unknown;
-  const sourceLabel = source ? formatSource(source) : null;
+  const hasAccentBorder =
+    freshness.tier === 'stale' || freshness.tier === 'needs_caution';
+
+  // Per-fuel source for selected fuel
+  const sourceField = SOURCE_FIELD[fuelType];
+  const fuelSource =
+    (sourceField && station?.[sourceField]) || source || null;
+  const sourceLabel = fuelSource ? formatSource(fuelSource) : null;
+  const sourceDot = getSourceDotColor(fuelSource);
+  const sourceShort = getSourceShortLabel(fuelSource);
+
   const trustLine = sourceLabel
-    ? `${freshness.label} · ${sourceLabel}`
+    ? `${freshness.label} \u00B7 ${sourceLabel}`
     : freshness.label;
 
   // Build other-fuel entries
   const otherFuels = Object.keys(FUEL_LABELS)
     .filter((ft) => ft !== fuelType)
-    .map((ft) => ({ ft, ppl: resolvePrice(station, ft) }))
+    .map((ft) => {
+      const ppl = resolvePrice(station, ft);
+      const srcField = SOURCE_FIELD[ft];
+      const rawSrc = (srcField && station?.[srcField]) || null;
+      const dot = getSourceDotColor(rawSrc);
+      const q = evaluateStation(station, ft) || {};
+      const dimmed =
+        q.quarantined && q.reason && q.reason !== 'missing_price';
+      return { ft, ppl, dot, dimmed };
+    })
     .filter(({ ppl }) => ppl !== null)
     .slice(0, 2);
 
+  const cardStyle = [
+    styles.card,
+    hasAccentBorder && {
+      borderLeftWidth: 3,
+      borderLeftColor: freshnessColor,
+    },
+  ];
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.78}>
+    <TouchableOpacity style={cardStyle} onPress={onPress} activeOpacity={0.78}>
       {/* Top row: brand + distance + favourite */}
       <View style={styles.topRow}>
         <Text style={styles.brand}>{brand ?? 'Unknown'}</Text>
@@ -110,7 +186,13 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
 
       {/* Primary price for selected fuel type */}
       <View style={styles.priceRow}>
-        <View style={[styles.primaryPriceBadge, { borderColor: selectedColor }]}>
+        <View
+          style={[
+            styles.primaryPriceBadge,
+            { borderColor: selectedColor },
+            primaryDimmed && { opacity: 0.5 },
+          ]}
+        >
           <Text style={styles.primaryFuelLabel}>
             {FUEL_LABELS[fuelType] ?? fuelType}
           </Text>
@@ -119,25 +201,58 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
               ? `${selectedPrice.toFixed(1)}p`
               : 'N/A'}
           </Text>
+          {sourceDot ? (
+            <View style={styles.sourceBadgeRow}>
+              <View
+                style={[styles.sourceDot, { backgroundColor: sourceDot }]}
+              />
+              {sourceShort ? (
+                <Text style={[styles.sourceBadgeText, { color: sourceDot }]}>
+                  {sourceShort}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
-        {/* Other fuel prices at smaller size */}
+        {/* Quarantine warning + other fuel prices */}
         <View style={styles.otherPrices}>
-          {otherFuels.map(({ ft, ppl }) => (
-            <View key={ft} style={styles.otherChip}>
-              <Text style={styles.otherFuelLabel}>{FUEL_LABELS[ft] ?? ft}</Text>
-              <Text style={styles.otherPrice}>
-                {ppl !== null ? `${ppl.toFixed(1)}p` : 'N/A'}
-              </Text>
-            </View>
-          ))}
+          {quarantineLabel ? (
+            <Text style={styles.quarantineLabel}>{quarantineLabel}</Text>
+          ) : null}
+          <View style={styles.otherChipsRow}>
+            {otherFuels.map(({ ft, ppl, dot, dimmed }) => (
+              <View
+                key={ft}
+                style={[styles.otherChip, dimmed && { opacity: 0.5 }]}
+              >
+                <View style={styles.otherChipHeader}>
+                  {dot ? (
+                    <View
+                      style={[styles.otherSourceDot, { backgroundColor: dot }]}
+                    />
+                  ) : null}
+                  <Text style={styles.otherFuelLabel}>
+                    {FUEL_LABELS[ft] ?? ft}
+                  </Text>
+                </View>
+                <Text style={styles.otherPrice}>
+                  {ppl !== null ? `${ppl.toFixed(1)}p` : 'N/A'}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
 
-      {/* Trust line: freshness + source */}
+      {/* Trust line: freshness dot + text + source */}
       <View style={styles.freshnessRow}>
-        <Ionicons name="time-outline" size={11} color={freshnessColor} />
-        <Text style={[styles.freshnessText, { color: freshnessColor }]}>{trustLine}</Text>
+        <View
+          style={[styles.freshnessDot, { backgroundColor: freshnessColor }]}
+        />
+        <Text style={[styles.freshnessText, { color: freshnessColor }]}>
+          {trustLine}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -196,7 +311,7 @@ const styles = StyleSheet.create({
   },
   priceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
@@ -220,8 +335,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 1,
   },
+  sourceBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 3,
+  },
+  sourceDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  sourceBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   otherPrices: {
     flex: 1,
+  },
+  quarantineLabel: {
+    fontSize: 9,
+    color: '#F39C12',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  otherChipsRow: {
     flexDirection: 'row',
     gap: 6,
     flexWrap: 'wrap',
@@ -232,6 +372,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     alignItems: 'center',
+  },
+  otherChipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  otherSourceDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   otherFuelLabel: {
     fontSize: 9,
@@ -248,7 +398,12 @@ const styles = StyleSheet.create({
   freshnessRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
+  },
+  freshnessDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   freshnessText: {
     fontSize: FONT_SIZES.xs,
