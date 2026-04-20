@@ -77,11 +77,19 @@ export default function FavouritesScreen({ navigation }) {
     // Prefer station name; fall back to brand if name is absent
     const displayName = item.name || item.brand || 'Station';
 
+    const a11yParts = [];
+    if (item.brand) a11yParts.push(item.brand);
+    if (item.name) a11yParts.push(item.name);
+    if (petrolPrice != null) a11yParts.push(`Petrol ${petrolPrice.toFixed(1)}p`);
+    const cardA11y = a11yParts.join(', ') || displayName;
+
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() => navigation.navigate('StationDetail', { station: item })}
         activeOpacity={0.85}
+        accessibilityLabel={cardA11y}
+        accessibilityRole="button"
       >
         <View style={styles.cardLeft}>
           <Text style={styles.stationName} numberOfLines={1}>
@@ -121,6 +129,9 @@ export default function FavouritesScreen({ navigation }) {
           style={styles.removeBtn}
           onPress={() => removeFavourite(item.id)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Remove from favourites"
+          accessibilityRole="button"
+          accessibilityState={{ checked: true }}
         >
           <Ionicons name="heart" size={24} color={COLORS.error} />
         </TouchableOpacity>
@@ -140,10 +151,9 @@ export default function FavouritesScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.emptyState}>
         <Ionicons name="heart-outline" size={64} color={COLORS.textDisabled} />
-        <Text style={styles.emptyTitle}>No Favourites Yet</Text>
+        <Text style={styles.emptyTitle}>No saved stations</Text>
         <Text style={styles.emptySubtext}>
-          Save stations you visit often by tapping the heart icon on any station.
-          Favourites stay in sync on this device, even when you're offline.
+          Tap the heart icon on any station to save it here for quick access.
         </Text>
       </SafeAreaView>
     );

@@ -36,6 +36,29 @@ export const COLORS = {
   overlay:         'rgba(0,0,0,0.7)',
   bannerWarning:   '#2a2200',
   bannerDanger:    '#220000',
+
+  // Map overlays / chrome — rgba variants of the base dark palette.
+  mapOverlayStrong:  'rgba(13,17,23,0.92)',   // background at ~92% alpha
+  mapOverlayMedium:  'rgba(13,17,23,0.88)',
+  mapOverlaySurface: 'rgba(22,27,34,0.92)',   // surface at ~92% alpha
+  mapOverlayError:   'rgba(40,0,0,0.92)',
+
+  // Map tile colours — darker-than-background greens/blues used by the
+  // custom Google map style so parks/water read as separate layers.
+  mapParkGreen:      '#0f1a0f',
+  mapWaterBlue:      '#0a1520',
+
+  // Cluster — slightly darker green used for large clusters.
+  clusterLarge:      '#27AE60',
+
+  // Placeholder / input outlines that don't fit the main palette.
+  inputBorderDark:   '#333',
+  placeholderMuted:  '#777',
+
+  // Reg plate — UK yellow plate styling used on the trip calculator.
+  plateYellow:       '#F5D300',
+  plateText:         '#111111',
+  plateBorder:       '#b8a000',
 };
 
 // ─── Fuel color map (keyed by fuel type string) ───────────────────────────────

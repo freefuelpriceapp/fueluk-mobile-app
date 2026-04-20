@@ -183,11 +183,25 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
     { transform: [{ scale: pressScale }] },
   ];
 
+  const accessibilityLabel = (() => {
+    const parts = [];
+    if (brand) parts.push(brand);
+    if (name) parts.push(name);
+    if (distanceLabel) parts.push(`${distanceLabel} away`);
+    if (selectedPrice !== null) {
+      const fuelLabel = FUEL_LABELS[fuelType] ?? fuelType;
+      parts.push(`${fuelLabel} ${selectedPrice.toFixed(1)}p`);
+    }
+    return parts.join(', ') || 'Station';
+  })();
+
   return (
     <Pressable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
     >
     <Animated.View style={cardStyle}>
       {/* Top row: brand + distance + favourite */}
@@ -204,6 +218,9 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
             onPress={toggleFavourite}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.favBtn}
+            accessibilityLabel={isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+            accessibilityRole="button"
+            accessibilityState={{ checked: isFavourite }}
           >
             <Ionicons
               name={isFavourite ? 'heart' : 'heart-outline'}

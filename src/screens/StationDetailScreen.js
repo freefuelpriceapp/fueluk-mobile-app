@@ -28,6 +28,7 @@ import { getFreshness, FRESHNESS_COLOR, formatSource } from '../lib/trust';
 import { worthTheDrive } from '../lib/smartDecision';
 import { lightHaptic, mediumHaptic, successHaptic } from '../lib/haptics';
 import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib/theme';
+import { ensurePushPermission } from '../lib/pushPermission';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -231,16 +232,14 @@ export default function StationDetailScreen({ route }) {
   const [deviceToken, setDeviceToken] = useState(null);
 
   // ─── Request push permission and obtain Expo push token ─────────────────────
+  // ensurePushPermission shows an explanatory pre-prompt when the OS
+  // permission state is "undetermined"; it's a no-op dialog-wise if the
+  // user has already granted or denied.
   useEffect(() => {
     if (!FEATURES.priceAlerts) return;
     (async () => {
       try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
+        const finalStatus = await ensurePushPermission();
         if (finalStatus !== 'granted') return;
         const tokenData = await Notifications.getExpoPushTokenAsync();
         setDeviceToken(tokenData.data);
@@ -553,6 +552,9 @@ export default function StationDetailScreen({ route }) {
               onPress={toggleFavourite}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.heartBtn}
+              accessibilityLabel={isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+              accessibilityRole="button"
+              accessibilityState={{ checked: isFavourite }}
             >
               <Animated.View style={{ transform: [{ scale: heartScale }] }}>
                 <Ionicons
@@ -571,6 +573,8 @@ export default function StationDetailScreen({ route }) {
             style={styles.directionsBtn}
             onPress={() => openDirections(station)}
             activeOpacity={0.82}
+            accessibilityLabel={`Get directions to ${station.name || station.brand || 'this station'}`}
+            accessibilityRole="link"
           >
             <Ionicons name="navigate-outline" size={18} color={THEME_COLORS.white} style={styles.directionsIcon} />
             <Text style={styles.directionsBtnText}>Get Directions</Text>
@@ -663,25 +667,31 @@ export default function StationDetailScreen({ route }) {
               <Text style={styles.pplLabel}>p/litre</Text>
             </View>
             <View style={styles.fuelTypeRow}>
-              {fuelsToRender.map((f) => (
-                <TouchableOpacity
-                  key={f.key}
-                  style={[
-                    styles.fuelTypeBtn,
-                    alertFuelType === f.key && { backgroundColor: f.color },
-                  ]}
-                  onPress={() => setAlertFuelType(f.key)}
-                >
-                  <Text
+              {fuelsToRender.map((f) => {
+                const isActive = alertFuelType === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
                     style={[
-                      styles.fuelTypeBtnText,
-                      alertFuelType === f.key && { color: COLORS.background },
+                      styles.fuelTypeBtn,
+                      isActive && { backgroundColor: f.color },
                     ]}
+                    onPress={() => setAlertFuelType(f.key)}
+                    accessibilityLabel={`Filter by ${f.label}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
                   >
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.fuelTypeBtnText,
+                        isActive && { color: COLORS.background },
+                      ]}
+                    >
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             <View style={styles.modalActions}>
               <TouchableOpacity
