@@ -49,6 +49,13 @@ export default function MoreScreen({ navigation }) {
             sublabel="Get notified when prices drop"
             onPress={() => navigation.navigate('Alerts')}
           />
+          <View style={styles.divider} />
+          <MenuRow
+            icon="car-outline"
+            label="Vehicle Check"
+            sublabel="Tax, MOT & insurance status"
+            onPress={() => navigation.navigate('VehicleCheck')}
+          />
         </View>
 
         <Text style={styles.sectionHeader}>APP</Text>
