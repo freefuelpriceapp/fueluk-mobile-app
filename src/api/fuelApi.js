@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { sanitizeStations, brandToString, safeText } from '../lib/brand';
 
 const BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://api.freefuelpriceapp.com';
 
@@ -7,6 +8,55 @@ const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
 });
+
+function sanitizeStationPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return sanitizeStations(data);
+  if (Array.isArray(data.stations)) {
+    return { ...data, stations: sanitizeStations(data.stations) };
+  }
+  return data;
+}
+
+function sanitizeBrandsPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+  const raw = Array.isArray(data) ? data : data.brands;
+  if (!Array.isArray(raw)) return data;
+  const brands = raw
+    .map((b) => {
+      if (b == null) return null;
+      if (typeof b === 'string') return { name: b, count: 0 };
+      if (typeof b === 'object') {
+        const name = brandToString(b);
+        if (!name) return null;
+        const count =
+          typeof b.count === 'number'
+            ? b.count
+            : typeof b.station_count === 'number'
+              ? b.station_count
+              : 0;
+        return { name, count };
+      }
+      return null;
+    })
+    .filter(Boolean);
+  return Array.isArray(data) ? brands : { ...data, brands };
+}
+
+function sanitizeAlertsPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+  const list = Array.isArray(data) ? data : data.alerts;
+  if (!Array.isArray(list)) return data;
+  const alerts = list.map((a) => {
+    if (!a || typeof a !== 'object') return a;
+    return {
+      ...a,
+      station_name: safeText(a.station_name),
+      station_brand: brandToString(a.station_brand),
+    };
+  });
+  return Array.isArray(data) ? alerts : { ...data, alerts };
+}
 
 /**
  * Get nearby fuel stations
@@ -18,9 +68,9 @@ const api = axios.create({
  */
 export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol', brand = null }) {
   const params = { lat, lon: lng, radius: radiusKm, fuel_type: fuel };
-  if (brand) params.brand = brand;
+  if (brand) params.brand = brandToString(brand) || brand;
   const resp = await api.get('/api/v1/stations/nearby', { params });
-  return resp.data;
+  return sanitizeStationPayload(resp.data);
 }
 
 /**
@@ -28,7 +78,7 @@ export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol
  */
 export async function getBrands() {
   const resp = await api.get('/api/v1/stations/brands');
-  return resp.data;
+  return sanitizeBrandsPayload(resp.data);
 }
 
 /**
@@ -43,7 +93,7 @@ export async function searchStations(q, { fuelType, lat, lon } = {}) {
   if (lat != null) params.lat = lat;
   if (lon != null) params.lon = lon;
   const resp = await api.get('/api/v1/stations/search', { params });
-  return resp.data;
+  return sanitizeStationPayload(resp.data);
 }
 
 /**
@@ -82,7 +132,7 @@ export async function createAlert({ station_id, fuel_type, threshold_pence, devi
  */
 export async function getAlerts(deviceToken) {
   const resp = await api.get(`/api/v1/alerts/${encodeURIComponent(deviceToken)}`);
-  return resp.data;
+  return sanitizeAlertsPayload(resp.data);
 }
 
 /**
@@ -103,7 +153,7 @@ export async function getPricesByStation(stationId, fuelType = null) {
   const params = {};
   if (fuelType) params.fuel_type = fuelType;
   const resp = await api.get(`/api/v1/prices/station/${stationId}`, { params });
-  return resp.data;
+  return sanitizeStationPayload(resp.data);
 }
 
 /**
@@ -117,7 +167,7 @@ export async function getCheapestStations({ lat, lon, radiusKm = 10, fuelType = 
   const resp = await api.get('/api/v1/stations/cheapest', {
     params: { lat, lon, radius: radiusKm, fuel_type: fuelType },
   });
-  return resp.data;
+  return sanitizeStationPayload(resp.data);
 }
 
 /**

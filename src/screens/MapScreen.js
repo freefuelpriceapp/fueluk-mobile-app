@@ -29,7 +29,7 @@ if (Platform.OS !== 'web') {
 }
 import { resolvePrice } from '../lib/quarantine';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
-import { brandToString } from '../lib/brand';
+import { brandToString, safeText } from '../lib/brand';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -405,7 +405,7 @@ export default function MapScreen({ navigation }) {
             <View style={styles.sheetRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetName} numberOfLines={1}>
-                  {selectedStation.name || brandToString(selectedStation.brand)}
+                  {safeText(selectedStation.name) || brandToString(selectedStation.brand) || 'Station'}
                 </Text>
                 {brandToString(selectedStation.brand) ? (
                   <Text style={[styles.sheetBrand, { color: selectedFuelMeta.color }]}>
@@ -413,7 +413,7 @@ export default function MapScreen({ navigation }) {
                   </Text>
                 ) : null}
                 <Text style={styles.sheetAddress} numberOfLines={1}>
-                  {selectedStation.address}
+                  {safeText(selectedStation.address)}
                 </Text>
                 {selectedStation.distance_km != null && (
                   <Text style={styles.sheetDistance}>

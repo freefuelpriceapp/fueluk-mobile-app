@@ -24,6 +24,7 @@ import { resolvePrice } from '../lib/quarantine';
 import { rankStationsByValue } from '../lib/smartDecision';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
+import { sanitizeStations } from '../lib/brand';
 
 const FUEL_TYPES = [
   { key: 'petrol', label: 'Petrol', color: FUEL_COLORS.petrol },
@@ -116,7 +117,7 @@ const HomeScreen = ({ navigation }) => {
         setOffline(true);
         try {
           const cached = await AsyncStorage.getItem(STATIONS_CACHE_KEY);
-          if (cached) { setStations(JSON.parse(cached)); setError(null); }
+          if (cached) { setStations(sanitizeStations(JSON.parse(cached)) || []); setError(null); }
           else setError('You\u2019re offline and no cached data is available.');
         } catch (_e) { setError('You\u2019re offline. Please check your connection.'); }
       } else {

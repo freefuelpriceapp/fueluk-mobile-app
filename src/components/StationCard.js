@@ -11,7 +11,7 @@ import {
 } from '../lib/trust';
 import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { mediumHaptic } from '../lib/haptics';
-import { brandToString } from '../lib/brand';
+import { brandToString, safeText } from '../lib/brand';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -186,7 +186,8 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
 
   const accessibilityLabel = (() => {
     const parts = [];
-    if (brand) parts.push(brand);
+    const brandStr = brandToString(brand);
+    if (brandStr) parts.push(brandStr);
     if (name) parts.push(name);
     if (distanceLabel) parts.push(`${distanceLabel} away`);
     if (selectedPrice !== null) {
@@ -233,8 +234,8 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
       </View>
 
       {/* Station name + address */}
-      <Text style={styles.name}>{name}</Text>
-      {address ? <Text style={styles.address}>{address}</Text> : null}
+      <Text style={styles.name}>{safeText(name)}</Text>
+      {address ? <Text style={styles.address}>{safeText(address)}</Text> : null}
 
       {/* Primary price for selected fuel type */}
       <View style={styles.priceRow}>

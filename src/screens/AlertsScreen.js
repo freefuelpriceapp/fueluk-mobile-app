@@ -15,6 +15,7 @@ import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import * as Notifications from 'expo-notifications';
 import { ensurePushPermission } from '../lib/pushPermission';
+import { brandToString, safeText } from '../lib/brand';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
 const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
@@ -76,9 +77,10 @@ const AlertsScreen = () => {
   };
 
   const handleDelete = (alert) => {
+    const stationLabel = safeText(alert.station_name) || brandToString(alert.station_brand) || 'this station';
     Alert.alert(
       'Remove Alert',
-      `Remove the ${FUEL_LABELS[alert.fuel_type] || alert.fuel_type} alert for ${alert.station_name || alert.station_brand}?`,
+      `Remove the ${FUEL_LABELS[alert.fuel_type] || alert.fuel_type} alert for ${stationLabel}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -112,8 +114,8 @@ const AlertsScreen = () => {
           <Text style={styles.deleteBtnText}>Remove</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.stationName}>{item.station_name || item.station_brand}</Text>
-      <Text style={styles.stationAddress}>{item.address}</Text>
+      <Text style={styles.stationName}>{safeText(item.station_name) || brandToString(item.station_brand) || 'Station'}</Text>
+      <Text style={styles.stationAddress}>{safeText(item.address)}</Text>
       <View style={styles.alertDetails}>
         <Text style={styles.alertLabel}>Alert when below</Text>
         <Text style={styles.alertThreshold}>{formatPrice(item.threshold_pence)}</Text>
