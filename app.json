@@ -3,7 +3,9 @@
     "name": "FreeFuelPrice UK",
     "slug": "fueluk-mobile-app",
     "version": "1.0.0",
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -13,7 +15,8 @@
       "backgroundColor": "#1a1a2e"
     },
     "updates": {
-      "fallbackToCacheTimeout": 5000,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD",
       "url": "https://u.expo.dev/6a52b661-f990-4436-9ecb-49148533d02b"
     },
     "assetBundlePatterns": [
