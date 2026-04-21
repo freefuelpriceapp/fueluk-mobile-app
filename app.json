@@ -23,6 +23,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.freefuelpriceapp.uk",
       "buildNumber": "1",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCfTsM8WGFAyEV0zZndVW8EfUycxw024Wk"
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
         "UIBackgroundModes": [
@@ -37,6 +40,11 @@
       },
       "package": "com.freefuelpriceapp.uk",
       "versionCode": 1,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCfTsM8WGFAyEV0zZndVW8EfUycxw024Wk"
+        }
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
