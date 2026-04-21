@@ -14,6 +14,7 @@
     },
     "updates": {
       "fallbackToCacheTimeout": 5000,
+      "checkAutomatically": "ON_LOAD",
       "url": "https://u.expo.dev/6a52b661-f990-4436-9ecb-49148533d02b"
     },
     "assetBundlePatterns": [
