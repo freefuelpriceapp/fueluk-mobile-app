@@ -61,6 +61,37 @@ const DARK_MAP_STYLE = [
 
 const BOTTOM_SHEET_HEIGHT = 180;
 
+// Isolates native map mount failures so a crash in react-native-maps
+// renders a safe fallback instead of tearing down the whole app.
+class MapErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: null };
+  }
+  static getDerivedStateFromError(err) {
+    return { hasError: true, message: err && err.message ? String(err.message) : 'Map unavailable' };
+  }
+  componentDidCatch(err, info) {
+    if (typeof console !== 'undefined' && console.error) {
+      console.error('[MapScreen] native map error:', err, info);
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, padding: 24 }]}>
+          <Ionicons name="map-outline" size={48} color={COLORS.textSecondary} />
+          <Text style={{ color: COLORS.text, marginTop: 12, fontSize: 15, fontWeight: '600' }}>Map couldn't load</Text>
+          <Text style={{ color: COLORS.textSecondary, marginTop: 6, fontSize: 13, textAlign: 'center' }}>
+            Use the Home tab to browse nearby stations while we sort this out.
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function MapScreen({ navigation }) {
   const [fuelType, setFuelType] = useState('petrol');
   const [mode, setMode] = useState('nearby');
@@ -74,9 +105,9 @@ export default function MapScreen({ navigation }) {
 
   const stationLocation = useMemo(() => {
     if (!location) return null;
-    const lat = location.coords?.latitude;
-    const lng = location.coords?.longitude;
-    if (lat == null || lng == null) return null;
+    const lat = Number(location.coords?.latitude);
+    const lng = Number(location.coords?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     return { lat, lng };
   }, [location]);
 
@@ -98,14 +129,32 @@ export default function MapScreen({ navigation }) {
     [stations]
   );
 
+  // Only render stations with valid finite numeric coordinates —
+  // NaN or undefined lat/lng can trigger a native crash in Google Maps.
+  const mappableStations = useMemo(() => {
+    if (!Array.isArray(stations)) return [];
+    return stations.filter((s) => {
+      if (!s) return false;
+      const lat = Number(s.lat ?? s.latitude);
+      const lng = Number(s.lon ?? s.lng ?? s.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lng);
+    });
+  }, [stations]);
+
   const filteredStations = useMemo(() => {
-    if (!selectedBrand) return stations;
-    return stations.filter(s => brandToString(s.brand) === selectedBrand);
-  }, [stations, selectedBrand]);
+    const base = selectedBrand
+      ? mappableStations.filter(s => brandToString(s.brand) === selectedBrand)
+      : mappableStations;
+    // Cap marker count so extremely dense responses don't OOM the native map.
+    return base.length > 150 ? base.slice(0, 150) : base;
+  }, [mappableStations, selectedBrand]);
 
   const initialRegion = useMemo(() => {
-    const lat = location?.coords?.latitude ?? 52.4862;
-    const lng = location?.coords?.longitude ?? -1.8904;
+    // London as last-resort fallback — always a valid finite region.
+    const rawLat = Number(location?.coords?.latitude);
+    const rawLng = Number(location?.coords?.longitude);
+    const lat = Number.isFinite(rawLat) ? rawLat : 51.5074;
+    const lng = Number.isFinite(rawLng) ? rawLng : -0.1278;
     return {
       latitude: lat,
       longitude: lng,
@@ -117,13 +166,15 @@ export default function MapScreen({ navigation }) {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     if (!mapRef.current) return;
-    const lat = location?.coords?.latitude;
-    const lng = location?.coords?.longitude;
-    if (lat == null || lng == null) return;
-    mapRef.current.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: 0.15, longitudeDelta: 0.15 },
-      600
-    );
+    const lat = Number(location?.coords?.latitude);
+    const lng = Number(location?.coords?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    try {
+      mapRef.current.animateToRegion(
+        { latitude: lat, longitude: lng, latitudeDelta: 0.15, longitudeDelta: 0.15 },
+        600
+      );
+    } catch (_e) {}
   }, [location?.coords?.latitude, location?.coords?.longitude]);
 
   const cheapestStationId = useMemo(() => {
@@ -170,31 +221,34 @@ export default function MapScreen({ navigation }) {
   }, [selectedStation, navigation, dismissSheet]);
 
   const recenterMap = useCallback(() => {
-    const lat = location?.coords?.latitude;
-    const lng = location?.coords?.longitude;
-    if (lat == null || lng == null || !mapRef.current) return;
-    mapRef.current.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: 0.1, longitudeDelta: 0.1 },
-      400
-    );
+    const lat = Number(location?.coords?.latitude);
+    const lng = Number(location?.coords?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !mapRef.current) return;
+    try {
+      mapRef.current.animateToRegion(
+        { latitude: lat, longitude: lng, latitudeDelta: 0.1, longitudeDelta: 0.1 },
+        400
+      );
+    } catch (_e) {}
   }, [location]);
 
   const renderCluster = useCallback((cluster) => {
-    const { id, geometry, onPress, properties } = cluster;
-    const points = properties.point_count;
+    const { id, geometry, onPress, properties } = cluster || {};
+    const coords = geometry && Array.isArray(geometry.coordinates) ? geometry.coordinates : null;
+    const lng = coords ? Number(coords[0]) : NaN;
+    const lat = coords ? Number(coords[1]) : NaN;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const points = properties?.point_count ?? 0;
     const isLarge = points > 20;
     return (
       <Marker
         key={`cluster-${id}`}
-        coordinate={{
-          latitude: geometry.coordinates[1],
-          longitude: geometry.coordinates[0],
-        }}
+        coordinate={{ latitude: lat, longitude: lng }}
         onPress={onPress}
       >
         <View style={[styles.cluster, isLarge && styles.clusterLarge]}>
           <Text style={[styles.clusterText, isLarge && styles.clusterTextLarge]}>
-            {points}
+            {String(points)}
           </Text>
         </View>
       </Marker>
@@ -230,38 +284,40 @@ export default function MapScreen({ navigation }) {
           <Text style={{ color: COLORS.textSecondary, marginTop: 12, fontSize: 14 }}>Map view is available on iOS and Android</Text>
         </View>
       ) : (
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        initialRegion={initialRegion}
-        showsUserLocation
-        showsMyLocationButton={Platform.OS === 'android'}
-        customMapStyle={DARK_MAP_STYLE}
-        onPress={dismissSheet}
-        clusterColor={COLORS.accent}
-        clusterTextColor={COLORS.background}
-        clusterFontFamily={undefined}
-        radius={50}
-        minZoom={1}
-        maxZoom={16}
-        extent={256}
-        renderCluster={renderCluster}
-      >
-        {filteredStations.map((station) => {
-          const price = resolvePrice(station, fuelType);
-          return (
-            <StationMarker
-              key={String(station.id)}
-              station={station}
-              cheapestPrice={price}
-              fuelType={fuelType}
-              onPress={handleMarkerPress}
-              isCheapest={station.id === cheapestStationId}
-              isSelected={selectedStation?.id === station.id}
-            />
-          );
-        })}
-      </MapView>
+      <MapErrorBoundary>
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFill}
+          initialRegion={initialRegion}
+          showsUserLocation
+          showsMyLocationButton={Platform.OS === 'android'}
+          customMapStyle={DARK_MAP_STYLE}
+          onPress={dismissSheet}
+          clusterColor={COLORS.accent}
+          clusterTextColor={COLORS.background}
+          clusterFontFamily={undefined}
+          radius={50}
+          minZoom={1}
+          maxZoom={16}
+          extent={256}
+          renderCluster={renderCluster}
+        >
+          {filteredStations.map((station) => {
+            const price = resolvePrice(station, fuelType);
+            return (
+              <StationMarker
+                key={String(station.id)}
+                station={station}
+                cheapestPrice={price}
+                fuelType={fuelType}
+                onPress={handleMarkerPress}
+                isCheapest={station.id === cheapestStationId}
+                isSelected={selectedStation?.id === station.id}
+              />
+            );
+          })}
+        </MapView>
+      </MapErrorBoundary>
       )}
 
       <SafeAreaView style={styles.overlayTop} pointerEvents="box-none">
