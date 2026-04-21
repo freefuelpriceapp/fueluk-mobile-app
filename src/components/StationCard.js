@@ -11,6 +11,7 @@ import {
 } from '../lib/trust';
 import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { mediumHaptic } from '../lib/haptics';
+import { brandToString } from '../lib/brand';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -206,7 +207,7 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
     <Animated.View style={cardStyle}>
       {/* Top row: brand + distance + favourite */}
       <View style={styles.topRow}>
-        <Text style={styles.brand}>{brand ?? 'Unknown'}</Text>
+        <Text style={styles.brand}>{brandToString(brand) || 'Unknown'}</Text>
         <View style={styles.topRight}>
           {distanceLabel ? (
             <View style={styles.distanceBadge}>

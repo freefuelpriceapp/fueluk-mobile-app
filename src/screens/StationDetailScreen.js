@@ -29,6 +29,7 @@ import { worthTheDrive } from '../lib/smartDecision';
 import { lightHaptic, mediumHaptic, successHaptic } from '../lib/haptics';
 import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib/theme';
 import { ensurePushPermission } from '../lib/pushPermission';
+import { brandToString } from '../lib/brand';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -542,9 +543,9 @@ export default function StationDetailScreen({ route }) {
             <View style={styles.stationTitleText}>
               <Text style={styles.stationName}>{station.name}</Text>
               <Text style={styles.stationAddress}>{station.address}</Text>
-              {station.brand && (
-                <Text style={styles.stationBrand}>{station.brand}</Text>
-              )}
+              {brandToString(station.brand) ? (
+                <Text style={styles.stationBrand}>{brandToString(station.brand)}</Text>
+              ) : null}
             </View>
 
             {/* Favourite heart button */}

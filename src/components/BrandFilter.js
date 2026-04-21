@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { getBrands } from '../api/fuelApi';
+import { brandToString } from '../lib/brand';
 
 const BRAND_COLORS = {
   Shell: '#FFD500',
@@ -13,6 +14,8 @@ const BRAND_COLORS = {
   Texaco: '#E31937',
 };
 
+const brandName = brandToString;
+
 export default function BrandFilter({ selectedBrand, onSelectBrand }) {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +25,13 @@ export default function BrandFilter({ selectedBrand, onSelectBrand }) {
     (async () => {
       try {
         const res = await getBrands();
-        if (mounted && res && res.brands) {
-          setBrands(res.brands);
+        if (!mounted) return;
+        const raw = Array.isArray(res) ? res : res && res.brands;
+        if (Array.isArray(raw)) {
+          const names = raw
+            .map(brandName)
+            .filter((n) => typeof n === 'string' && n.length > 0);
+          setBrands(names);
         }
       } catch (e) {
         console.warn('BrandFilter fetch error:', e.message);
@@ -55,18 +63,20 @@ export default function BrandFilter({ selectedBrand, onSelectBrand }) {
           <Text style={[styles.chipText, !selectedBrand && styles.chipTextActive]}>All</Text>
         </TouchableOpacity>
         {brands.map((b) => {
-          const active = selectedBrand === b;
-          const accent = BRAND_COLORS[b] || '#00B4D8';
+          const name = brandName(b);
+          if (!name) return null;
+          const active = selectedBrand === name;
+          const accent = BRAND_COLORS[name] || '#00B4D8';
           return (
             <TouchableOpacity
-              key={b}
+              key={name}
               style={[
                 styles.chip,
                 active && { backgroundColor: accent, borderColor: accent },
               ]}
-              onPress={() => onSelectBrand(active ? null : b)}
+              onPress={() => onSelectBrand(active ? null : name)}
             >
-              <Text style={[styles.chipText, active && { color: '#fff' }]}>{b}</Text>
+              <Text style={[styles.chipText, active && { color: '#fff' }]}>{name}</Text>
             </TouchableOpacity>
           );
         })}

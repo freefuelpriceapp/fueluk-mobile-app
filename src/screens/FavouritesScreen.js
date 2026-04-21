@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic, mediumHaptic } from '../lib/haptics';
+import { brandToString } from '../lib/brand';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -75,10 +76,11 @@ export default function FavouritesScreen({ navigation }) {
     const e10Price    = item.prices?.e10    ?? null;
 
     // Prefer station name; fall back to brand if name is absent
-    const displayName = item.name || item.brand || 'Station';
+    const brandStr = brandToString(item.brand);
+    const displayName = item.name || brandStr || 'Station';
 
     const a11yParts = [];
-    if (item.brand) a11yParts.push(item.brand);
+    if (brandStr) a11yParts.push(brandStr);
     if (item.name) a11yParts.push(item.name);
     if (petrolPrice != null) a11yParts.push(`Petrol ${petrolPrice.toFixed(1)}p`);
     const cardA11y = a11yParts.join(', ') || displayName;
