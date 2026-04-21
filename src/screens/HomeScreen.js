@@ -21,7 +21,6 @@ import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelAp
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
 import { resolvePrice } from '../lib/quarantine';
-import { rankStationsByValue } from '../lib/smartDecision';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import { sanitizeStations } from '../lib/brand';
@@ -35,7 +34,7 @@ const FUEL_TYPES = [
 
 const SORT_MODES = [
   { key: 'nearest',  label: 'Nearest',  icon: 'navigate-outline' },
-  { key: 'cheapest', label: 'Best Value', icon: 'trending-down-outline' },
+  { key: 'cheapest', label: 'Cheapest', icon: 'trending-down-outline' },
 ];
 
 const FUEL_PRICE_KEY = {
@@ -161,15 +160,39 @@ const HomeScreen = ({ navigation }) => {
     else Linking.openSettings();
   };
 
-  // Sort the stations array based on the current sortMode.
-  // 'nearest' — preserve API order (already sorted by distance ascending).
-  // 'cheapest' — rank by effective price (pump price + amortised drive cost)
-  //              so that nearby stations rank higher unless a distant one is
-  //              genuinely cheaper after accounting for fuel to get there.
   const sortedStations = useMemo(() => {
-    if (sortMode === 'nearest') return stations;
+    if (!Array.isArray(stations) || stations.length === 0) return [];
     const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
-    return rankStationsByValue(stations, { fuelKey });
+    const getDistance = (s) => {
+      if (!s) return Infinity;
+      const m = Number(s.distance_miles);
+      if (Number.isFinite(m)) return m;
+      const km = Number(s.distance_km);
+      if (Number.isFinite(km)) return km / 1.60934;
+      return Infinity;
+    };
+    const getPrice = (s) => {
+      if (!s) return Infinity;
+      const direct = Number(s[fuelKey]);
+      if (Number.isFinite(direct) && direct > 0) return direct;
+      const viaPrices = s.prices ? Number(s.prices[selectedFuel]) : NaN;
+      if (Number.isFinite(viaPrices) && viaPrices > 0) return viaPrices;
+      const viaResolve = Number(resolvePrice(s, selectedFuel));
+      if (Number.isFinite(viaResolve) && viaResolve > 0) return viaResolve;
+      return Infinity;
+    };
+    const copy = [...stations];
+    if (sortMode === 'cheapest') {
+      copy.sort((a, b) => {
+        const pa = getPrice(a);
+        const pb = getPrice(b);
+        if (pa !== pb) return pa - pb;
+        return getDistance(a) - getDistance(b);
+      });
+    } else {
+      copy.sort((a, b) => getDistance(a) - getDistance(b));
+    }
+    return copy;
   }, [stations, sortMode, selectedFuel]);
 
   const headerSub = loading
@@ -267,7 +290,7 @@ const HomeScreen = ({ navigation }) => {
                 styles.sortBtn,
                 active && styles.sortBtnActive,
               ]}
-              onPress={() => setSortMode(sm.key)}
+              onPress={() => { setSortMode(sm.key); lightHaptic(); }}
               accessibilityLabel={`Sort by ${sm.label.toLowerCase()}`}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
@@ -300,6 +323,7 @@ const HomeScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={sortedStations}
+          extraData={`${sortMode}-${selectedFuel}-${selectedBrand || ''}`}
           keyExtractor={(item) => item.id?.toString()}
           renderItem={({ item }) => (
             <StationCard
