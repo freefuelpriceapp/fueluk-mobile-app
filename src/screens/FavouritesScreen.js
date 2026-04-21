@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic, mediumHaptic } from '../lib/haptics';
 import { brandToString, safeText } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -110,7 +111,7 @@ export default function FavouritesScreen({ navigation }) {
       >
         <View style={styles.cardLeft}>
           <Text style={styles.stationName} numberOfLines={1}>
-            {displayName}
+            {toRenderableString(displayName)}
           </Text>
           <Text style={styles.stationAddress} numberOfLines={2}>
             {safeText(item.address) || safeText(item.postcode) || 'Address unavailable'}

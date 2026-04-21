@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { getBrands } from '../api/fuelApi';
 import { brandToString } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 const BRAND_COLORS = {
   Shell: '#FFD500',
@@ -63,7 +64,7 @@ export default function BrandFilter({ selectedBrand, onSelectBrand }) {
           <Text style={[styles.chipText, !selectedBrand && styles.chipTextActive]}>All</Text>
         </TouchableOpacity>
         {brands.map((b) => {
-          const name = brandName(b);
+          const name = toRenderableString(brandName(b));
           if (!name) return null;
           const active = selectedBrand === name;
           const accent = BRAND_COLORS[name] || '#00B4D8';

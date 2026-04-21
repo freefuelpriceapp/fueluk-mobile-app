@@ -25,6 +25,7 @@ import { rankStationsByValue } from '../lib/smartDecision';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import { sanitizeStations } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 const FUEL_TYPES = [
   { key: 'petrol', label: 'Petrol', color: FUEL_COLORS.petrol },
@@ -291,7 +292,7 @@ const HomeScreen = ({ navigation }) => {
       {error ? (
         <View style={styles.centered}>
           <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger} />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{toRenderableString(error)}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
             <Text style={styles.retryBtnText}>Retry</Text>
           </TouchableOpacity>
