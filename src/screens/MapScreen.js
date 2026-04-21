@@ -10,6 +10,9 @@ import {
   Animated,
   Easing,
   Platform,
+  Linking,
+  useColorScheme,
+  AccessibilityInfo,
 } from 'react-native';
 // Conditional imports — react-native-maps + clustering don't support web
 let MapView;
@@ -20,6 +23,7 @@ if (Platform.OS !== 'web') {
   Marker = require('react-native-maps').Marker;
 }
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import useLocation from '../hooks/useLocation';
 import useStations from '../hooks/useStations';
 // StationMarker also depends on react-native-maps
@@ -31,6 +35,8 @@ import { resolvePrice } from '../lib/quarantine';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import { formatPencePrice, parsePrice, isPlausiblePrice } from '../lib/price';
+import { darkMapStyleRefined, lightMapStyleRefined } from '../lib/mapStyles';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -40,26 +46,7 @@ const FUEL_TYPES = [
   { key: 'premium_diesel', label: 'Prem. Diesel',   color: FUEL_COLORS.premium_diesel },
 ];
 
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: COLORS.background }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: COLORS.background }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: COLORS.textSecondary }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: COLORS.border }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: COLORS.card }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: COLORS.border }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: COLORS.text }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: COLORS.mapParkGreen }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: COLORS.mapWaterBlue }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: FUEL_COLORS.diesel }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: COLORS.surface }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: COLORS.border }] },
-  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: COLORS.textSecondary }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: COLORS.text }] },
-];
-
-const BOTTOM_SHEET_HEIGHT = 180;
+const BOTTOM_SHEET_HEIGHT = 240;
 
 // Isolates native map mount failures so a crash in react-native-maps
 // renders a safe fallback instead of tearing down the whole app.
@@ -97,9 +84,29 @@ export default function MapScreen({ navigation }) {
   const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [visibleRegion, setVisibleRegion] = useState(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  const colorScheme = useColorScheme();
+  const mapStyle = colorScheme === 'light' ? lightMapStyleRefined : darkMapStyleRefined;
 
   const mapRef = useRef(null);
   const sheetAnim = useRef(new Animated.Value(BOTTOM_SHEET_HEIGHT)).current;
+  const regionDebounceRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((v) => { if (!cancelled) setReduceMotion(!!v); })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener
+      ? AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => setReduceMotion(!!v))
+      : null;
+    return () => {
+      cancelled = true;
+      if (sub && sub.remove) sub.remove();
+    };
+  }, []);
 
   const { location, loading: locationLoading, error: locationError } = useLocation();
 
@@ -145,9 +152,59 @@ export default function MapScreen({ navigation }) {
     const base = selectedBrand
       ? mappableStations.filter(s => brandToString(s.brand) === selectedBrand)
       : mappableStations;
-    // Cap marker count so extremely dense responses don't OOM the native map.
-    return base.length > 150 ? base.slice(0, 150) : base;
-  }, [mappableStations, selectedBrand]);
+    // Drop stations whose price doesn't normalise to something plausible —
+    // last-defence quarantine so "1374" / "1666" wire-format leaks never
+    // surface as pins. Stations with a null price still show on the list
+    // views elsewhere; they're just excluded from the visual map.
+    const plausible = base.filter((s) => isPlausiblePrice(resolvePrice(s, fuelType)));
+    return plausible.length > 150 ? plausible.slice(0, 150) : plausible;
+  }, [mappableStations, selectedBrand, fuelType]);
+
+  // Regional cohort used for tier thresholds on each pin. Recomputed
+  // only when the filtered set or fuel type changes.
+  const cohortPrices = useMemo(() => {
+    return filteredStations
+      .map((s) => parsePrice(resolvePrice(s, fuelType)))
+      .filter((p) => typeof p === 'number' && Number.isFinite(p));
+  }, [filteredStations, fuelType]);
+
+  // Stations inside the visible region + 20% buffer. Falls back to
+  // all stations until the first onRegionChange event arrives.
+  const visibleStations = useMemo(() => {
+    if (!visibleRegion) return filteredStations;
+    const { latitude, longitude, latitudeDelta, longitudeDelta } = visibleRegion;
+    const latPad = latitudeDelta * 0.6;
+    const lngPad = longitudeDelta * 0.6;
+    const minLat = latitude - latPad;
+    const maxLat = latitude + latPad;
+    const minLng = longitude - lngPad;
+    const maxLng = longitude + lngPad;
+    return filteredStations.filter((s) => {
+      const lat = Number(s.lat ?? s.latitude);
+      const lng = Number(s.lon ?? s.lng ?? s.longitude);
+      return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+    });
+  }, [filteredStations, visibleRegion]);
+
+  // Count off-screen stations cheaper than the cheapest visible one —
+  // drives the subtle "+N cheaper nearby" hint at the bottom.
+  const cheaperOffscreenCount = useMemo(() => {
+    if (!visibleRegion || visibleStations.length === filteredStations.length) return 0;
+    let visibleMin = Infinity;
+    for (const s of visibleStations) {
+      const p = parsePrice(resolvePrice(s, fuelType));
+      if (p !== null && p < visibleMin) visibleMin = p;
+    }
+    if (!Number.isFinite(visibleMin)) return 0;
+    let count = 0;
+    const visibleIds = new Set(visibleStations.map((s) => s.id));
+    for (const s of filteredStations) {
+      if (visibleIds.has(s.id)) continue;
+      const p = parsePrice(resolvePrice(s, fuelType));
+      if (p !== null && p < visibleMin) count += 1;
+    }
+    return count;
+  }, [filteredStations, visibleStations, visibleRegion, fuelType]);
 
   const initialRegion = useMemo(() => {
     // London as last-resort fallback — always a valid finite region.
@@ -182,7 +239,7 @@ export default function MapScreen({ navigation }) {
     let best = null;
     let bestPrice = Infinity;
     for (const s of filteredStations) {
-      const p = resolvePrice(s, fuelType);
+      const p = parsePrice(resolvePrice(s, fuelType));
       if (p !== null && p < bestPrice) {
         bestPrice = p;
         best = s.id;
@@ -191,34 +248,94 @@ export default function MapScreen({ navigation }) {
     return best;
   }, [filteredStations, fuelType]);
 
+  const onRegionChangeComplete = useCallback((region) => {
+    if (regionDebounceRef.current) clearTimeout(regionDebounceRef.current);
+    regionDebounceRef.current = setTimeout(() => setVisibleRegion(region), 150);
+  }, []);
+
+  useEffect(() => () => {
+    if (regionDebounceRef.current) clearTimeout(regionDebounceRef.current);
+  }, []);
+
   const selectedFuelMeta = FUEL_TYPES.find(f => f.key === fuelType) || FUEL_TYPES[0];
 
   const handleMarkerPress = useCallback((station) => {
     setSelectedStation(station);
     Animated.timing(sheetAnim, {
       toValue: 0,
-      duration: 280,
+      duration: reduceMotion ? 0 : 280,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [sheetAnim]);
+  }, [sheetAnim, reduceMotion]);
 
   const dismissSheet = useCallback(() => {
     Animated.timing(sheetAnim, {
       toValue: BOTTOM_SHEET_HEIGHT,
-      duration: 220,
+      duration: reduceMotion ? 0 : 220,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => setSelectedStation(null));
-  }, [sheetAnim]);
+  }, [sheetAnim, reduceMotion]);
 
   const navigateToDetail = useCallback(() => {
     if (!selectedStation) return;
     dismissSheet();
     setTimeout(() => {
       navigation.navigate('StationDetail', { station: selectedStation });
-    }, 230);
-  }, [selectedStation, navigation, dismissSheet]);
+    }, reduceMotion ? 0 : 230);
+  }, [selectedStation, navigation, dismissSheet, reduceMotion]);
+
+  const [isFavourite, setIsFavourite] = useState(false);
+  useEffect(() => {
+    if (!selectedStation) return;
+    let mounted = true;
+    AsyncStorage.getItem('user_favourites').then((stored) => {
+      if (!mounted) return;
+      const favs = stored ? JSON.parse(stored) : [];
+      setIsFavourite(
+        Array.isArray(favs) &&
+        favs.some((s) => (typeof s === 'object' ? s?.id === selectedStation.id : s === selectedStation.id))
+      );
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [selectedStation]);
+
+  const toggleFavourite = useCallback(async () => {
+    if (!selectedStation) return;
+    try {
+      const stored = await AsyncStorage.getItem('user_favourites');
+      const parsed = stored ? JSON.parse(stored) : [];
+      let favs = Array.isArray(parsed)
+        ? parsed.filter((s) => s && typeof s === 'object' && s.id != null)
+        : [];
+      if (isFavourite) {
+        favs = favs.filter((s) => s.id !== selectedStation.id);
+      } else {
+        favs = [...favs.filter((s) => s.id !== selectedStation.id), selectedStation];
+      }
+      await AsyncStorage.setItem('user_favourites', JSON.stringify(favs));
+      setIsFavourite(!isFavourite);
+    } catch (_e) {}
+  }, [selectedStation, isFavourite]);
+
+  const openDirections = useCallback(async () => {
+    if (!selectedStation) return;
+    const destination = encodeURIComponent(
+      selectedStation.address || selectedStation.name || ''
+    );
+    const native =
+      Platform.OS === 'ios'
+        ? `maps://?daddr=${destination}`
+        : Platform.OS === 'android'
+          ? `google.navigation:q=${destination}`
+          : `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    const fallback = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    try {
+      const canOpen = await Linking.canOpenURL(native).catch(() => false);
+      await Linking.openURL(canOpen ? native : fallback);
+    } catch (_e) {}
+  }, [selectedStation]);
 
   const recenterMap = useCallback(() => {
     const lat = Number(location?.coords?.latitude);
@@ -240,20 +357,46 @@ export default function MapScreen({ navigation }) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     const points = properties?.point_count ?? 0;
     const isLarge = points > 20;
+
+    // Compute the cheapest price among this cluster's member stations.
+    // Use a simple radius check keyed off the supercluster geometry —
+    // the library doesn't hand us the raw leaves in renderCluster.
+    let minPrice = Infinity;
+    const latTol = 0.2;
+    const lngTol = 0.2;
+    for (const s of filteredStations) {
+      const sLat = Number(s.lat ?? s.latitude);
+      const sLng = Number(s.lon ?? s.lng ?? s.longitude);
+      if (!Number.isFinite(sLat) || !Number.isFinite(sLng)) continue;
+      if (Math.abs(sLat - lat) > latTol || Math.abs(sLng - lng) > lngTol) continue;
+      const p = parsePrice(resolvePrice(s, fuelType));
+      if (p !== null && p < minPrice) minPrice = p;
+    }
+    const priceLabel = Number.isFinite(minPrice) ? `from ${minPrice.toFixed(1)}p` : null;
+
+    const a11y = priceLabel
+      ? `Cluster of ${points} stations, cheapest ${minPrice.toFixed(1)} pence. Tap to expand.`
+      : `Cluster of ${points} stations. Tap to expand.`;
+
     return (
       <Marker
         key={`cluster-${id}`}
         coordinate={{ latitude: lat, longitude: lng }}
         onPress={onPress}
+        accessibilityLabel={a11y}
+        tracksViewChanges={false}
       >
         <View style={[styles.cluster, isLarge && styles.clusterLarge]}>
-          <Text style={[styles.clusterText, isLarge && styles.clusterTextLarge]}>
+          <Text style={[styles.clusterCount, isLarge && styles.clusterCountLarge]}>
             {String(points)}
           </Text>
+          {priceLabel ? (
+            <Text style={styles.clusterPrice} numberOfLines={1}>{priceLabel}</Text>
+          ) : null}
         </View>
       </Marker>
     );
-  }, []);
+  }, [filteredStations, fuelType]);
 
   if (locationLoading) {
     return (
@@ -291,18 +434,20 @@ export default function MapScreen({ navigation }) {
           initialRegion={initialRegion}
           showsUserLocation
           showsMyLocationButton={Platform.OS === 'android'}
-          customMapStyle={DARK_MAP_STYLE}
+          customMapStyle={mapStyle}
           onPress={dismissSheet}
-          clusterColor={COLORS.accent}
-          clusterTextColor={COLORS.background}
+          onRegionChangeComplete={onRegionChangeComplete}
+          clusterColor={'#10B981'}
+          clusterTextColor={'#0B0F14'}
           clusterFontFamily={undefined}
           radius={50}
           minZoom={1}
           maxZoom={16}
           extent={256}
+          animationEnabled={!reduceMotion}
           renderCluster={renderCluster}
         >
-          {filteredStations.map((station) => {
+          {visibleStations.map((station) => {
             const price = resolvePrice(station, fuelType);
             return (
               <StationMarker
@@ -310,6 +455,7 @@ export default function MapScreen({ navigation }) {
                 station={station}
                 cheapestPrice={price}
                 fuelType={fuelType}
+                cohort={cohortPrices}
                 onPress={handleMarkerPress}
                 isCheapest={station.id === cheapestStationId}
                 isSelected={selectedStation?.id === station.id}
@@ -464,6 +610,19 @@ export default function MapScreen({ navigation }) {
           <View style={styles.sheetContent}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetRow}>
+              <View
+                style={[
+                  styles.sheetBrandBadge,
+                  { backgroundColor: brandToString(selectedStation.brand) ? '#1F2937' : '#374151' },
+                ]}
+              >
+                <Text style={styles.sheetBrandInitial}>
+                  {(brandToString(selectedStation.brand) || safeText(selectedStation.name) || '?')
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase() || '?'}
+                </Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetName} numberOfLines={1}>
                   {safeText(selectedStation.name) || brandToString(selectedStation.brand) || 'Station'}
@@ -482,30 +641,73 @@ export default function MapScreen({ navigation }) {
                   </Text>
                 )}
               </View>
-              {resolvePrice(selectedStation, fuelType) !== null && (
-                <View style={[styles.sheetPriceBadge, { borderColor: selectedFuelMeta.color }]}>
-                  <Text style={styles.sheetPriceLabel}>{selectedFuelMeta.label}</Text>
-                  <Text style={[styles.sheetPrice, { color: selectedFuelMeta.color }]}>
-                    {Number(resolvePrice(selectedStation, fuelType)).toFixed(1)}p
-                  </Text>
-                </View>
-              )}
             </View>
+
+            <View style={styles.sheetPriceRow}>
+              {FUEL_TYPES.map((ft) => {
+                const label = formatPencePrice(resolvePrice(selectedStation, ft.key));
+                if (!label) return null;
+                const isActive = ft.key === fuelType;
+                return (
+                  <View
+                    key={ft.key}
+                    style={[
+                      styles.sheetPricePill,
+                      isActive && { borderColor: ft.color, backgroundColor: 'rgba(16,185,129,0.08)' },
+                    ]}
+                  >
+                    <Text style={styles.sheetPricePillLabel}>{ft.label}</Text>
+                    <Text style={[styles.sheetPricePillValue, { color: ft.color }]}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
             <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.dismissBtn} onPress={dismissSheet}>
-                <Text style={styles.dismissBtnText}>Dismiss</Text>
+              <TouchableOpacity
+                style={styles.sheetActionBtn}
+                onPress={openDirections}
+                accessibilityLabel="Get directions"
+              >
+                <Ionicons name="navigate" size={16} color={COLORS.accent} />
+                <Text style={styles.sheetActionBtnText}>Directions</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.detailBtn, { backgroundColor: selectedFuelMeta.color }]}
-                onPress={navigateToDetail}
+                style={styles.sheetActionBtn}
+                onPress={toggleFavourite}
+                accessibilityLabel={isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+                accessibilityState={{ checked: isFavourite }}
               >
-                <Text style={styles.detailBtnText}>View Details</Text>
+                <Ionicons
+                  name={isFavourite ? 'heart' : 'heart-outline'}
+                  size={16}
+                  color={isFavourite ? '#EF4444' : COLORS.textSecondary}
+                />
+                <Text style={styles.sheetActionBtnText}>
+                  {isFavourite ? 'Saved' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetPrimaryBtn, { backgroundColor: selectedFuelMeta.color }]}
+                onPress={navigateToDetail}
+                accessibilityLabel="See station details"
+              >
+                <Text style={styles.sheetPrimaryBtnText}>See details</Text>
                 <Ionicons name="chevron-forward" size={14} color={COLORS.background} />
               </TouchableOpacity>
             </View>
           </View>
         )}
       </Animated.View>
+
+      {cheaperOffscreenCount > 0 && !selectedStation && (
+        <View style={styles.offscreenHint} pointerEvents="none">
+          <Ionicons name="trending-down" size={12} color="#10B981" />
+          <Text style={styles.offscreenHintText}>
+            +{cheaperOffscreenCount} cheaper nearby — zoom out
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -619,33 +821,60 @@ const styles = StyleSheet.create({
   errorBannerText: { color: COLORS.danger, fontSize: 12, flex: 1, marginLeft: 6 },
   retryInline: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   cluster: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.accent,
+    minWidth: 52,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: COLORS.background,
-    shadowColor: '#000',
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
   },
   clusterLarge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.clusterLarge,
+    minWidth: 66,
+    paddingVertical: 8,
+    backgroundColor: '#059669',
   },
-  clusterText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.background,
+  clusterCount: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0B0F14',
+    lineHeight: 17,
   },
-  clusterTextLarge: {
-    fontSize: 16,
+  clusterCountLarge: {
+    fontSize: 17,
+  },
+  clusterPrice: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#052E1E',
+    marginTop: 1,
+    letterSpacing: 0.2,
+  },
+  offscreenHint: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15,23,30,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    gap: 6,
+  },
+  offscreenHintText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '700',
   },
   recenterBtn: {
     position: 'absolute',
@@ -690,42 +919,82 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 12,
   },
-  sheetRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
+  sheetRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  sheetBrandBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  sheetBrandInitial: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   sheetName: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   sheetBrand: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   sheetAddress: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
   sheetDistance: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
-  sheetPriceBadge: {
-    marginLeft: 12,
-    borderWidth: 1.5,
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
-    minWidth: 64,
-    backgroundColor: COLORS.background,
+  sheetPriceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
   },
-  sheetPriceLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 2 },
-  sheetPrice: { fontSize: 20, fontWeight: '800' },
-  sheetActions: { flexDirection: 'row', gap: 10 },
-  dismissBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+  sheetPricePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 6,
   },
-  dismissBtnText: { color: COLORS.textSecondary, fontWeight: '600' },
-  detailBtn: {
-    flex: 2,
-    paddingVertical: 12,
-    borderRadius: 10,
+  sheetPricePillLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  sheetPricePillValue: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  sheetActions: { flexDirection: 'row', gap: 8 },
+  sheetActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     gap: 4,
   },
-  detailBtnText: { color: COLORS.background, fontWeight: '700', fontSize: 15 },
+  sheetActionBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sheetPrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 4,
+  },
+  sheetPrimaryBtnText: {
+    color: COLORS.background,
+    fontWeight: '800',
+    fontSize: 14,
+  },
   loadingText: { marginTop: 12, color: COLORS.textSecondary, fontSize: 14 },
   errorText: { color: COLORS.danger, fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
   retryBtn: { backgroundColor: COLORS.accent, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
