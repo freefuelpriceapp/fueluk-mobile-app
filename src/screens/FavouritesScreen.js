@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic, mediumHaptic } from '../lib/haptics';
-import { brandToString } from '../lib/brand';
+import { brandToString, safeText } from '../lib/brand';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -28,9 +28,23 @@ export default function FavouritesScreen({ navigation }) {
       const stored = await AsyncStorage.getItem(FAVOURITES_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       // Filter out legacy ID-only entries (pre-bugfix) — they lack price/name data.
+      // Coerce brand/name in case the cache was written while the backend
+      // was returning enrichment-object shapes.
       const normalised = Array.isArray(parsed)
-        ? parsed.filter((s) => s && typeof s === 'object' && s.id != null)
+        ? parsed
+            .filter((s) => s && typeof s === 'object' && s.id != null)
+            .map((s) => ({
+              ...s,
+              brand: brandToString(s.brand),
+              name: safeText(s.name),
+              address: safeText(s.address),
+              postcode: safeText(s.postcode),
+            }))
         : [];
+      // Rewrite cache if we actually changed anything, so future hydrates are clean.
+      if (Array.isArray(parsed) && JSON.stringify(normalised) !== JSON.stringify(parsed)) {
+        try { await AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify(normalised)); } catch (_e) {}
+      }
       setFavourites(normalised);
     } catch (err) {
       console.error('Failed to load favourites:', err);
@@ -77,7 +91,8 @@ export default function FavouritesScreen({ navigation }) {
 
     // Prefer station name; fall back to brand if name is absent
     const brandStr = brandToString(item.brand);
-    const displayName = item.name || brandStr || 'Station';
+    const nameStr = safeText(item.name);
+    const displayName = nameStr || brandStr || 'Station';
 
     const a11yParts = [];
     if (brandStr) a11yParts.push(brandStr);
@@ -98,7 +113,7 @@ export default function FavouritesScreen({ navigation }) {
             {displayName}
           </Text>
           <Text style={styles.stationAddress} numberOfLines={2}>
-            {item.address || item.postcode || 'Address unavailable'}
+            {safeText(item.address) || safeText(item.postcode) || 'Address unavailable'}
           </Text>
           <View style={styles.priceRow}>
             {petrolPrice != null ? (

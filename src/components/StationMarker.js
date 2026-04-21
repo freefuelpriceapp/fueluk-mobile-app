@@ -10,7 +10,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
-import { brandToString } from '../lib/brand';
+import { brandToString, safeText } from '../lib/brand';
 
 const FUEL_COLORS = {
   petrol: '#2ECC71',
@@ -77,7 +77,7 @@ const StationMarker = ({ station, cheapestPrice, fuelType, onPress, isCheapest, 
       >
         <View style={styles.callout}>
           <Text style={styles.calloutName} numberOfLines={1}>
-            {station.name || brandToString(station.brand)}
+            {safeText(station.name) || brandToString(station.brand) || 'Station'}
           </Text>
           {brandToString(station.brand) ? (
             <Text style={[styles.calloutBrand, { color: fuelColor }]}>{brandToString(station.brand)}</Text>

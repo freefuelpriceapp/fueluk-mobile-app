@@ -29,7 +29,7 @@ import { worthTheDrive } from '../lib/smartDecision';
 import { lightHaptic, mediumHaptic, successHaptic } from '../lib/haptics';
 import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib/theme';
 import { ensurePushPermission } from '../lib/pushPermission';
-import { brandToString } from '../lib/brand';
+import { brandToString, safeText } from '../lib/brand';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -289,10 +289,10 @@ export default function StationDetailScreen({ route }) {
         : [];
       const stationSnapshot = {
         id: station.id,
-        name: station.name,
-        brand: station.brand,
-        address: station.address,
-        postcode: station.postcode,
+        name: safeText(station.name),
+        brand: brandToString(station.brand),
+        address: safeText(station.address),
+        postcode: safeText(station.postcode),
         petrol_price: station.petrol_price,
         diesel_price: station.diesel_price,
         e10_price: station.e10_price,
@@ -541,8 +541,8 @@ export default function StationDetailScreen({ route }) {
         <View style={styles.stationHeader}>
           <View style={styles.stationTitleRow}>
             <View style={styles.stationTitleText}>
-              <Text style={styles.stationName}>{station.name}</Text>
-              <Text style={styles.stationAddress}>{station.address}</Text>
+              <Text style={styles.stationName}>{safeText(station.name) || 'Station'}</Text>
+              <Text style={styles.stationAddress}>{safeText(station.address)}</Text>
               {brandToString(station.brand) ? (
                 <Text style={styles.stationBrand}>{brandToString(station.brand)}</Text>
               ) : null}
@@ -574,7 +574,7 @@ export default function StationDetailScreen({ route }) {
             style={styles.directionsBtn}
             onPress={() => openDirections(station)}
             activeOpacity={0.82}
-            accessibilityLabel={`Get directions to ${station.name || station.brand || 'this station'}`}
+            accessibilityLabel={`Get directions to ${station.name || brandToString(station.brand) || 'this station'}`}
             accessibilityRole="link"
           >
             <Ionicons name="navigate-outline" size={18} color={THEME_COLORS.white} style={styles.directionsIcon} />
