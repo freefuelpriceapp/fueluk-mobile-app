@@ -29,6 +29,7 @@ if (Platform.OS !== 'web') {
 }
 import { resolvePrice } from '../lib/quarantine';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
+import { brandToString } from '../lib/brand';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -86,13 +87,19 @@ export default function MapScreen({ navigation }) {
   } = useStations(stationLocation, { fuelType, mode, radiusKm: 25 });
 
   const brands = useMemo(
-    () => [...new Set(stations.map(s => s.brand).filter(Boolean))].sort(),
+    () => [
+      ...new Set(
+        stations
+          .map(s => brandToString(s.brand))
+          .filter(n => typeof n === 'string' && n.length > 0)
+      ),
+    ].sort(),
     [stations]
   );
 
   const filteredStations = useMemo(() => {
     if (!selectedBrand) return stations;
-    return stations.filter(s => s.brand === selectedBrand);
+    return stations.filter(s => brandToString(s.brand) === selectedBrand);
   }, [stations, selectedBrand]);
 
   const initialRegion = useMemo(() => {
@@ -398,13 +405,13 @@ export default function MapScreen({ navigation }) {
             <View style={styles.sheetRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetName} numberOfLines={1}>
-                  {selectedStation.name || selectedStation.brand}
+                  {selectedStation.name || brandToString(selectedStation.brand)}
                 </Text>
-                {selectedStation.brand && (
+                {brandToString(selectedStation.brand) ? (
                   <Text style={[styles.sheetBrand, { color: selectedFuelMeta.color }]}>
-                    {selectedStation.brand}
+                    {brandToString(selectedStation.brand)}
                   </Text>
-                )}
+                ) : null}
                 <Text style={styles.sheetAddress} numberOfLines={1}>
                   {selectedStation.address}
                 </Text>

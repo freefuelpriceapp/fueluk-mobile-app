@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cheapestBrand } from '../lib/brandLeadership';
+import { brandToString } from '../lib/brand';
 
 /**
  * BrandHeader
@@ -94,10 +95,12 @@ function buildBrandSubtitle(stations, fuelType) {
   if (!Array.isArray(stations) || stations.length === 0) return null;
   const brand = cheapestBrand(stations, fuelType);
   if (!brand) return null;
+  const brandName = brandToString(brand.brand);
+  if (!brandName) return null;
   if (brand.leadByPence >= 0.5) {
-    return `${brand.brand} leads by ${brand.leadByPence.toFixed(1)}p`;
+    return `${brandName} leads by ${brand.leadByPence.toFixed(1)}p`;
   }
-  return `${brand.brand} cheapest nearby`;
+  return `${brandName} cheapest nearby`;
 }
 
 export default function BrandHeader({

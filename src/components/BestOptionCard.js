@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { filterRankable } from '../lib/quarantine';
+import { brandToString } from '../lib/brand';
 
 /**
  * BestOptionCard — hero intelligence card for the top of the Nearby list.
@@ -114,7 +115,7 @@ export default function BestOptionCard({ stations, fuelType = 'petrol', onPress 
           <Text style={styles.topLabel}>Best option near you</Text>
         </View>
         <Text style={styles.stationName} numberOfLines={1}>
-          {best.station.name || best.station.brand}
+          {best.station.name || brandToString(best.station.brand)}
         </Text>
         <View style={styles.metaRow}>
           {best.price != null && (

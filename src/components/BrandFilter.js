@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { getBrands } from '../api/fuelApi';
+import { brandToString } from '../lib/brand';
 
 const BRAND_COLORS = {
   Shell: '#FFD500',
@@ -13,12 +14,7 @@ const BRAND_COLORS = {
   Texaco: '#E31937',
 };
 
-function brandName(b) {
-  if (b == null) return '';
-  if (typeof b === 'string') return b;
-  if (typeof b === 'object') return b.name || b.brand || '';
-  return String(b);
-}
+const brandName = brandToString;
 
 export default function BrandFilter({ selectedBrand, onSelectBrand }) {
   const [brands, setBrands] = useState([]);
