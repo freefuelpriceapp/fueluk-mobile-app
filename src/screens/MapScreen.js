@@ -30,6 +30,7 @@ if (Platform.OS !== 'web') {
 import { resolvePrice } from '../lib/quarantine';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { brandToString, safeText } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -311,17 +312,21 @@ export default function MapScreen({ navigation }) {
                   All
                 </Text>
               </TouchableOpacity>
-              {brands.map((brand) => (
-                <TouchableOpacity
-                  key={brand}
-                  style={[styles.brandChip, selectedBrand === brand && styles.brandChipActive]}
-                  onPress={() => setSelectedBrand(prev => prev === brand ? null : brand)}
-                >
-                  <Text style={[styles.brandChipText, selectedBrand === brand && styles.brandChipTextActive]}>
-                    {brand}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {brands.map((brand) => {
+                const brandLabel = toRenderableString(brand);
+                if (!brandLabel) return null;
+                return (
+                  <TouchableOpacity
+                    key={brandLabel}
+                    style={[styles.brandChip, selectedBrand === brandLabel && styles.brandChipActive]}
+                    onPress={() => setSelectedBrand(prev => prev === brandLabel ? null : brandLabel)}
+                  >
+                    <Text style={[styles.brandChipText, selectedBrand === brandLabel && styles.brandChipTextActive]}>
+                      {brandLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         )}

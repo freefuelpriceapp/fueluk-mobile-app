@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -25,6 +25,51 @@ import { initNotifications, registerNotificationResponseHandler } from './src/li
 import { COLORS } from './src/lib/theme';
 
 const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
+// Bumping this forces a one-shot purge of AsyncStorage caches that might hold
+// the legacy brand-enrichment shape ({ name, count }) from the pre-hardening
+// API. Each bump wipes `cached_nearby_stations` and normalises `user_favourites`.
+const CACHE_VERSION = 2;
+const CACHE_VERSION_KEY = 'cache_schema_version';
+const STATIONS_CACHE_KEY = 'cached_nearby_stations';
+const FAVOURITES_KEY = 'user_favourites';
+
+async function runCacheMigration() {
+  try {
+    const stored = await AsyncStorage.getItem(CACHE_VERSION_KEY);
+    const version = stored ? parseInt(stored, 10) : 0;
+    if (version >= CACHE_VERSION) return;
+    // Purge stations cache — it's re-fetched on launch anyway.
+    try { await AsyncStorage.removeItem(STATIONS_CACHE_KEY); } catch (_) {}
+    // Normalise favourites — strip any brand/name object shape left behind.
+    try {
+      const favsRaw = await AsyncStorage.getItem(FAVOURITES_KEY);
+      if (favsRaw) {
+        const parsed = JSON.parse(favsRaw);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed
+            .filter((s) => s && typeof s === 'object' && s.id != null)
+            .map((s) => {
+              const brand = s.brand;
+              const name = s.name;
+              return {
+                ...s,
+                brand: typeof brand === 'string'
+                  ? brand
+                  : (brand && typeof brand === 'object' && typeof brand.name === 'string' ? brand.name : ''),
+                name: typeof name === 'string'
+                  ? name
+                  : (name && typeof name === 'object' && typeof name.name === 'string' ? name.name : ''),
+              };
+            });
+          await AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (_) {}
+    try { await AsyncStorage.setItem(CACHE_VERSION_KEY, String(CACHE_VERSION)); } catch (_) {}
+  } catch (_) {
+    // Migration failures must never crash app startup.
+  }
+}
 
 // Install global crash handlers (uncaught JS errors + unhandled promise rejections)
 // before any React tree is mounted. Safe to call multiple times — idempotent.
@@ -41,35 +86,90 @@ const Stack = createStackNavigator();
 // ─────────────────────────────────────────────────────────────────────────────
 // ErrorBoundary
 // ─────────────────────────────────────────────────────────────────────────────
+// Truncate + trim the first N frames of a component stack so we can render
+// it on the error screen without blowing up the layout. Always returns a
+// string — never an object or nullish.
+function extractComponentStackLines(stack, maxLines = 6) {
+  if (!stack || typeof stack !== 'string') return '';
+  const lines = stack.split('\n').map((l) => l.trim()).filter(Boolean);
+  return lines.slice(0, maxLines).join('\n');
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, errorMessage: null };
+    this.state = {
+      hasError: false,
+      errorName: null,
+      errorMessage: null,
+      componentStackTop: null,
+    };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, errorMessage: error?.message || 'An unexpected error occurred.' };
+    return {
+      hasError: true,
+      errorName: error?.name || 'Error',
+      errorMessage: error?.message || 'An unexpected error occurred.',
+    };
   }
 
   componentDidCatch(error, info) {
+    const rawStack = info?.componentStack || '';
+    const componentStackTop = extractComponentStackLines(rawStack, 6);
+    // Update state so the stack is visible on the error screen itself. Do this
+    // even in production — we're shipping OTA to a user-side APK and need
+    // the stack rendered so screenshots tell us what crashed.
+    this.setState({ componentStackTop });
     try {
-      logger.fatal('react_render_error', { componentStack: info?.componentStack?.slice(0, 500) }, error);
+      // eslint-disable-next-line no-console
+      console.error('[ErrorBoundary] render crash',
+        error?.name,
+        error?.message,
+        '\nerror.stack:', error?.stack,
+        '\ncomponentStack:', rawStack,
+      );
+    } catch (_) {}
+    try {
+      logger.fatal(
+        'react_render_error',
+        {
+          errorName: error?.name,
+          componentStack: rawStack.slice(0, 1200),
+          stack: typeof error?.stack === 'string' ? error.stack.slice(0, 1200) : undefined,
+        },
+        error
+      );
     } catch (_) {}
   }
 
   handleReload = () => {
-    this.setState({ hasError: false, errorMessage: null });
+    this.setState({ hasError: false, errorName: null, errorMessage: null, componentStackTop: null });
   };
 
   render() {
     if (this.state.hasError) {
+      const { errorName, errorMessage, componentStackTop } = this.state;
       return (
         <View style={errorStyles.container}>
           <Ionicons name="warning-outline" size={56} color={COLORS.warning} />
           <Text style={errorStyles.title}>Something went wrong</Text>
+          {errorName ? (
+            <Text style={errorStyles.errorType}>{String(errorName)}</Text>
+          ) : null}
           <Text style={errorStyles.message}>
-            {this.state.errorMessage}
+            {String(errorMessage || '')}
           </Text>
+          {componentStackTop ? (
+            <ScrollView
+              style={errorStyles.stackBox}
+              contentContainerStyle={errorStyles.stackBoxContent}
+            >
+              <Text style={errorStyles.stackText} selectable>
+                {String(componentStackTop)}
+              </Text>
+            </ScrollView>
+          ) : null}
           <Text style={errorStyles.hint}>
             If this keeps happening, try restarting the app.
           </Text>
@@ -98,12 +198,40 @@ const errorStyles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
+  errorType: {
+    fontSize: 12,
+    color: COLORS.warning,
+    textAlign: 'center',
+    marginBottom: 6,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   message: {
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 20,
+  },
+  stackBox: {
+    alignSelf: 'stretch',
+    maxHeight: 140,
+    marginTop: 10,
+    marginBottom: 12,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.border,
+  },
+  stackBoxContent: {
+    padding: 10,
+  },
+  stackText: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: COLORS.textMuted,
+    fontFamily: 'monospace',
   },
   hint: {
     fontSize: 12,
@@ -282,6 +410,9 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // Run cache migration before any screen reads AsyncStorage so stale
+      // object-shaped brand/name values can't leak into render.
+      await runCacheMigration();
       try {
         const flag = await AsyncStorage.getItem(LOCATION_PERMISSION_SHOWN_KEY);
         setShowPermissionGate(!flag);

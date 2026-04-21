@@ -16,6 +16,7 @@ import { lightHaptic } from '../lib/haptics';
 import * as Notifications from 'expo-notifications';
 import { ensurePushPermission } from '../lib/pushPermission';
 import { brandToString, safeText } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
 const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
@@ -108,7 +109,7 @@ const AlertsScreen = () => {
     <View style={styles.alertCard}>
       <View style={styles.alertHeader}>
         <View style={[styles.fuelBadge, { backgroundColor: FUEL_COLOURS[item.fuel_type] || '#888' }]}>
-          <Text style={styles.fuelBadgeText}>{FUEL_LABELS[item.fuel_type] || item.fuel_type}</Text>
+          <Text style={styles.fuelBadgeText}>{toRenderableString(FUEL_LABELS[item.fuel_type] || item.fuel_type)}</Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteBtn}>
           <Text style={styles.deleteBtnText}>Remove</Text>
@@ -142,7 +143,7 @@ const AlertsScreen = () => {
         <ActivityIndicator size="large" color={COLORS.accent} style={styles.loader} />
       ) : error ? (
         <View style={styles.emptyState}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{toRenderableString(error)}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={fetchAlerts}>
             <Text style={styles.retryBtnText}>Retry</Text>
           </TouchableOpacity>

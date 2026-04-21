@@ -30,6 +30,7 @@ import { lightHaptic, mediumHaptic, successHaptic } from '../lib/haptics';
 import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib/theme';
 import { ensurePushPermission } from '../lib/pushPermission';
 import { brandToString, safeText } from '../lib/brand';
+import { toRenderableString } from '../lib/safeRender';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -429,7 +430,7 @@ export default function StationDetailScreen({ route }) {
       <View key={fuelType} style={styles.fuelCard}>
         <View style={styles.fuelHeader}>
           <View style={[styles.fuelDot, { backgroundColor: color }]} />
-          <Text style={styles.fuelLabel}>{label}</Text>
+          <Text style={styles.fuelLabel}>{toRenderableString(label)}</Text>
 
           {live ? (
             <View style={styles.priceContainer}>
@@ -654,7 +655,7 @@ export default function StationDetailScreen({ route }) {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Set Price Alert</Text>
             <Text style={styles.modalSubtitle}>
-              Notify me when {FUEL_LABELS[alertFuelType]} drops below:
+              Notify me when {toRenderableString(FUEL_LABELS[alertFuelType])} drops below:
             </Text>
             <View style={styles.inputRow}>
               <TextInput
@@ -688,7 +689,7 @@ export default function StationDetailScreen({ route }) {
                         isActive && { color: COLORS.background },
                       ]}
                     >
-                      {f.label}
+                      {toRenderableString(f.label)}
                     </Text>
                   </TouchableOpacity>
                 );
