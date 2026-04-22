@@ -39,6 +39,27 @@ import {
 } from '../lib/priceTiers';
 import { brandColor, brandShortName, brandAbbrev } from '../lib/brandColors';
 
+// v4: render the brand initial inside a visible 24x24 circle to the
+// LEFT of the price.  The initial is derived from the first character
+// of the brand name (uppercased), falling back to "?" for unknowns.
+function brandInitial(brand) {
+  if (!brand) return '?';
+  const s = String(brand).trim();
+  if (!s) return '?';
+  const c = s.charAt(0).toUpperCase();
+  return /[A-Z0-9]/.test(c) ? c : '?';
+}
+
+// Width budget for the "XXX.Xp" price label on Android.  The previous
+// 3.85x multiplier was derived from iOS tabular-nums metrics and clipped
+// variable-width Roboto glyphs on Android.  0.72x per char (worst case
+// "888.8p") keeps the label fully inside its container.
+const PRICE_CHAR_RATIO = 0.72;
+const PRICE_LABEL_CHARS = 6;
+function priceTextMinWidth(priceFont) {
+  return Math.ceil(priceFont * PRICE_CHAR_RATIO * PRICE_LABEL_CHARS);
+}
+
 const FADE_DURATION = 200;
 const STAGGER_PER_PIN = 15;
 const MAX_STAGGER = 500;
@@ -97,6 +118,7 @@ const StationMarker = ({
 
   const brand = brandToString(station.brand);
   const chipColor = brandColor(brand);
+  const initial = brandInitial(brand);
   const isExpensive = effectiveTier === PIN_TIER.PRICEY;
   const brandLabel = isExpensive
     ? brandAbbrev(brand)
@@ -240,47 +262,62 @@ const StationMarker = ({
             </View>
           )}
 
-          {/* Row 1: price (hero). Always full format, never truncated. */}
-          <Text
-            style={[
-              styles.priceText,
-              {
-                color: style.text,
-                fontSize: style.priceFont,
-                lineHeight: Math.round(style.priceFont * 1.1),
-                minWidth: Math.round(style.priceFont * 3.85),
-              },
-            ]}
-            numberOfLines={1}
-            ellipsizeMode="clip"
-            allowFontScaling={false}
-          >
-            {priceLabel || ''}
-          </Text>
-
-          {/* Row 2: brand chip + name. Elevated tiers allow wrapping up to
-              two lines; neutral/expensive stay on one line. */}
-          {style.showBrand && brandLabel ? (
-            <View style={styles.brandRow}>
-              <View style={[styles.brandChip, { backgroundColor: chipColor }]}>
-                {isSupermarket && (
-                  <View style={styles.supermarketDot} />
-                )}
-                {fuelDot && (
-                  <View style={[styles.fuelDot, { backgroundColor: fuelDot }]} />
-                )}
-              </View>
+          {/* Row 1: brand-initial circle + price (hero).
+              The circle sits IN-FLOW (no absolute positioning) so it
+              never overlaps the price.  The price uses a worst-case
+              width budget so the full "XXX.Xp" label always fits. */}
+          <View style={styles.heroRow}>
+            <View
+              style={[
+                styles.brandInitialCircle,
+                { backgroundColor: chipColor },
+              ]}
+            >
               <Text
-                style={[
-                  styles.brandText,
-                  { color: style.subText, fontSize: style.brandFont },
-                ]}
-                numberOfLines={effectiveTier === PIN_TIER.CHEAPEST ? 2 : 1}
+                style={styles.brandInitialText}
+                numberOfLines={1}
                 allowFontScaling={false}
               >
-                {brandLabel}
+                {initial}
               </Text>
+              {isSupermarket && (
+                <View style={styles.supermarketDot} />
+              )}
+              {fuelDot && (
+                <View style={[styles.fuelDot, { backgroundColor: fuelDot }]} />
+              )}
             </View>
+            <Text
+              style={[
+                styles.priceText,
+                {
+                  color: style.text,
+                  fontSize: style.priceFont,
+                  lineHeight: Math.round(style.priceFont * 1.1),
+                  minWidth: priceTextMinWidth(style.priceFont),
+                },
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="clip"
+              allowFontScaling={false}
+            >
+              {priceLabel || ''}
+            </Text>
+          </View>
+
+          {/* Row 2: brand name. Elevated tiers allow wrapping up to
+              two lines; neutral/expensive stay on one line. */}
+          {style.showBrand && brandLabel ? (
+            <Text
+              style={[
+                styles.brandText,
+                { color: style.subText, fontSize: style.brandFont },
+              ]}
+              numberOfLines={effectiveTier === PIN_TIER.CHEAPEST ? 2 : 1}
+              allowFontScaling={false}
+            >
+              {brandLabel}
+            </Text>
           ) : null}
 
           {/* Row 3: savings delta (elevated tiers only, when > threshold). */}
@@ -359,53 +396,66 @@ const styles = StyleSheet.create({
   priceText: {
     fontWeight: '800',
     letterSpacing: 0.2,
-    textAlign: 'center',
+    textAlign: 'left',
     flexShrink: 0,
     flexGrow: 0,
     includeFontPadding: false,
-    fontVariant: ['tabular-nums'],
+    // NOTE: deliberately NO fontVariant: tabular-nums — on Android the
+    // variant is ignored and the measurement pass still uses the default
+    // (variable-width) glyph metrics, which means a min-width sized to
+    // tabular widths clips the label on first paint.
   },
-  brandRow: {
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
-    maxWidth: 120,
+    alignSelf: 'stretch',
+    justifyContent: 'flex-start',
   },
-  brandChip: {
-    width: 10,
-    height: 10,
-    borderRadius: 3,
-    marginRight: 4,
+  brandInitialCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 6,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.25)',
+  },
+  brandInitialText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   supermarketDot: {
     position: 'absolute',
     top: -3,
     right: -3,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#F59E0B',
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: '#0B0F14',
   },
   fuelDot: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    borderWidth: 0.5,
+    bottom: -3,
+    right: -3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    borderWidth: 1,
     borderColor: '#0B0F14',
   },
   brandText: {
     fontWeight: '600',
     letterSpacing: 0.1,
     flexShrink: 0,
-    maxWidth: 100,
+    maxWidth: 120,
+    marginTop: 3,
     includeFontPadding: false,
   },
   deltaText: {
