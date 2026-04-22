@@ -37,6 +37,7 @@ import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
 import { formatPencePrice, parsePrice, isPlausiblePrice } from '../lib/price';
 import { darkMapStyleRefined, lightMapStyleRefined } from '../lib/mapStyles';
+import { buildTierClassifier, PIN_TIER } from '../lib/priceTiers';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -47,6 +48,22 @@ const FUEL_TYPES = [
 ];
 
 const BOTTOM_SHEET_HEIGHT = 240;
+
+function formatRelativeTime(iso) {
+  if (!iso) return 'just now';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'recently';
+  const diffMs = Date.now() - d.getTime();
+  if (diffMs < 60 * 1000) return 'just now';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
 
 // Isolates native map mount failures so a crash in react-native-maps
 // renders a safe fallback instead of tearing down the whole app.
@@ -185,6 +202,35 @@ export default function MapScreen({ navigation }) {
       return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
     });
   }, [filteredStations, visibleRegion]);
+
+  // Prices from the currently-visible stations. Drives the tier
+  // classifier below so pin colouring re-flows as the user pans/zooms.
+  const visiblePrices = useMemo(() => {
+    return visibleStations
+      .map((s) => parsePrice(resolvePrice(s, fuelType)))
+      .filter((p) => typeof p === 'number' && Number.isFinite(p));
+  }, [visibleStations, fuelType]);
+
+  const tierClassifier = useMemo(
+    () => buildTierClassifier(visiblePrices),
+    [visiblePrices]
+  );
+
+  // Summary stats for the status strip at the top of the map.
+  const mapStatus = useMemo(() => {
+    const count = visibleStations.length;
+    let min = Infinity;
+    let minStation = null;
+    for (const s of visibleStations) {
+      const p = parsePrice(resolvePrice(s, fuelType));
+      if (p !== null && p < min) {
+        min = p;
+        minStation = s;
+      }
+    }
+    const cheapestPrice = Number.isFinite(min) ? min : null;
+    return { count, cheapestPrice, cheapestStation: minStation };
+  }, [visibleStations, fuelType]);
 
   // Count off-screen stations cheaper than the cheapest visible one —
   // drives the subtle "+N cheaper nearby" hint at the bottom.
@@ -337,6 +383,20 @@ export default function MapScreen({ navigation }) {
     } catch (_e) {}
   }, [selectedStation]);
 
+  const recenterCheapest = useCallback(() => {
+    const s = mapStatus.cheapestStation;
+    if (!s || !mapRef.current) return;
+    const lat = Number(s.lat ?? s.latitude);
+    const lng = Number(s.lon ?? s.lng ?? s.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    try {
+      mapRef.current.animateToRegion(
+        { latitude: lat, longitude: lng, latitudeDelta: 0.08, longitudeDelta: 0.08 },
+        450
+      );
+    } catch (_e) {}
+  }, [mapStatus.cheapestStation]);
+
   const recenterMap = useCallback(() => {
     const lat = Number(location?.coords?.latitude);
     const lng = Number(location?.coords?.longitude);
@@ -356,7 +416,6 @@ export default function MapScreen({ navigation }) {
     const lat = coords ? Number(coords[1]) : NaN;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     const points = properties?.point_count ?? 0;
-    const isLarge = points > 20;
 
     // Compute the cheapest price among this cluster's member stations.
     // Use a simple radius check keyed off the supercluster geometry —
@@ -372,7 +431,17 @@ export default function MapScreen({ navigation }) {
       const p = parsePrice(resolvePrice(s, fuelType));
       if (p !== null && p < minPrice) minPrice = p;
     }
-    const priceLabel = Number.isFinite(minPrice) ? `from ${minPrice.toFixed(1)}p` : null;
+    const hasOverallCheapest = Number.isFinite(minPrice)
+      && cheapestStationId != null
+      && filteredStations.some((s) => {
+        if (s.id !== cheapestStationId) return false;
+        const sLat = Number(s.lat ?? s.latitude);
+        const sLng = Number(s.lon ?? s.lng ?? s.longitude);
+        return Number.isFinite(sLat) && Number.isFinite(sLng)
+          && Math.abs(sLat - lat) <= latTol
+          && Math.abs(sLng - lng) <= lngTol;
+      });
+    const priceLabel = Number.isFinite(minPrice) ? `from ${minPrice.toFixed(0)}p` : null;
 
     const a11y = priceLabel
       ? `Cluster of ${points} stations, cheapest ${minPrice.toFixed(1)} pence. Tap to expand.`
@@ -386,8 +455,8 @@ export default function MapScreen({ navigation }) {
         accessibilityLabel={a11y}
         tracksViewChanges={false}
       >
-        <View style={[styles.cluster, isLarge && styles.clusterLarge]}>
-          <Text style={[styles.clusterCount, isLarge && styles.clusterCountLarge]}>
+        <View style={[styles.cluster, hasOverallCheapest && styles.clusterCheapest]}>
+          <Text style={styles.clusterCount} numberOfLines={1}>
             {String(points)}
           </Text>
           {priceLabel ? (
@@ -396,7 +465,7 @@ export default function MapScreen({ navigation }) {
         </View>
       </Marker>
     );
-  }, [filteredStations, fuelType]);
+  }, [filteredStations, fuelType, cheapestStationId]);
 
   if (locationLoading) {
     return (
@@ -447,18 +516,22 @@ export default function MapScreen({ navigation }) {
           animationEnabled={!reduceMotion}
           renderCluster={renderCluster}
         >
-          {visibleStations.map((station) => {
+          {visibleStations.map((station, idx) => {
             const price = resolvePrice(station, fuelType);
+            const parsed = parsePrice(price);
+            const tier = station.id === cheapestStationId
+              ? PIN_TIER.CHEAPEST
+              : tierClassifier(parsed);
             return (
               <StationMarker
                 key={String(station.id)}
                 station={station}
                 cheapestPrice={price}
-                fuelType={fuelType}
-                cohort={cohortPrices}
+                tier={tier}
                 onPress={handleMarkerPress}
-                isCheapest={station.id === cheapestStationId}
                 isSelected={selectedStation?.id === station.id}
+                staggerIndex={idx}
+                reduceMotion={reduceMotion}
               />
             );
           })}
@@ -569,6 +642,35 @@ export default function MapScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {mapStatus.count > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.statusStrip,
+              colorScheme === 'light' && styles.statusStripLight,
+            ]}
+            onPress={recenterCheapest}
+            accessibilityRole="button"
+            accessibilityLabel={`${mapStatus.count} stations visible. Cheapest ${
+              mapStatus.cheapestPrice != null ? mapStatus.cheapestPrice.toFixed(1) + ' pence' : 'unavailable'
+            }. Updated ${formatRelativeTime(mapStatus.cheapestStation?.last_updated)}. Tap to recentre on cheapest.`}
+          >
+            <Text style={styles.statusStripText} numberOfLines={1}>
+              <Text style={styles.statusStripStrong}>{String(mapStatus.count)}</Text>
+              <Text>{' stations'}</Text>
+              {mapStatus.cheapestPrice != null && (
+                <>
+                  <Text style={styles.statusDot}>{' · '}</Text>
+                  <Text>{'Cheapest '}</Text>
+                  <Text style={styles.statusStripStrong}>{mapStatus.cheapestPrice.toFixed(1)}p</Text>
+                </>
+              )}
+              <Text style={styles.statusDot}>{' · '}</Text>
+              <Text>{'Updated '}</Text>
+              <Text>{formatRelativeTime(mapStatus.cheapestStation?.last_updated)}</Text>
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {stationsLoading && (
           <View style={styles.loadingBanner}>
@@ -796,6 +898,33 @@ const styles = StyleSheet.create({
   },
   modeBtnActive: { borderBottomWidth: 2 },
   modeBtnText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
+  statusStrip: {
+    height: 28,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(31,41,55,0.9)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  statusStripLight: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  statusStripText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.1,
+  },
+  statusStripStrong: {
+    color: COLORS.text,
+    fontWeight: '800',
+  },
+  statusDot: {
+    color: COLORS.textMuted,
+  },
   loadingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -821,39 +950,38 @@ const styles = StyleSheet.create({
   errorBannerText: { color: COLORS.danger, fontSize: 12, flex: 1, marginLeft: 6 },
   retryInline: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   cluster: {
-    minWidth: 52,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
-    backgroundColor: '#10B981',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1F2937',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.25)',
-    shadowColor: '#10B981',
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
     elevation: 6,
   },
-  clusterLarge: {
-    minWidth: 66,
-    paddingVertical: 8,
-    backgroundColor: '#059669',
+  clusterCheapest: {
+    backgroundColor: '#10B981',
+    borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#10B981',
+    shadowOpacity: 0.75,
+    shadowRadius: 10,
+    elevation: 10,
   },
   clusterCount: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0B0F14',
-    lineHeight: 17,
-  },
-  clusterCountLarge: {
-    fontSize: 17,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 16,
   },
   clusterPrice: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#052E1E',
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 1,
     letterSpacing: 0.2,
   },
