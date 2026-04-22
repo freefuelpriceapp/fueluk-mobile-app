@@ -555,9 +555,17 @@ export default function MapScreen({ navigation }) {
           clusterColor={'#10B981'}
           clusterTextColor={'#0B0F14'}
           clusterFontFamily={undefined}
-          radius={50}
+          // v4: supercluster radius bumped from 50 → 80 (screen pixels at
+          // extent=256). On a 360dp-wide Android, 80px ≈ 22% of the map
+          // width, so stations tighter than that collapse into a cluster
+          // instead of stacking as overlapping illegible cards. maxZoom
+          // reduced from 16 → 14 so the "no more clustering" cutoff
+          // happens at a further-in zoom level, keeping city views
+          // clean while still letting the user zoom in to see individuals.
+          radius={80}
           minZoom={1}
-          maxZoom={16}
+          maxZoom={14}
+          minPoints={2}
           extent={256}
           animationEnabled={!reduceMotion}
           renderCluster={renderCluster}

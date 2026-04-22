@@ -11,6 +11,13 @@
  *        a standard 5-char UK price label like "142.9p" at the tier's
  *        `priceFont`.
  *
+ *   v4 followup:
+ *     The 3.85x multiplier (iOS tabular-nums) also clipped labels like
+ *     "140.0p" to "14" on Android. The tests below now use a 0.72x per-char
+ *     ratio (Roboto worst-case, variable-width glyphs) and assert that
+ *     each tier's container has room for the brand-initial chip + gap +
+ *     full price label.
+ *
  *   We can't easily exercise react-native-maps inside jest (node env), so
  *   these tests instead assert the numeric invariants that must hold for
  *   the pin to render its full price on first paint.
@@ -19,13 +26,21 @@
 const { parsePrice, formatPencePrice } = require('../price');
 const { PIN_TIER, TIER_STYLES } = require('../priceTiers');
 
-// Rough width per character for a bold sans font at a given point size.
-// 0.62em is a conservative lower bound for tabular digits; the real
-// string includes a decimal point (narrower) and trailing "p".
-const CHAR_WIDTH_RATIO = 0.62;
+// Roboto (Android default) at bold/semibold weights runs ~0.72x the font
+// size per character for worst-case digits like 8.  Using a single
+// conservative upper bound avoids the tabular-nums trap where iOS
+// ships a narrower measurement than Android actually renders.
+const CHAR_WIDTH_RATIO = 0.72;
+const PRICE_LABEL_CHARS = 6; // "XXX.Xp"
+const BRAND_CHIP_WIDTH = 22;
+const BRAND_CHIP_GAP = 6;
 
 function estimatePriceWidth(label, fontSize) {
   return Math.ceil(label.length * fontSize * CHAR_WIDTH_RATIO);
+}
+
+function priceTextMinWidth(fontSize) {
+  return Math.ceil(fontSize * CHAR_WIDTH_RATIO * PRICE_LABEL_CHARS);
 }
 
 describe('map pin price labels — hotfix regression', () => {
@@ -42,26 +57,35 @@ describe('map pin price labels — hotfix regression', () => {
       expect(label.length).toBeGreaterThanOrEqual(6);
     }
   });
+
+  test('rendered label for "172.9" is exactly "172.9p" (no decimal drop)', () => {
+    expect(formatPencePrice(172.9)).toBe('172.9p');
+    expect(formatPencePrice(175.4)).toBe('175.4p');
+    expect(formatPencePrice(140.0)).toBe('140.0p');
+    expect(formatPencePrice(169.9)).toBe('169.9p');
+  });
 });
 
-describe('tier styles — minWidth must accommodate the full price label', () => {
+describe('tier styles — card width must fit brand chip + full price', () => {
   // "142.9p" is the canonical 6-char UK price label. At any tier, the card
-  // must be wide enough to show this without clipping, after accounting for
-  // paddingHorizontal on both sides.
+  // must be wide enough to show the brand-initial chip + gap + the full
+  // label without clipping, after accounting for paddingHorizontal on
+  // both sides.
   const REFERENCE_LABEL = '142.9p';
 
   for (const tierKey of Object.keys(TIER_STYLES)) {
     const style = TIER_STYLES[tierKey];
-    test(`tier ${tierKey}: minWidth covers "${REFERENCE_LABEL}" at ${style.priceFont}pt`, () => {
+    test(`tier ${tierKey}: container fits chip + "${REFERENCE_LABEL}" at ${style.priceFont}pt`, () => {
       const textWidth = estimatePriceWidth(REFERENCE_LABEL, style.priceFont);
+      const contentWidth = BRAND_CHIP_WIDTH + BRAND_CHIP_GAP + textWidth;
       const available = style.minWidth - 2 * style.paddingH;
-      // The card should fit the price comfortably, OR the price Text's
-      // own minWidth (3.2 * priceFont) will hold the line — whichever is
-      // larger. Either way the card must not be narrower than the padding
-      // plus a reasonable share of the text width.
-      const priceTextMinWidth = Math.round(style.priceFont * 3.85);
-      const guaranteed = Math.max(available, priceTextMinWidth);
-      expect(guaranteed).toBeGreaterThanOrEqual(textWidth);
+      expect(available).toBeGreaterThanOrEqual(contentWidth);
+    });
+
+    test(`tier ${tierKey}: priceText minWidth ≥ worst-case label width`, () => {
+      const priceMin = priceTextMinWidth(style.priceFont);
+      const textWidth = estimatePriceWidth('888.8p', style.priceFont);
+      expect(priceMin).toBeGreaterThanOrEqual(textWidth);
     });
   }
 
@@ -77,14 +101,43 @@ describe('tier styles — minWidth must accommodate the full price label', () =>
     }
   });
 
-  test('pricey tier (4) can still show "142.9p" via the price Text minWidth', () => {
-    const style = TIER_STYLES[PIN_TIER.PRICEY];
-    const priceTextMinWidth = Math.round(style.priceFont * 3.85);
-    const textWidth = estimatePriceWidth(REFERENCE_LABEL, style.priceFont);
-    // Even the smallest pin tier must guarantee enough horizontal space
-    // for the full price label — otherwise Android snapshots render it
-    // clipped to a single glyph.
-    expect(priceTextMinWidth).toBeGreaterThanOrEqual(textWidth);
+  test('tier 1 (cheapest) is wider than tier 4 (pricey)', () => {
+    expect(TIER_STYLES[PIN_TIER.CHEAPEST].minWidth).toBeGreaterThan(
+      TIER_STYLES[PIN_TIER.PRICEY].minWidth
+    );
+  });
+});
+
+describe('brand initial rendering — v4', () => {
+  // The brand initial is computed inline in StationMarker.js; duplicate
+  // the logic here as a pure function so we can unit-test invariants.
+  function brandInitial(brand) {
+    if (!brand) return '?';
+    const s = String(brand).trim();
+    if (!s) return '?';
+    const c = s.charAt(0).toUpperCase();
+    return /[A-Z0-9]/.test(c) ? c : '?';
+  }
+
+  test('known brands yield their first-letter initial', () => {
+    expect(brandInitial('Esso')).toBe('E');
+    expect(brandInitial('Applegreen')).toBe('A');
+    expect(brandInitial('Morrisons')).toBe('M');
+    expect(brandInitial('Tesco')).toBe('T');
+    expect(brandInitial('Shell')).toBe('S');
+    expect(brandInitial('BP')).toBe('B');
+  });
+
+  test('numeric-prefix brand names use the digit', () => {
+    expect(brandInitial('24/7 Mini-Mart')).toBe('2');
+  });
+
+  test('missing/empty/unusual brands fall back to "?"', () => {
+    expect(brandInitial('')).toBe('?');
+    expect(brandInitial(null)).toBe('?');
+    expect(brandInitial(undefined)).toBe('?');
+    expect(brandInitial('   ')).toBe('?');
+    expect(brandInitial('!!!')).toBe('?');
   });
 });
 

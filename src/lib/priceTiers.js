@@ -28,6 +28,19 @@ export const PIN_TIER = {
   STALE:    'stale',
 };
 
+// v4 minWidth sizing notes:
+//   The price label is always "XXX.Xp" (6 chars).  On Android, the
+//   variable-width glyphs rendered by the system font need ~0.72x the
+//   font size per character as a conservative upper bound — so at 18pt
+//   the string is ~18*6*0.72 = 78px wide.  Add 2x paddingH on each side
+//   PLUS the 24x24 brand-initial chip PLUS a 6px gap, and we land at
+//   ~78 + 24 + 6 + 18 = 126px for the cheapest tier.  Previous values
+//   (minWidth: 84 for tier 1) were clipping the price on real devices.
+//
+//   We size minWidth so that even if React Native's initial measure
+//   pass ships an underestimate to the native marker snapshot, the
+//   container still has enough room for the full label.  See
+//   stationMarkerLayout.test.js for the numeric invariants.
 export const TIER_STYLES = {
   1: {
     bg:          '#10B981',
@@ -40,8 +53,8 @@ export const TIER_STYLES = {
     opacity:     1,
     priceFont:   18,
     brandFont:   11,
-    minWidth:    84,
-    paddingH:    9,
+    minWidth:    140,
+    paddingH:    10,
     paddingV:    6,
     showDelta:   true,
     showBrand:   true,
@@ -60,8 +73,8 @@ export const TIER_STYLES = {
     opacity:     1,
     priceFont:   16,
     brandFont:   10,
-    minWidth:    76,
-    paddingH:    8,
+    minWidth:    128,
+    paddingH:    9,
     paddingV:    5,
     showDelta:   true,
     showBrand:   true,
@@ -80,8 +93,8 @@ export const TIER_STYLES = {
     opacity:     1,
     priceFont:   14,
     brandFont:   9,
-    minWidth:    64,
-    paddingH:    7,
+    minWidth:    116,
+    paddingH:    8,
     paddingV:    4,
     showDelta:   false,
     showBrand:   true,
@@ -96,12 +109,12 @@ export const TIER_STYLES = {
     subText:     'rgba(229,231,235,0.75)',
     deltaText:   'rgba(229,231,235,0.6)',
     glow:        false,
-    scale:       0.88,
+    scale:       0.9,
     opacity:     0.9,
-    priceFont:   11,
+    priceFont:   12,
     brandFont:   8,
-    minWidth:    44,
-    paddingH:    5,
+    minWidth:    96,
+    paddingH:    7,
     paddingV:    3,
     showDelta:   false,
     showBrand:   true,
@@ -120,8 +133,8 @@ export const TIER_STYLES = {
     opacity:     0.6,
     priceFont:   13,
     brandFont:   9,
-    minWidth:    60,
-    paddingH:    6,
+    minWidth:    112,
+    paddingH:    8,
     paddingV:    4,
     showDelta:   false,
     showBrand:   true,
