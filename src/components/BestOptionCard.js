@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { filterRankable } from '../lib/quarantine';
 import { brandToString, safeText } from '../lib/brand';
+import { normaliseSelectedReason } from '../lib/selectedReason';
 
 /**
  * BestOptionCard — hero intelligence card for the top of the Nearby list.
@@ -86,8 +87,9 @@ function timeAgo(iso) {
   } catch (_) { return null; }
 }
 
-export default function BestOptionCard({ stations, fuelType = 'petrol', onPress }) {
+export default function BestOptionCard({ stations, fuelType = 'petrol', onPress, selectedReason = null }) {
   const best = pickBest(stations, fuelType);
+  const reasonText = normaliseSelectedReason(selectedReason);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(12)).current;
 
@@ -132,6 +134,18 @@ export default function BestOptionCard({ stations, fuelType = 'petrol', onPress 
             </Text>
           )}
         </View>
+        {reasonText && (
+          <View
+            style={styles.reasonRow}
+            accessible
+            accessibilityLabel={reasonText}
+          >
+            <Ionicons name="checkmark-circle" size={12} color={THEME.muted} />
+            <Text style={styles.reasonText} numberOfLines={2}>
+              {reasonText}
+            </Text>
+          </View>
+        )}
         <View style={styles.tagRow}>
           {best.tags.map((t, i) => (
             <View key={i} style={styles.tag}>
@@ -168,6 +182,13 @@ const styles = StyleSheet.create({
   price: { fontSize: 15, fontWeight: '700', color: THEME.accent },
   fuelLabel: { fontSize: 12, fontWeight: '500', color: THEME.muted },
   meta: { fontSize: 12, color: THEME.muted },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 8,
+  },
+  reasonText: { fontSize: 12, color: THEME.muted, flexShrink: 1 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: {
     flexDirection: 'row', alignItems: 'center',
