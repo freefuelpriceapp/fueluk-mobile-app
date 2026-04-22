@@ -21,6 +21,7 @@ import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelAp
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
 import { resolvePrice } from '../lib/quarantine';
+import { extractSelectedReason } from '../lib/selectedReason';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import { sanitizeStations } from '../lib/brand';
@@ -75,6 +76,7 @@ const HomeScreen = ({ navigation }) => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
   const [sortMode, setSortMode] = useState('nearest'); // 'nearest' | 'cheapest'
+  const [selectedReason, setSelectedReason] = useState(null);
   const { location } = useLocation();
 
   useEffect(() => { trackNearbyScreenView(); }, []);
@@ -111,6 +113,7 @@ const HomeScreen = ({ navigation }) => {
         },
       }));
       setStations(list);
+      setSelectedReason(extractSelectedReason(data));
       try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch (_e) {}
     } catch (err) {
       if (isOffline(err)) {
@@ -341,6 +344,7 @@ const HomeScreen = ({ navigation }) => {
               stations={stations}
               fuelType={selectedFuel}
               onPress={handleStationPress}
+              selectedReason={selectedReason}
             />
           }
           ListEmptyComponent={
