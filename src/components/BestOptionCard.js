@@ -1,20 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { filterRankable } from '../lib/quarantine';
+import { resolvePrice } from '../lib/quarantine';
 import { brandToString, safeText } from '../lib/brand';
 import { normaliseSelectedReason } from '../lib/selectedReason';
+import { chooseBestOption } from '../lib/bestOption';
 
 /**
  * BestOptionCard — hero intelligence card for the top of the Nearby list.
  *
- * Analyses the loaded stations and picks the best, then shows a concise
- * explanation ("Cheapest nearby", "Closest", "Freshest data", "Best value").
+ * Renders the backend-authoritative Best Option station. The backend owns
+ * the choice; this component does not recompute. If `bestOption` is
+ * provided, it is rendered as-is. Otherwise, for legacy callers, we fall
+ * back to picking the nearest non-stale station from `stations`.
  *
  * Props:
- *   stations  – full array of nearby station objects
- *   fuelType  – 'petrol' | 'diesel' | 'e10'
- *   onPress   – tap handler (navigate to StationDetail)
+ *   bestOption     – station object chosen by the backend (preferred)
+ *   stations       – full array of nearby station objects (fallback only)
+ *   fuelType       – 'petrol' | 'diesel' | 'e10'
+ *   onPress        – tap handler (navigate to StationDetail)
+ *   selectedReason – backend-provided reason string; rendered verbatim
  */
 
 const THEME = {
@@ -26,57 +31,6 @@ const THEME = {
   tag: '#2ECC7120',
 };
 
-function pickBest(stations, fuelType) {
-  if (!stations || !stations.length) return null;
-  const priceKey = fuelType === 'diesel' ? 'diesel_price' : fuelType === 'e10' ? 'e10_price' : 'petrol_price';
-  const altKey = fuelType === 'diesel' ? 'diesel' : fuelType === 'e10' ? 'e10' : 'petrol';
-
-    const withPrice = filterRankable(stations, fuelType);
-  if (!withPrice.length) return null;
-
-  const cheapest = [...withPrice].sort((a, b) => {
-    const pa = a[priceKey] ?? a.prices?.[altKey];
-    const pb = b[priceKey] ?? b.prices?.[altKey];
-    return pa - pb;
-  })[0];
-
-  const closest = [...withPrice].sort((a, b) => {
-    const da = a.distance_miles ?? a.distance_km ?? 999;
-    const db = b.distance_miles ?? b.distance_km ?? 999;
-    return da - db;
-  })[0];
-
-  const freshest = [...withPrice].sort((a, b) => {
-    const ta = a.last_updated ? new Date(a.last_updated).getTime() : 0;
-    const tb = b.last_updated ? new Date(b.last_updated).getTime() : 0;
-    return tb - ta;
-  })[0];
-
-  // Scoring: price rank (70%) + distance rank (30%)
-  const ranked = withPrice.map(s => {
-    const price = s[priceKey] ?? s.prices?.[altKey];
-    const dist = s.distance_miles ?? s.distance_km ?? 999;
-    return { s, price, dist };
-  }).sort((a, b) => a.price * 0.7 + a.dist * 0.3 - (b.price * 0.7 + b.dist * 0.3));
-  const best = ranked[0].s;
-
-  const tags = [];
-  if (best.id === cheapest.id) tags.push({ label: 'Cheapest nearby', icon: 'pricetag' });
-  if (best.id === closest.id) tags.push({ label: 'Closest', icon: 'navigate' });
-  if (best.id === freshest.id) tags.push({ label: 'Freshest data', icon: 'time' });
-  if (!tags.length) tags.push({ label: 'Best value', icon: 'star' });
-
-  const price = best[priceKey] ?? best.prices?.[altKey];
-  const dist = best.distance_miles != null
-    ? `${best.distance_miles.toFixed(1)} mi`
-    : best.distance_km != null
-    ? `${best.distance_km.toFixed(1)} km`
-    : null;
-  const updated = best.last_updated ? timeAgo(best.last_updated) : null;
-
-  return { station: best, tags, price, dist, updated };
-}
-
 function timeAgo(iso) {
   try {
     const diff = (Date.now() - new Date(iso).getTime()) / 60000;
@@ -87,14 +41,26 @@ function timeAgo(iso) {
   } catch (_) { return null; }
 }
 
-export default function BestOptionCard({ stations, fuelType = 'petrol', onPress, selectedReason = null }) {
-  const best = pickBest(stations, fuelType);
+function formatDistance(station) {
+  if (station.distance_miles != null && Number.isFinite(station.distance_miles)) {
+    return `${station.distance_miles.toFixed(1)} mi`;
+  }
+  if (station.distance_km != null && Number.isFinite(station.distance_km)) {
+    return `${station.distance_km.toFixed(1)} km`;
+  }
+  return null;
+}
+
+export default function BestOptionCard({ bestOption = null, stations = [], fuelType = 'petrol', onPress, selectedReason = null }) {
+  // Backend is source of truth. If no prop was passed in (older callers),
+  // fall back to lib helper: nearest non-stale station with a price.
+  const station = bestOption || chooseBestOption(null, stations, fuelType);
   const reasonText = normaliseSelectedReason(selectedReason);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
-    if (best) {
+    if (station) {
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 380, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: 0, duration: 380, easing: Easing.out(Easing.ease), useNativeDriver: true }),
@@ -103,34 +69,37 @@ export default function BestOptionCard({ stations, fuelType = 'petrol', onPress,
       fadeAnim.setValue(0);
       slideAnim.setValue(12);
     }
-  }, [best, fadeAnim, slideAnim]);
+  }, [station, fadeAnim, slideAnim]);
 
-  if (!best) return null;
+  if (!station) return null;
 
+  const price = resolvePrice(station, fuelType);
+  const dist = formatDistance(station);
+  const updated = station.last_updated ? timeAgo(station.last_updated) : null;
   const fuelLabel = fuelType === 'diesel' ? 'Diesel' : fuelType === 'e10' ? 'E10' : 'Petrol';
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-      <TouchableOpacity activeOpacity={0.75} onPress={() => onPress && onPress(best.station)} style={styles.inner}>
+      <TouchableOpacity activeOpacity={0.75} onPress={() => onPress && onPress(station)} style={styles.inner}>
         <View style={styles.topRow}>
           <Ionicons name="bulb" size={16} color={THEME.accent} />
           <Text style={styles.topLabel}>Best option near you</Text>
         </View>
         <Text style={styles.stationName} numberOfLines={1}>
-          {safeText(best.station.name) || brandToString(best.station.brand) || 'Station'}
+          {safeText(station.name) || brandToString(station.brand) || 'Station'}
         </Text>
         <View style={styles.metaRow}>
-          {best.price != null && (
-            <Text style={styles.price}>{best.price.toFixed(1)}p <Text style={styles.fuelLabel}>{fuelLabel}</Text></Text>
+          {price != null && Number.isFinite(price) && (
+            <Text style={styles.price}>{price.toFixed(1)}p <Text style={styles.fuelLabel}>{fuelLabel}</Text></Text>
           )}
-          {best.dist && (
+          {dist && (
             <Text style={styles.meta}>
-              <Ionicons name="location-outline" size={12} color={THEME.muted} /> {best.dist}
+              <Ionicons name="location-outline" size={12} color={THEME.muted} /> {dist}
             </Text>
           )}
-          {best.updated && (
+          {updated && (
             <Text style={styles.meta}>
-              <Ionicons name="time-outline" size={12} color={THEME.muted} /> {best.updated}
+              <Ionicons name="time-outline" size={12} color={THEME.muted} /> {updated}
             </Text>
           )}
         </View>
@@ -146,14 +115,6 @@ export default function BestOptionCard({ stations, fuelType = 'petrol', onPress,
             </Text>
           </View>
         )}
-        <View style={styles.tagRow}>
-          {best.tags.map((t, i) => (
-            <View key={i} style={styles.tag}>
-              <Ionicons name={t.icon} size={11} color={THEME.accent} />
-              <Text style={styles.tagText}>{t.label}</Text>
-            </View>
-          ))}
-        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -186,14 +147,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 8,
   },
   reasonText: { fontSize: 12, color: THEME.muted, flexShrink: 1 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 6, backgroundColor: THEME.tag,
-  },
-  tagText: { fontSize: 11, fontWeight: '600', color: THEME.accent, marginLeft: 4 },
 });
