@@ -25,7 +25,7 @@
  * don't leak onto the map.
  */
 
-import React, { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -110,6 +110,16 @@ const StationMarker = ({
   const fadeAnim = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // HOTFIX: on Android, tracksViewChanges=false snapshots the marker
+  // before Text nodes have finished measuring, leaving the price
+  // clipped to a single glyph. Track changes for the first ~400ms,
+  // then freeze so we don't burn battery re-rasterising every frame.
+  const [tracking, setTracking] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setTracking(false), 400);
+    return () => clearTimeout(t);
+  }, [priceLabel]);
 
   // Stagger fade-in on mount. Cap total stagger so panning/zooming
   // doesn't introduce user-perceptible lag.
@@ -196,7 +206,7 @@ const StationMarker = ({
     <Marker
       coordinate={{ latitude: markerLat, longitude: markerLng }}
       onPress={handlePress}
-      tracksViewChanges={false}
+      tracksViewChanges={tracking}
       anchor={{ x: 0.5, y: 1 }}
       accessibilityLabel={a11yLabel}
     >
@@ -238,6 +248,7 @@ const StationMarker = ({
                 color: style.text,
                 fontSize: style.priceFont,
                 lineHeight: Math.round(style.priceFont * 1.1),
+                minWidth: Math.round(style.priceFont * 3.85),
               },
             ]}
             numberOfLines={1}
@@ -313,14 +324,18 @@ const StationMarker = ({
 
 const styles = StyleSheet.create({
   wrapper: {
+    alignSelf: 'flex-start',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    flexShrink: 0,
   },
   tag: {
     borderRadius: 10,
+    alignSelf: 'flex-start',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    flexGrow: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -345,6 +360,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.2,
     textAlign: 'center',
+    flexShrink: 0,
+    flexGrow: 0,
+    includeFontPadding: false,
+    fontVariant: ['tabular-nums'],
   },
   brandRow: {
     flexDirection: 'row',
@@ -385,8 +404,9 @@ const styles = StyleSheet.create({
   brandText: {
     fontWeight: '600',
     letterSpacing: 0.1,
-    flexShrink: 1,
+    flexShrink: 0,
     maxWidth: 100,
+    includeFontPadding: false,
   },
   deltaText: {
     fontSize: 9,
