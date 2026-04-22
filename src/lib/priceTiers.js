@@ -7,10 +7,10 @@
  * user pans/zooms.
  *
  * Tiers:
- *   1 — cheapest ~10% in view   (bright green)
+ *   1 — cheapest ~10% in view   (bright green, hero card)
  *   2 — next ~15%                (green outline on dark)
- *   3 — middle ~50%              (dark neutral)
- *   4 — expensive ~25%           (muted grey)
+ *   3 — middle ~50%              (dark neutral, compact)
+ *   4 — expensive ~25%           (muted grey, minimal)
  *   stale — price_age_hours > 24 (60% opacity clock overlay)
  *
  * When fewer than 6 stations are visible, tier 4 is skipped — the
@@ -30,49 +30,104 @@ export const PIN_TIER = {
 
 export const TIER_STYLES = {
   1: {
-    bg:       '#10B981',
-    border:   '#10B981',
-    text:     '#FFFFFF',
-    subText:  'rgba(255,255,255,0.85)',
-    glow:     true,
-    scale:    1.1,
-    opacity:  1,
+    bg:          '#10B981',
+    border:      '#10B981',
+    text:        '#FFFFFF',
+    subText:     'rgba(255,255,255,0.92)',
+    deltaText:   '#ECFDF5',
+    glow:        true,
+    scale:       1.1,
+    opacity:     1,
+    priceFont:   18,
+    brandFont:   11,
+    minWidth:    84,
+    paddingH:    9,
+    paddingV:    6,
+    showDelta:   true,
+    showBrand:   true,
+    showDistance:true,
+    brandMaxLen: 12,
+    borderWidth: 1.75,
   },
   2: {
-    bg:       '#1F2937',
-    border:   '#10B981',
-    text:     '#FFFFFF',
-    subText:  'rgba(255,255,255,0.8)',
-    glow:     false,
-    scale:    1,
-    opacity:  1,
+    bg:          '#1F2937',
+    border:      '#10B981',
+    text:        '#FFFFFF',
+    subText:     'rgba(255,255,255,0.85)',
+    deltaText:   '#6EE7B7',
+    glow:        false,
+    scale:       1,
+    opacity:     1,
+    priceFont:   16,
+    brandFont:   10,
+    minWidth:    76,
+    paddingH:    8,
+    paddingV:    5,
+    showDelta:   true,
+    showBrand:   true,
+    showDistance:true,
+    brandMaxLen: 12,
+    borderWidth: 1.5,
   },
   3: {
-    bg:       '#1F2937',
-    border:   '#1F2937',
-    text:     '#FFFFFF',
-    subText:  'rgba(255,255,255,0.75)',
-    glow:     false,
-    scale:    1,
-    opacity:  1,
+    bg:          '#1F2937',
+    border:      '#1F2937',
+    text:        '#FFFFFF',
+    subText:     'rgba(255,255,255,0.75)',
+    deltaText:   'rgba(255,255,255,0.65)',
+    glow:        false,
+    scale:       1,
+    opacity:     1,
+    priceFont:   14,
+    brandFont:   9,
+    minWidth:    64,
+    paddingH:    7,
+    paddingV:    4,
+    showDelta:   false,
+    showBrand:   true,
+    showDistance:false,
+    brandMaxLen: 8,
+    borderWidth: 1.25,
   },
   4: {
-    bg:       '#6B7280',
-    border:   '#6B7280',
-    text:     '#E5E7EB',
-    subText:  'rgba(229,231,235,0.75)',
-    glow:     false,
-    scale:    0.95,
-    opacity:  0.95,
+    bg:          '#4B5563',
+    border:      '#6B7280',
+    text:        '#E5E7EB',
+    subText:     'rgba(229,231,235,0.75)',
+    deltaText:   'rgba(229,231,235,0.6)',
+    glow:        false,
+    scale:       0.88,
+    opacity:     0.9,
+    priceFont:   11,
+    brandFont:   8,
+    minWidth:    44,
+    paddingH:    5,
+    paddingV:    3,
+    showDelta:   false,
+    showBrand:   true,
+    showDistance:false,
+    brandMaxLen: 5,
+    borderWidth: 1,
   },
   stale: {
-    bg:       '#1F2937',
-    border:   '#374151',
-    text:     '#FFFFFF',
-    subText:  'rgba(255,255,255,0.7)',
-    glow:     false,
-    scale:    0.95,
-    opacity:  0.6,
+    bg:          '#1F2937',
+    border:      '#374151',
+    text:        '#FFFFFF',
+    subText:     'rgba(255,255,255,0.6)',
+    deltaText:   'rgba(255,255,255,0.5)',
+    glow:        false,
+    scale:       0.92,
+    opacity:     0.6,
+    priceFont:   13,
+    brandFont:   9,
+    minWidth:    60,
+    paddingH:    6,
+    paddingV:    4,
+    showDelta:   false,
+    showBrand:   true,
+    showDistance:false,
+    brandMaxLen: 8,
+    borderWidth: 1.25,
   },
 };
 
@@ -151,6 +206,43 @@ export function tierStyle(tier) {
   return TIER_STYLES[tier] || TIER_STYLES[3];
 }
 
+/**
+ * Compute the price delta (in pence) vs the area average for the
+ * visible cohort. Returns the signed difference (negative = cheaper
+ * than avg) rounded to 1 decimal place, or null when there isn't
+ * enough data to compute a meaningful average.
+ *
+ * Guards:
+ *  - requires at least 3 valid prices in the cohort (otherwise the
+ *    "average" is noisy / meaningless)
+ *  - returns null for non-finite inputs
+ */
+export function computeSavingsDelta(price, visiblePrices) {
+  if (price == null || typeof price !== 'number' || !Number.isFinite(price)) {
+    return null;
+  }
+  const nums = (Array.isArray(visiblePrices) ? visiblePrices : [])
+    .filter((p) => typeof p === 'number' && Number.isFinite(p));
+  if (nums.length < 3) return null;
+  const avg = nums.reduce((sum, p) => sum + p, 0) / nums.length;
+  const delta = price - avg;
+  return Math.round(delta * 10) / 10;
+}
+
+/**
+ * Format a savings delta for display on a pin. Returns a string like
+ * "−4.2p" for cheaper-than-avg or "+2.1p" for pricier. Returns null
+ * when the absolute delta is below `threshold` (default 1.0p) — below
+ * that we don't want to clutter the pin with noise.
+ */
+export function formatSavingsDelta(delta, threshold = 1.0) {
+  if (delta == null || !Number.isFinite(delta)) return null;
+  const abs = Math.abs(delta);
+  if (abs < threshold) return null;
+  const sign = delta < 0 ? '−' : '+';
+  return `${sign}${abs.toFixed(1)}p`;
+}
+
 export default {
   PIN_TIER,
   TIER_STYLES,
@@ -159,4 +251,6 @@ export default {
   tierStyle,
   isStale,
   ageHoursFromIso,
+  computeSavingsDelta,
+  formatSavingsDelta,
 };

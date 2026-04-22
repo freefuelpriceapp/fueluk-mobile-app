@@ -49,6 +49,16 @@ const FUEL_TYPES = [
 
 const BOTTOM_SHEET_HEIGHT = 240;
 
+function freshnessState(iso) {
+  if (!iso) return 'unknown';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'unknown';
+  const hours = (Date.now() - d.getTime()) / 3600000;
+  if (hours < 1) return 'fresh';
+  if (hours < 24) return 'ok';
+  return 'stale';
+}
+
 function formatRelativeTime(iso) {
   if (!iso) return 'just now';
   const d = new Date(iso);
@@ -103,6 +113,7 @@ export default function MapScreen({ navigation }) {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [visibleRegion, setVisibleRegion] = useState(null);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   const colorScheme = useColorScheme();
   const mapStyle = colorScheme === 'light' ? lightMapStyleRefined : darkMapStyleRefined;
@@ -123,6 +134,21 @@ export default function MapScreen({ navigation }) {
       cancelled = true;
       if (sub && sub.remove) sub.remove();
     };
+  }, []);
+
+  // First-run "tap a pin" hint. Shown once; dismissed via AsyncStorage
+  // key map_hint_dismissed_v1 so subsequent mounts skip it.
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem('map_hint_dismissed_v1')
+      .then((v) => { if (!cancelled && !v) setShowHint(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const dismissHint = useCallback(() => {
+    setShowHint(false);
+    AsyncStorage.setItem('map_hint_dismissed_v1', '1').catch(() => {});
   }, []);
 
   const { location, loading: locationLoading, error: locationError } = useLocation();
@@ -215,6 +241,18 @@ export default function MapScreen({ navigation }) {
     () => buildTierClassifier(visiblePrices),
     [visiblePrices]
   );
+
+  // Average visible price — cached once per region change so each pin
+  // doesn't re-reduce the full cohort to compute its delta.
+  const visibleAvgPrice = useMemo(() => {
+    if (!visiblePrices.length) return null;
+    const sum = visiblePrices.reduce((a, b) => a + b, 0);
+    return sum / visiblePrices.length;
+  }, [visiblePrices]);
+
+  // Whether the visible cohort is large enough to compute meaningful
+  // savings deltas (mirrors computeSavingsDelta's threshold).
+  const hasDeltaCohort = visiblePrices.length >= 3;
 
   // Summary stats for the status strip at the top of the map.
   const mapStatus = useMemo(() => {
@@ -441,7 +479,7 @@ export default function MapScreen({ navigation }) {
           && Math.abs(sLat - lat) <= latTol
           && Math.abs(sLng - lng) <= lngTol;
       });
-    const priceLabel = Number.isFinite(minPrice) ? `from ${minPrice.toFixed(0)}p` : null;
+    const priceLabel = Number.isFinite(minPrice) ? `${minPrice.toFixed(0)}p` : null;
 
     const a11y = priceLabel
       ? `Cluster of ${points} stations, cheapest ${minPrice.toFixed(1)} pence. Tap to expand.`
@@ -460,7 +498,15 @@ export default function MapScreen({ navigation }) {
             {String(points)}
           </Text>
           {priceLabel ? (
-            <Text style={styles.clusterPrice} numberOfLines={1}>{priceLabel}</Text>
+            <Text
+              style={[
+                styles.clusterPrice,
+                hasOverallCheapest && styles.clusterPriceOnGreen,
+              ]}
+              numberOfLines={1}
+            >
+              {priceLabel}
+            </Text>
           ) : null}
         </View>
       </Marker>
@@ -522,12 +568,20 @@ export default function MapScreen({ navigation }) {
             const tier = station.id === cheapestStationId
               ? PIN_TIER.CHEAPEST
               : tierClassifier(parsed);
+            // Savings delta pre-computed against the cached avg — cheap
+            // path, no full-cohort reduce per marker.
+            let delta = null;
+            if (hasDeltaCohort && parsed != null && visibleAvgPrice != null) {
+              delta = Math.round((parsed - visibleAvgPrice) * 10) / 10;
+            }
             return (
               <StationMarker
                 key={String(station.id)}
                 station={station}
                 cheapestPrice={price}
                 tier={tier}
+                fuelType={fuelType}
+                savingsDelta={delta}
                 onPress={handleMarkerPress}
                 isSelected={selectedStation?.id === station.id}
                 staggerIndex={idx}
@@ -655,20 +709,34 @@ export default function MapScreen({ navigation }) {
               mapStatus.cheapestPrice != null ? mapStatus.cheapestPrice.toFixed(1) + ' pence' : 'unavailable'
             }. Updated ${formatRelativeTime(mapStatus.cheapestStation?.last_updated)}. Tap to recentre on cheapest.`}
           >
-            <Text style={styles.statusStripText} numberOfLines={1}>
+            <View style={styles.statusCluster}>
+              <Ionicons name="location-outline" size={12} color={COLORS.textSecondary} style={{ marginRight: 3 }} />
               <Text style={styles.statusStripStrong}>{String(mapStatus.count)}</Text>
-              <Text>{' stations'}</Text>
-              {mapStatus.cheapestPrice != null && (
-                <>
-                  <Text style={styles.statusDot}>{' · '}</Text>
-                  <Text>{'Cheapest '}</Text>
-                  <Text style={styles.statusStripStrong}>{mapStatus.cheapestPrice.toFixed(1)}p</Text>
-                </>
-              )}
-              <Text style={styles.statusDot}>{' · '}</Text>
-              <Text>{'Updated '}</Text>
-              <Text>{formatRelativeTime(mapStatus.cheapestStation?.last_updated)}</Text>
-            </Text>
+            </View>
+
+            {mapStatus.cheapestPrice != null && (
+              <View style={styles.statusCluster}>
+                <Text style={styles.statusDot}>{'·'}</Text>
+                <Text style={styles.statusCheapestPrice}>
+                  {mapStatus.cheapestPrice.toFixed(1)}p
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.statusCluster}>
+              <Text style={styles.statusDot}>{'·'}</Text>
+              <View
+                style={[
+                  styles.freshnessDot,
+                  freshnessState(mapStatus.cheapestStation?.last_updated) === 'fresh' && styles.freshnessDotGreen,
+                  freshnessState(mapStatus.cheapestStation?.last_updated) === 'ok' && styles.freshnessDotAmber,
+                  freshnessState(mapStatus.cheapestStation?.last_updated) === 'stale' && styles.freshnessDotGrey,
+                ]}
+              />
+              <Text style={styles.statusStripText} numberOfLines={1}>
+                {formatRelativeTime(mapStatus.cheapestStation?.last_updated)}
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -810,6 +878,21 @@ export default function MapScreen({ navigation }) {
           </Text>
         </View>
       )}
+
+      {showHint && !selectedStation && (
+        <TouchableOpacity
+          style={styles.firstRunHint}
+          onPress={dismissHint}
+          accessibilityRole="button"
+          accessibilityLabel="Tap a pin for station details. Tap to dismiss."
+        >
+          <Ionicons name="information-circle-outline" size={14} color="#10B981" />
+          <Text style={styles.firstRunHintText}>
+            Tap a pin for details
+          </Text>
+          <Ionicons name="close" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 6 }} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -899,15 +982,38 @@ const styles = StyleSheet.create({
   modeBtnActive: { borderBottomWidth: 2 },
   modeBtnText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
   statusStrip: {
-    height: 28,
+    minHeight: 30,
     paddingHorizontal: 12,
+    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(31,41,55,0.9)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
+    gap: 6,
   },
+  statusCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusCheapestPrice: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 6,
+    letterSpacing: 0.2,
+  },
+  freshnessDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#6B7280',
+    marginHorizontal: 6,
+  },
+  freshnessDotGreen: { backgroundColor: '#10B981' },
+  freshnessDotAmber: { backgroundColor: '#F59E0B' },
+  freshnessDotGrey:  { backgroundColor: '#6B7280' },
   statusStripLight: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderBottomColor: 'rgba(0,0,0,0.08)',
@@ -921,9 +1027,11 @@ const styles = StyleSheet.create({
   statusStripStrong: {
     color: COLORS.text,
     fontWeight: '800',
+    fontSize: 13,
   },
   statusDot: {
     color: COLORS.textMuted,
+    marginHorizontal: 2,
   },
   loadingBanner: {
     flexDirection: 'row',
@@ -950,9 +1058,10 @@ const styles = StyleSheet.create({
   errorBannerText: { color: COLORS.danger, fontSize: 12, flex: 1, marginLeft: 6 },
   retryInline: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   cluster: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    minWidth: 48,
+    height: 48,
+    paddingHorizontal: 8,
+    borderRadius: 24,
     backgroundColor: '#1F2937',
     alignItems: 'center',
     justifyContent: 'center',
@@ -979,11 +1088,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   clusterPrice: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
+    marginTop: 0,
     letterSpacing: 0.2,
+  },
+  clusterPriceOnGreen: {
+    color: '#0B0F14',
   },
   offscreenHint: {
     position: 'absolute',
@@ -1003,6 +1115,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10B981',
     fontWeight: '700',
+  },
+  firstRunHint: {
+    position: 'absolute',
+    top: 170,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: 'rgba(15,23,30,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  firstRunHintText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   recenterBtn: {
     position: 'absolute',
