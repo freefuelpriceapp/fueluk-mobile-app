@@ -27,6 +27,14 @@ import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic } from '../lib/haptics';
 import { sanitizeStations } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import TrajectoryBadge from '../components/TrajectoryBadge';
+import FlagPriceSheet from '../components/FlagPriceSheet';
+import {
+  loadUserVehicle,
+  isVehiclePromptDismissed,
+  dismissVehiclePrompt,
+} from '../lib/userVehicle';
+import { FEATURE_FLAGS } from '../config/featureFlags';
 
 const FUEL_TYPES = [
   { key: 'petrol', label: 'Petrol', color: FUEL_COLORS.petrol },
@@ -79,9 +87,29 @@ const HomeScreen = ({ navigation }) => {
   const [sortMode, setSortMode] = useState('nearest'); // 'nearest' | 'cheapest'
   const [selectedReason, setSelectedReason] = useState(null);
   const [bestOption, setBestOption] = useState(null);
+  const [bestValue, setBestValue] = useState(null);
+  const [bestValueReason, setBestValueReason] = useState(null);
+  const [nationalTrajectory, setNationalTrajectory] = useState(null);
+  const [userVehicle, setUserVehicle] = useState(null);
+  const [promptDismissed, setPromptDismissed] = useState(true);
+  const [flagTarget, setFlagTarget] = useState(null);
   const { location } = useLocation();
 
   useEffect(() => { trackNearbyScreenView(); }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [v, dismissed] = await Promise.all([
+        loadUserVehicle(),
+        isVehiclePromptDismissed(),
+      ]);
+      if (!mounted) return;
+      setUserVehicle(v);
+      setPromptDismissed(dismissed);
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const fetchStations = useCallback(async () => {
     if (!location) return;
@@ -94,7 +122,14 @@ const HomeScreen = ({ navigation }) => {
       let data;
       if (lat && lng) {
         setUsingFallback(false);
-        data = await getNearbyStations({ lat, lng, radiusKm: location.radiusKm || 5, fuel: selectedFuel, brand: selectedBrand });
+        data = await getNearbyStations({
+          lat,
+          lng,
+          radiusKm: location.radiusKm || 5,
+          fuel: selectedFuel,
+          brand: selectedBrand,
+          mpg: userVehicle?.mpg ?? null,
+        });
       } else if (location.postcode) {
         setUsingFallback(true);
         data = await searchStations(location.postcode);
@@ -117,6 +152,16 @@ const HomeScreen = ({ navigation }) => {
       setStations(list);
       setSelectedReason(extractSelectedReason(data));
       setBestOption(chooseBestOption(data, list, selectedFuel));
+      // New differentiator fields — all optional; tolerate missing.
+      setBestValue(data?.best_value || null);
+      setBestValueReason(
+        typeof data?.best_value_reason === 'string' ? data.best_value_reason : null
+      );
+      setNationalTrajectory(
+        data?.national_trajectory && typeof data.national_trajectory === 'object'
+          ? data.national_trajectory
+          : null
+      );
       try { await AsyncStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(list)); } catch (_e) {}
     } catch (err) {
       if (isOffline(err)) {
@@ -133,7 +178,7 @@ const HomeScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [location, selectedFuel, selectedBrand]);
+  }, [location, selectedFuel, selectedBrand, userVehicle?.mpg]);
 
   const fetchLastUpdated = useCallback(async () => {
     try {
@@ -336,6 +381,7 @@ const HomeScreen = ({ navigation }) => {
               station={item}
               fuelType={selectedFuel}
               onPress={() => handleStationPress(item)}
+              onFlagPrice={FEATURE_FLAGS.priceFlags ? (s) => setFlagTarget(s) : undefined}
             />
           )}
           refreshControl={
@@ -343,13 +389,47 @@ const HomeScreen = ({ navigation }) => {
           }
           contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <BestOptionCard
-              bestOption={bestOption}
-              stations={stations}
-              fuelType={selectedFuel}
-              onPress={handleStationPress}
-              selectedReason={selectedReason}
-            />
+            <>
+              {FEATURE_FLAGS.vehicleSettings && !userVehicle && !promptDismissed ? (
+                <View style={styles.vehiclePromptChip}>
+                  <Ionicons name="car-sport-outline" size={14} color={COLORS.accent} />
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => navigation.navigate('VehicleSettings')}
+                    accessibilityLabel="Tell us your car for accurate savings"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.vehiclePromptText} numberOfLines={2}>
+                      Tell us your car for accurate savings
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await dismissVehiclePrompt();
+                      setPromptDismissed(true);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Dismiss"
+                  >
+                    <Ionicons name="close" size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              {FEATURE_FLAGS.trajectory && nationalTrajectory ? (
+                <View style={styles.trajectoryWrap}>
+                  <TrajectoryBadge trajectory={nationalTrajectory} scope="national" size="md" />
+                </View>
+              ) : null}
+              <BestOptionCard
+                bestOption={bestOption}
+                bestValue={bestValue}
+                bestValueReason={bestValueReason}
+                stations={stations}
+                fuelType={selectedFuel}
+                onPress={handleStationPress}
+                selectedReason={selectedReason}
+              />
+            </>
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -368,6 +448,12 @@ const HomeScreen = ({ navigation }) => {
           }
         />
       )}
+      <FlagPriceSheet
+        visible={!!flagTarget}
+        station={flagTarget}
+        initialFuelType={selectedFuel}
+        onClose={() => setFlagTarget(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -430,6 +516,30 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 6 },
   footerText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', paddingVertical: 16 },
   footerStale: { color: COLORS.warning },
+  vehiclePromptChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+  },
+  vehiclePromptText: {
+    fontSize: 12,
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  trajectoryWrap: {
+    marginHorizontal: 12,
+    marginTop: 8,
+    flexDirection: 'row',
+  },
 });
 
 export default HomeScreen;

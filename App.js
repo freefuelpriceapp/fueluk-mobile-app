@@ -18,8 +18,10 @@ import MapScreen from './src/screens/MapScreen';
 import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
 import MoreScreen from './src/screens/MoreScreen';
 import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
+import VehicleSettingsScreen from './src/screens/VehicleSettingsScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import { FEATURES } from './src/lib/featureFlags';
+import { FEATURE_FLAGS } from './src/config/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
 import { initNotifications, registerNotificationResponseHandler } from './src/lib/notifications';
 import { COLORS } from './src/lib/theme';
@@ -274,6 +276,13 @@ function HomeStack() {
         component={StationDetailScreen}
         options={{ title: 'Station Detail' }}
       />
+      {FEATURE_FLAGS.vehicleSettings && (
+        <Stack.Screen
+          name="VehicleSettings"
+          component={VehicleSettingsScreen}
+          options={{ title: 'Your Vehicle' }}
+        />
+      )}
     </Stack.Navigator>
   );
 }
@@ -320,6 +329,13 @@ function MoreStack() {
         component={VehicleCheckScreen}
         options={{ title: 'Vehicle Check' }}
       />
+      {FEATURE_FLAGS.vehicleSettings && (
+        <Stack.Screen
+          name="VehicleSettings"
+          component={VehicleSettingsScreen}
+          options={{ title: 'Your Vehicle' }}
+        />
+      )}
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}

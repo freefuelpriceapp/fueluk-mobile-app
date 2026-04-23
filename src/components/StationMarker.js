@@ -38,6 +38,8 @@ import {
   formatSavingsDelta,
 } from '../lib/priceTiers';
 import { brandColor, brandShortName, brandAbbrev } from '../lib/brandColors';
+import { TRAJECTORY_ARROW } from '../lib/trajectory';
+import { FEATURE_FLAGS } from '../config/featureFlags';
 
 // v4: render the brand initial inside a visible 24x24 circle to the
 // LEFT of the price.  The initial is derived from the first character
@@ -98,6 +100,7 @@ const StationMarker = ({
   fuelType,
   savingsDelta = null,
   onPress,
+  onLongPress,
   isSelected,
   staggerIndex = 0,
   reduceMotion = false,
@@ -228,6 +231,7 @@ const StationMarker = ({
     <Marker
       coordinate={{ latitude: markerLat, longitude: markerLng }}
       onPress={handlePress}
+      onLongPress={onLongPress ? () => onLongPress(station) : undefined}
       tracksViewChanges={tracking}
       anchor={{ x: 0.5, y: 1 }}
       accessibilityLabel={a11yLabel}
@@ -261,6 +265,26 @@ const StationMarker = ({
               <Ionicons name="time-outline" size={10} color="#E5E7EB" />
             </View>
           )}
+          {FEATURE_FLAGS.trajectory &&
+          (effectiveTier === PIN_TIER.CHEAPEST || effectiveTier === PIN_TIER.CHEAP) &&
+          station?.trajectory &&
+          (station.trajectory.direction === 'rising' || station.trajectory.direction === 'falling') &&
+          (station.trajectory.confidence === 'high' || station.trajectory.confidence === 'medium') ? (
+            <View style={styles.trajectoryCorner} pointerEvents="none">
+              <Text
+                style={[
+                  styles.trajectoryArrow,
+                  {
+                    color:
+                      station.trajectory.direction === 'falling' ? '#2ECC71' : '#F59E0B',
+                  },
+                ]}
+                allowFontScaling={false}
+              >
+                {TRAJECTORY_ARROW[station.trajectory.direction]}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Row 1: brand-initial circle + price (hero).
               The circle sits IN-FLOW (no absolute positioning) so it
@@ -495,6 +519,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1F2937',
   },
+  trajectoryCorner: {
+    position: 'absolute',
+    top: -6,
+    left: -4,
+    paddingHorizontal: 3,
+    paddingVertical: 0,
+    borderRadius: 6,
+    backgroundColor: 'rgba(11,15,20,0.9)',
+  },
+  trajectoryArrow: {
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 13,
+  },
 });
 
 function areEqual(prev, next) {
@@ -513,6 +551,10 @@ function areEqual(prev, next) {
   const plu = prev.station && prev.station.last_updated;
   const nlu = next.station && next.station.last_updated;
   if (plu !== nlu) return false;
+  const pt = prev.station && prev.station.trajectory;
+  const nt = next.station && next.station.trajectory;
+  if ((pt && pt.direction) !== (nt && nt.direction)) return false;
+  if ((pt && pt.confidence) !== (nt && nt.confidence)) return false;
   return true;
 }
 
