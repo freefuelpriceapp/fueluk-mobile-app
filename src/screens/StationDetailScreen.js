@@ -31,6 +31,11 @@ import { COLORS as THEME_COLORS, FUEL_COLORS as THEME_FUEL_COLORS } from '../lib
 import { ensurePushPermission } from '../lib/pushPermission';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import BreakEvenBadge from '../components/BreakEvenBadge';
+import TrajectoryBadge from '../components/TrajectoryBadge';
+import FlagPriceSheet from '../components/FlagPriceSheet';
+import { FEATURE_FLAGS } from '../config/featureFlags';
+import { stationTrajectorySecondary } from '../lib/trajectory';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -232,6 +237,7 @@ export default function StationDetailScreen({ route }) {
   const [alertThreshold, setAlertThreshold] = useState('');
   const [alertSaving, setAlertSaving] = useState(false);
   const [deviceToken, setDeviceToken] = useState(null);
+  const [flagVisible, setFlagVisible] = useState(false);
 
   // ─── Request push permission and obtain Expo push token ─────────────────────
   // ensurePushPermission shows an explanatory pre-prompt when the OS
@@ -569,6 +575,34 @@ export default function StationDetailScreen({ route }) {
           </View>
         </View>
 
+        {(FEATURE_FLAGS.breakEven && station?.break_even) ||
+        (FEATURE_FLAGS.trajectory && stationTrajectorySecondary(station?.trajectory)) ||
+        FEATURE_FLAGS.priceFlags ? (
+          <View style={stationDiffStyles.stripWrap}>
+            {FEATURE_FLAGS.breakEven && station?.break_even ? (
+              <BreakEvenBadge breakEven={station.break_even} size="md" />
+            ) : null}
+            {FEATURE_FLAGS.trajectory && station?.trajectory ? (
+              <TrajectoryBadge
+                trajectory={station.trajectory}
+                scope="station"
+                size="sm"
+              />
+            ) : null}
+            {FEATURE_FLAGS.priceFlags ? (
+              <TouchableOpacity
+                style={stationDiffStyles.reportBtn}
+                onPress={() => setFlagVisible(true)}
+                accessibilityLabel="Report wrong price"
+                accessibilityRole="button"
+              >
+                <Ionicons name="flag-outline" size={14} color={COLORS.textSecondary || COLORS.muted} />
+                <Text style={stationDiffStyles.reportBtnText}>Report price</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Get Directions button */}
         <View style={styles.directionsRow}>
           <TouchableOpacity
@@ -717,9 +751,43 @@ export default function StationDetailScreen({ route }) {
           </View>
         </View>
       </Modal>
+
+      <FlagPriceSheet
+        visible={flagVisible}
+        station={station}
+        initialFuelType="petrol"
+        onClose={() => setFlagVisible(false)}
+      />
     </SafeAreaView>
   );
 }
+
+const stationDiffStyles = StyleSheet.create({
+  stripWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME_COLORS.border,
+    marginLeft: 'auto',
+  },
+  reportBtnText: {
+    fontSize: 11,
+    color: THEME_COLORS.textSecondary,
+    fontWeight: '600',
+  },
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

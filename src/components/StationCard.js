@@ -12,6 +12,9 @@ import {
 import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { mediumHaptic } from '../lib/haptics';
 import { brandToString, safeText } from '../lib/brand';
+import BreakEvenBadge from './BreakEvenBadge';
+import { stationTrajectorySecondary } from '../lib/trajectory';
+import { isFeatureEnabled } from '../config/featureFlags';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -63,7 +66,7 @@ function formatDistance(km) {
   return `${miles.toFixed(1)} mi`;
 }
 
-const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
+const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => {
   const {
     id,
     name,
@@ -237,6 +240,21 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
       <Text style={styles.name}>{safeText(name)}</Text>
       {address ? <Text style={styles.address}>{safeText(address)}</Text> : null}
 
+      {/* Differentiator strip: break-even savings + per-station trajectory */}
+      {(isFeatureEnabled('breakEven') && station.break_even) ||
+      (isFeatureEnabled('trajectory') && stationTrajectorySecondary(station.trajectory)) ? (
+        <View style={styles.diffStrip}>
+          {isFeatureEnabled('breakEven') && station.break_even ? (
+            <BreakEvenBadge breakEven={station.break_even} size="sm" />
+          ) : null}
+          {isFeatureEnabled('trajectory') && stationTrajectorySecondary(station.trajectory) ? (
+            <Text style={styles.trajectoryLine} numberOfLines={1}>
+              {stationTrajectorySecondary(station.trajectory)}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Primary price for selected fuel type */}
       <View style={styles.priceRow}>
         <View
@@ -306,6 +324,26 @@ const StationCard = ({ station, fuelType = 'petrol', onPress }) => {
         <Text style={[styles.freshnessText, { color: freshnessColor }]}>
           {trustLine}
         </Text>
+        {isFeatureEnabled('breakEven') &&
+        station.break_even &&
+        typeof station.break_even.fuel_cost_full_tank === 'number' &&
+        Number.isFinite(station.break_even.fuel_cost_full_tank) ? (
+          <Text style={styles.fullTankHint} numberOfLines={1}>
+            {`\u00B7 Full tank £${(station.break_even.fuel_cost_full_tank / 100).toFixed(2)}`}
+          </Text>
+        ) : null}
+        {isFeatureEnabled('priceFlags') && onFlagPrice ? (
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation?.(); onFlagPrice(station); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.reportBtn}
+            accessibilityLabel="Report price for this station"
+            accessibilityRole="button"
+          >
+            <Ionicons name="flag-outline" size={12} color={COLORS.textMuted} />
+            <Text style={styles.reportBtnText}>Report</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </Animated.View>
     </Pressable>
@@ -461,6 +499,36 @@ const styles = StyleSheet.create({
   },
   freshnessText: {
     fontSize: FONT_SIZES.xs,
+  },
+  diffStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: SPACING.sm,
+  },
+  trajectoryLine: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    flexShrink: 1,
+  },
+  fullTankHint: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textMuted,
+    marginLeft: 4,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 'auto',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  reportBtnText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
 });
 

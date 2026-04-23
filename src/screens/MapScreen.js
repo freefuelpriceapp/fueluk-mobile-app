@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import useLocation from '../hooks/useLocation';
 import useStations from '../hooks/useStations';
+import { loadUserVehicle } from '../lib/userVehicle';
 // StationMarker also depends on react-native-maps
 let StationMarker;
 if (Platform.OS !== 'web') {
@@ -38,6 +39,10 @@ import { toRenderableString } from '../lib/safeRender';
 import { formatPencePrice, parsePrice, isPlausiblePrice } from '../lib/price';
 import { darkMapStyleRefined, lightMapStyleRefined } from '../lib/mapStyles';
 import { buildTierClassifier, PIN_TIER } from '../lib/priceTiers';
+import TrajectoryBadge from '../components/TrajectoryBadge';
+import BreakEvenBadge from '../components/BreakEvenBadge';
+import FlagPriceSheet from '../components/FlagPriceSheet';
+import { FEATURE_FLAGS } from '../config/featureFlags';
 
 const FUEL_TYPES = [
   { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
@@ -114,6 +119,18 @@ export default function MapScreen({ navigation }) {
   const [visibleRegion, setVisibleRegion] = useState(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [userVehicle, setUserVehicle] = useState(null);
+  const [flagTarget, setFlagTarget] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loadUserVehicle().then((v) => { if (mounted) setUserVehicle(v); });
+    // Re-load on focus so returning from VehicleSettings refreshes the mpg.
+    const unsub = navigation?.addListener?.('focus', () => {
+      loadUserVehicle().then((v) => { if (mounted) setUserVehicle(v); });
+    });
+    return () => { mounted = false; if (typeof unsub === 'function') unsub(); };
+  }, [navigation]);
 
   const colorScheme = useColorScheme();
   const mapStyle = colorScheme === 'light' ? lightMapStyleRefined : darkMapStyleRefined;
@@ -166,7 +183,13 @@ export default function MapScreen({ navigation }) {
     loading: stationsLoading,
     error: stationsError,
     refetch,
-  } = useStations(stationLocation, { fuelType, mode, radiusKm: 25 });
+    meta: stationsMeta,
+  } = useStations(stationLocation, {
+    fuelType,
+    mode,
+    radiusKm: 25,
+    mpg: userVehicle?.mpg ?? null,
+  });
 
   const brands = useMemo(
     () => [
@@ -591,6 +614,7 @@ export default function MapScreen({ navigation }) {
                 fuelType={fuelType}
                 savingsDelta={delta}
                 onPress={handleMarkerPress}
+                onLongPress={FEATURE_FLAGS.priceFlags ? (s) => setFlagTarget(s) : undefined}
                 isSelected={selectedStation?.id === station.id}
                 staggerIndex={idx}
                 reduceMotion={reduceMotion}
@@ -745,6 +769,16 @@ export default function MapScreen({ navigation }) {
                 {formatRelativeTime(mapStatus.cheapestStation?.last_updated)}
               </Text>
             </View>
+
+            {FEATURE_FLAGS.trajectory && stationsMeta?.nationalTrajectory ? (
+              <View style={[styles.statusCluster, { marginLeft: 'auto' }]}>
+                <TrajectoryBadge
+                  trajectory={stationsMeta.nationalTrajectory}
+                  scope="national"
+                  size="sm"
+                />
+              </View>
+            ) : null}
           </TouchableOpacity>
         )}
 
@@ -776,6 +810,18 @@ export default function MapScreen({ navigation }) {
           <Ionicons name="locate-outline" size={22} color={COLORS.accent} />
         </TouchableOpacity>
       )}
+
+      {FEATURE_FLAGS.vehicleSettings && MapView ? (
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => navigation.navigate('VehicleSettings')}
+          accessibilityLabel="Vehicle settings"
+          accessibilityRole="button"
+        >
+          <Ionicons name="car-sport-outline" size={20} color={COLORS.accent} />
+          {!userVehicle ? <View style={styles.settingsBtnDot} /> : null}
+        </TouchableOpacity>
+      ) : null}
 
       <Animated.View
         style={[
@@ -821,6 +867,12 @@ export default function MapScreen({ navigation }) {
               </View>
             </View>
 
+            {FEATURE_FLAGS.breakEven && selectedStation.break_even ? (
+              <View style={styles.sheetBadgeRow}>
+                <BreakEvenBadge breakEven={selectedStation.break_even} size="md" />
+              </View>
+            ) : null}
+
             <View style={styles.sheetPriceRow}>
               {FUEL_TYPES.map((ft) => {
                 const label = formatPencePrice(resolvePrice(selectedStation, ft.key));
@@ -865,6 +917,20 @@ export default function MapScreen({ navigation }) {
                   {isFavourite ? 'Saved' : 'Save'}
                 </Text>
               </TouchableOpacity>
+              {FEATURE_FLAGS.priceFlags && (
+                <TouchableOpacity
+                  style={styles.sheetActionBtn}
+                  onPress={() => {
+                    const s = selectedStation;
+                    dismissSheet();
+                    setTimeout(() => setFlagTarget(s), reduceMotion ? 0 : 240);
+                  }}
+                  accessibilityLabel="Report wrong price"
+                >
+                  <Ionicons name="flag-outline" size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.sheetActionBtnText}>Report</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.sheetPrimaryBtn, { backgroundColor: selectedFuelMeta.color }]}
                 onPress={navigateToDetail}
@@ -877,6 +943,13 @@ export default function MapScreen({ navigation }) {
           </View>
         )}
       </Animated.View>
+
+      <FlagPriceSheet
+        visible={!!flagTarget}
+        station={flagTarget}
+        initialFuelType={fuelType}
+        onClose={() => setFlagTarget(null)}
+      />
 
       {cheaperOffscreenCount > 0 && !selectedStation && (
         <View style={styles.offscreenHint} pointerEvents="none">
@@ -1170,6 +1243,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  settingsBtn: {
+    position: 'absolute',
+    top: 160,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+  },
+  settingsBtnDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
+  },
+  sheetBadgeRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
   },
   bottomSheet: {
     position: 'absolute',

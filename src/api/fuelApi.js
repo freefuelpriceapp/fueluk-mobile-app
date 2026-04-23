@@ -66,9 +66,21 @@ function sanitizeAlertsPayload(data) {
  * @param {string} fuel - Fuel type: petrol | diesel | e10 (default petrol)
  * @param {string} brand - Optional brand filter
  */
-export async function getNearbyStations({ lat, lng, radiusKm = 5, fuel = 'petrol', brand = null }) {
+export async function getNearbyStations({
+  lat,
+  lng,
+  radiusKm = 5,
+  fuel = 'petrol',
+  brand = null,
+  mpg = null,
+  tankFillLitres = null,
+}) {
   const params = { lat, lon: lng, radius: radiusKm, fuel_type: fuel };
   if (brand) params.brand = brandToString(brand) || brand;
+  if (mpg != null && Number.isFinite(Number(mpg))) params.mpg = Number(mpg);
+  if (tankFillLitres != null && Number.isFinite(Number(tankFillLitres))) {
+    params.tank_fill_litres = Number(tankFillLitres);
+  }
   const resp = await api.get('/api/v1/stations/nearby', { params });
   return sanitizeStationPayload(resp.data);
 }
@@ -163,11 +175,36 @@ export async function getPricesByStation(stationId, fuelType = null) {
  * @param {number} radiusKm
  * @param {string} fuelType
  */
-export async function getCheapestStations({ lat, lon, radiusKm = 10, fuelType = 'petrol' }) {
-  const resp = await api.get('/api/v1/stations/cheapest', {
-    params: { lat, lon, radius: radiusKm, fuel_type: fuelType },
-  });
+export async function getCheapestStations({
+  lat,
+  lon,
+  radiusKm = 10,
+  fuelType = 'petrol',
+  mpg = null,
+  tankFillLitres = null,
+}) {
+  const params = { lat, lon, radius: radiusKm, fuel_type: fuelType };
+  if (mpg != null && Number.isFinite(Number(mpg))) params.mpg = Number(mpg);
+  if (tankFillLitres != null && Number.isFinite(Number(tankFillLitres))) {
+    params.tank_fill_litres = Number(tankFillLitres);
+  }
+  const resp = await api.get('/api/v1/stations/cheapest', { params });
   return sanitizeStationPayload(resp.data);
+}
+
+/**
+ * Silent community flag — user reports a wrong/missing/closed price.
+ * Anti-abuse is handled both client-side (dedup) and backend-side.
+ *
+ * @param {string|number} stationId
+ * @param {object} body  { fuel_type, device_id, reason }
+ */
+export async function flagStationPrice(stationId, body) {
+  const resp = await api.post(
+    `/api/v1/stations/${encodeURIComponent(stationId)}/flag-price`,
+    body
+  );
+  return resp.data;
 }
 
 /**
