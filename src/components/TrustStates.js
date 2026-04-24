@@ -1,6 +1,6 @@
 /**
  * TrustStates.js
- * Reusable, launch-safe trust UI primitives for the FreeFuelPrice core journey.
+ * Reusable, launch-safe trust UI primitives for the FuelUK core journey.
  */
 
 import React from 'react';

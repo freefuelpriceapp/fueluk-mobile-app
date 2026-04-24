@@ -56,7 +56,7 @@ export default function SettingsScreen() {
   };
 
   const contactSupport = () => {
-    openURL(`mailto:${CONTACT_EMAIL}?subject=FreeFuelPrice%20Support`);
+    openURL(`mailto:${CONTACT_EMAIL}?subject=FuelUK%20Support`);
   };
 
   const clearFavourites = () => {
@@ -182,7 +182,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={styles.footer}>
-        {`FreeFuelPrice \u00A9 2025-26. All rights reserved.\nHelping UK drivers find the cheapest fuel nearby.`}
+        {`FuelUK \u00A9 2025-26. All rights reserved.\nHelping UK drivers find the cheapest fuel nearby.`}
       </Text>
     </ScrollView>
   );

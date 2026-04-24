@@ -1,7 +1,7 @@
 /**
  * src/lib/theme.js
  *
- * Shared design tokens for FreeFuelPrice UK.
+ * Shared design tokens for FuelUK.
  * Single source of truth for colors, spacing, font sizes, and fuel metadata.
  *
  * Phase 1 — created as part of UI hardening pass.

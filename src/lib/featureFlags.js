@@ -1,6 +1,6 @@
 /**
  * featureFlags.js
- * Central mobile feature flag config for FreeFuelPrice.
+ * Central mobile feature flag config for FuelUK.
  *
  * LAUNCH-SAFE MVP: all non-MVP features are DISABLED by default.
  * To enable a feature in a future sprint, change its value to true.

@@ -180,7 +180,7 @@ export default function BrandHeader({
         </View>
         <View style={styles.textBlock}>
           <Text style={[styles.wordmark, { color: theme.text }]} numberOfLines={1}>
-            FreeFuel<Text style={{ color: theme.accent }}>Price</Text>
+            Fuel<Text style={{ color: theme.accent }}>UK</Text>
           </Text>
           <Animated.Text
             style={[styles.subtitle, { color: theme.muted, opacity: subtitleOpacity }]}
