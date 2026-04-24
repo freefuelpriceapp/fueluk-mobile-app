@@ -34,6 +34,7 @@ import { toRenderableString } from '../lib/safeRender';
 import BreakEvenBadge from '../components/BreakEvenBadge';
 import TrajectoryBadge from '../components/TrajectoryBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
+import StationStatusChip from '../components/StationStatusChip';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { stationTrajectorySecondary } from '../lib/trajectory';
 
@@ -553,6 +554,9 @@ export default function StationDetailScreen({ route }) {
               {brandToString(station.brand) ? (
                 <Text style={styles.stationBrand}>{brandToString(station.brand)}</Text>
               ) : null}
+              <View style={{ marginTop: 8 }}>
+                <StationStatusChip station={station} size="md" />
+              </View>
             </View>
 
             {/* Favourite heart button */}

@@ -13,7 +13,9 @@ import { COLORS, FUEL_COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { mediumHaptic } from '../lib/haptics';
 import { brandToString, safeText } from '../lib/brand';
 import BreakEvenBadge from './BreakEvenBadge';
+import StationStatusChip from './StationStatusChip';
 import { stationTrajectorySecondary } from '../lib/trajectory';
+import { isStationOpenNow, shouldDeEmphasise } from '../lib/stationStatus';
 import { isFeatureEnabled } from '../config/featureFlags';
 
 const FAVOURITES_KEY = 'user_favourites';
@@ -178,12 +180,22 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
     .filter(({ ppl }) => ppl !== null)
     .slice(0, 2);
 
+  // De-emphasise permanently-closed stations; keep currently-closed ones at
+  // full opacity — they just carry the chip.
+  const statusResult = isStationOpenNow(
+    station?.opening_hours || null,
+    !!station?.temporary_closure,
+    !!station?.permanent_closure,
+  );
+  const deEmphasise = shouldDeEmphasise(statusResult);
+
   const cardStyle = [
     styles.card,
     hasAccentBorder && {
       borderLeftWidth: 3,
       borderLeftColor: freshnessColor,
     },
+    deEmphasise && { opacity: 0.5 },
     { transform: [{ scale: pressScale }] },
   ];
 
@@ -239,6 +251,11 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
       {/* Station name + address */}
       <Text style={styles.name}>{safeText(name)}</Text>
       {address ? <Text style={styles.address}>{safeText(address)}</Text> : null}
+
+      {/* Status chip — open/closed/24h etc. Renders nothing when hours unknown. */}
+      <View style={styles.statusRow}>
+        <StationStatusChip station={station} size="sm" />
+      </View>
 
       {/* Differentiator strip: break-even savings + per-station trajectory */}
       {(isFeatureEnabled('breakEven') && station.break_even) ||
@@ -494,6 +511,9 @@ const styles = StyleSheet.create({
   },
   freshnessText: {
     fontSize: FONT_SIZES.xs,
+  },
+  statusRow: {
+    marginBottom: SPACING.xs,
   },
   diffStrip: {
     flexDirection: 'row',
