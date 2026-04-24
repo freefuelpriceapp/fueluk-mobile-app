@@ -76,6 +76,8 @@ export function describeBreakEven(breakEven) {
   let variant;
   let primary;
   let tone;
+  // "Tied" = similar variant where the per-tank difference is under £1.
+  let isTied = false;
   if (is_closest === true) {
     variant = 'closest';
     primary = null;
@@ -86,7 +88,11 @@ export function describeBreakEven(breakEven) {
     tone = 'positive';
   } else if (worth_the_drive === false) {
     variant = 'similar';
-    primary = 'Similar value to your closest';
+    // When the per-tank difference is less than £1, lean into the "tied" copy.
+    isTied = hasSavings && Math.abs(savingsPounds) < 1;
+    primary = isTied
+      ? 'Same value as your nearest station'
+      : 'Similar price to your nearest station';
     tone = 'neutral';
   } else if (hasSavings && savingsPounds > 0) {
     variant = 'worth';
@@ -125,8 +131,29 @@ export function describeBreakEven(breakEven) {
     } else if (hasPpl) {
       secondaryParts.push(formatPencePerLitre(price_per_l_pence));
     }
+  } else if (variant === 'similar') {
+    // New copy: lead with the per-tank difference as one clear thought.
+    // "Only £0.71 difference per full tank" — or, when tied, a gentler nudge.
+    if (hasSavings) {
+      const diffAbs = Math.abs(savingsPounds);
+      const diffLabel = formatPounds(diffAbs);
+      if (isTied) {
+        secondaryParts.push(`Under £1 difference per full tank — either works`);
+      } else if (diffLabel) {
+        secondaryParts.push(`Only ${diffLabel} difference per full tank`);
+      }
+    } else if (fullTankPounds != null) {
+      // Fallback when we don't know the delta: surface the tank cost.
+      if (hasTank && hasPpl) {
+        secondaryParts.push(
+          `${formatPounds(fullTankPounds)} to fill (${tank_litres}L @ ${formatPencePerLitre(price_per_l_pence)})`,
+        );
+      } else {
+        secondaryParts.push(`${formatPounds(fullTankPounds)} to fill`);
+      }
+    }
   } else {
-    // similar / closest — unchanged: show tank cost when we have it.
+    // closest — unchanged: show tank cost when we have it.
     if (fullTankPounds != null) {
       if (hasTank && hasPpl) {
         secondaryParts.push(
@@ -146,7 +173,20 @@ export function describeBreakEven(breakEven) {
   if (variant === 'worth' && savingsPounds != null) {
     a11yParts.push(`${formatPounds(savingsPounds)} cheaper per tank than your nearest station`);
   } else if (variant === 'similar') {
-    a11yParts.push('Similar value to your closest station');
+    a11yParts.push(
+      isTied
+        ? 'Same value as your nearest station'
+        : 'Similar price to your nearest station',
+    );
+    if (hasSavings) {
+      const diffAbs = Math.abs(savingsPounds);
+      const diffLabel = formatPounds(diffAbs);
+      if (isTied) {
+        a11yParts.push('Under one pound difference per full tank');
+      } else if (diffLabel) {
+        a11yParts.push(`Only ${diffLabel} difference per full tank`);
+      }
+    }
   } else if (variant === 'closest' && fullTankPounds != null) {
     if (hasTank && hasPpl) {
       a11yParts.push(
@@ -172,7 +212,7 @@ export function describeBreakEven(breakEven) {
   if (variant === 'worth' && savingsPounds != null) {
     legacyLabel = `+${formatPounds(savingsPounds)} saved`;
   } else if (variant === 'similar') {
-    legacyLabel = 'Similar value';
+    legacyLabel = isTied ? 'Same value' : 'Similar price';
   } else if (variant === 'closest' && fullTankPounds != null) {
     legacyLabel = `${formatPounds(fullTankPounds)} tank`;
   } else {
@@ -181,6 +221,7 @@ export function describeBreakEven(breakEven) {
 
   return {
     variant,                       // "worth" | "similar" | "closest"
+    isTied,                        // true when similar and |diff| < £1
     label: legacyLabel,            // short chip text (back-compat)
     primary,                       // full sentence for new badge primary line
     secondary,                     // "£56 to fill (40L @ 140p) · 2.3mi extra drive · net £4.20 saved"

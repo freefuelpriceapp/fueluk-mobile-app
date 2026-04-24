@@ -858,7 +858,7 @@ export default function MapScreen({ navigation }) {
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sheetName} numberOfLines={1}>
+                <Text style={styles.sheetName} numberOfLines={2}>
                   {safeText(selectedStation.name) || brandToString(selectedStation.brand) || 'Station'}
                 </Text>
                 {brandToString(selectedStation.brand) ? (
@@ -866,7 +866,7 @@ export default function MapScreen({ navigation }) {
                     {brandToString(selectedStation.brand)}
                   </Text>
                 ) : null}
-                <Text style={styles.sheetAddress} numberOfLines={1}>
+                <Text style={styles.sheetAddress} numberOfLines={2}>
                   {safeText(selectedStation.address)}
                 </Text>
                 {selectedStation.distance_km != null && (
@@ -903,52 +903,84 @@ export default function MapScreen({ navigation }) {
               })}
             </View>
 
-            <View style={styles.sheetActions}>
+            {/* Primary pair: See details (solid accent) + Directions (outlined) */}
+            <View style={styles.sheetPrimaryRow}>
               <TouchableOpacity
-                style={styles.sheetActionBtn}
-                onPress={openDirections}
-                accessibilityLabel="Get directions"
+                style={[styles.sheetPrimaryBtn, { backgroundColor: COLORS.accent }]}
+                onPress={navigateToDetail}
+                accessibilityRole="button"
+                accessibilityLabel="See station details"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Ionicons name="navigate" size={16} color={COLORS.accent} />
-                <Text style={styles.sheetActionBtnText}>Directions</Text>
+                <Text
+                  style={styles.sheetPrimaryBtnText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
+                >
+                  See details
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={COLORS.background} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.sheetActionBtn}
+                style={styles.sheetSecondaryBtn}
+                onPress={openDirections}
+                accessibilityRole="button"
+                accessibilityLabel="Get directions"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="navigate" size={16} color={COLORS.accent} />
+                <Text
+                  style={styles.sheetSecondaryBtnText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
+                >
+                  Directions
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Secondary row: Save + Report (icon-led utilities) */}
+            <View style={styles.sheetUtilRow}>
+              <TouchableOpacity
+                style={styles.sheetUtilBtn}
                 onPress={toggleFavourite}
-                accessibilityLabel={isFavourite ? 'Remove from favourites' : 'Add to favourites'}
+                accessibilityRole="button"
+                accessibilityLabel={isFavourite ? 'Remove station from saved' : 'Save station'}
                 accessibilityState={{ checked: isFavourite }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons
                   name={isFavourite ? 'heart' : 'heart-outline'}
-                  size={16}
-                  color={isFavourite ? '#EF4444' : COLORS.textSecondary}
+                  size={14}
+                  color={isFavourite ? '#10B981' : COLORS.textSecondary}
                 />
-                <Text style={styles.sheetActionBtnText}>
+                <Text
+                  style={[
+                    styles.sheetUtilBtnText,
+                    isFavourite && { color: '#10B981' },
+                  ]}
+                >
                   {isFavourite ? 'Saved' : 'Save'}
                 </Text>
               </TouchableOpacity>
               {FEATURE_FLAGS.priceFlags && (
                 <TouchableOpacity
-                  style={styles.sheetActionBtn}
+                  style={styles.sheetUtilBtn}
                   onPress={() => {
                     const s = selectedStation;
                     dismissSheet();
                     setTimeout(() => setFlagTarget(s), reduceMotion ? 0 : 240);
                   }}
-                  accessibilityLabel="Report wrong price"
+                  accessibilityRole="button"
+                  accessibilityLabel="Report incorrect price"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="flag-outline" size={16} color={COLORS.textSecondary} />
-                  <Text style={styles.sheetActionBtnText}>Report</Text>
+                  <Ionicons name="flag-outline" size={14} color={COLORS.textSecondary} />
+                  <Text style={styles.sheetUtilBtnText}>Report</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                style={[styles.sheetPrimaryBtn, { backgroundColor: selectedFuelMeta.color }]}
-                onPress={navigateToDetail}
-                accessibilityLabel="See station details"
-              >
-                <Text style={styles.sheetPrimaryBtnText}>See details</Text>
-                <Ionicons name="chevron-forward" size={14} color={COLORS.background} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -1419,36 +1451,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  sheetActions: { flexDirection: 'row', gap: 8 },
-  sheetActionBtn: {
+  sheetPrimaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 4,
-  },
-  sheetActionBtnText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
+    gap: 10,
   },
   sheetPrimaryBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    gap: 6,
   },
   sheetPrimaryBtnText: {
     color: COLORS.background,
     fontWeight: '800',
     fontSize: 14,
+    letterSpacing: 0.1,
+  },
+  sheetSecondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 6,
+  },
+  sheetSecondaryBtnText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sheetUtilRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 18,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  sheetUtilBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  sheetUtilBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   loadingText: { marginTop: 12, color: COLORS.textSecondary, fontSize: 14 },
   errorText: { color: COLORS.danger, fontSize: 14, textAlign: 'center', marginTop: 12, marginBottom: 12 },
