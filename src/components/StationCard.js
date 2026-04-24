@@ -324,14 +324,9 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
         <Text style={[styles.freshnessText, { color: freshnessColor }]}>
           {trustLine}
         </Text>
-        {isFeatureEnabled('breakEven') &&
-        station.break_even &&
-        typeof station.break_even.fuel_cost_full_tank === 'number' &&
-        Number.isFinite(station.break_even.fuel_cost_full_tank) ? (
-          <Text style={styles.fullTankHint} numberOfLines={1}>
-            {`\u00B7 Full tank £${(station.break_even.fuel_cost_full_tank / 100).toFixed(2)}`}
-          </Text>
-        ) : null}
+        {/* Raw tank-cost line removed — break-even savings (if any) are the
+            story; the tank cost is presented within the break-even card's
+            secondary line where it's properly contextualised. */}
         {isFeatureEnabled('priceFlags') && onFlagPrice ? (
           <TouchableOpacity
             onPress={(e) => { e.stopPropagation?.(); onFlagPrice(station); }}

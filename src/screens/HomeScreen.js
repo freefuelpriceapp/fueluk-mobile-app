@@ -29,6 +29,8 @@ import { sanitizeStations } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
 import TrajectoryBadge from '../components/TrajectoryBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
+import PersonalisationChip from '../components/PersonalisationChip';
+import FirstVehicleCelebration from '../components/FirstVehicleCelebration';
 import {
   loadUserVehicle,
   isVehiclePromptDismissed,
@@ -110,6 +112,26 @@ const HomeScreen = ({ navigation }) => {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Re-load the vehicle when returning from VehicleSettings so the chip
+  // + celebration refresh without a full remount.
+  useEffect(() => {
+    const unsub = navigation?.addListener?.('focus', () => {
+      loadUserVehicle().then(setUserVehicle).catch(() => {});
+    });
+    return () => { if (typeof unsub === 'function') unsub(); };
+  }, [navigation]);
+
+  // Track the moment the first vehicle is linked (controls the celebration).
+  useEffect(() => {
+    if (!userVehicle) return;
+    AsyncStorage.getItem('first_vehicle_linked_at').then((existing) => {
+      if (!existing) {
+        AsyncStorage.setItem('first_vehicle_linked_at', new Date().toISOString())
+          .catch(() => {});
+      }
+    }).catch(() => {});
+  }, [userVehicle]);
 
   const fetchStations = useCallback(async () => {
     if (!location) return;
@@ -390,6 +412,12 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <>
+              {FEATURE_FLAGS.vehicleSettings && userVehicle ? (
+                <PersonalisationChip
+                  vehicle={userVehicle}
+                  onPress={() => navigation.navigate('VehicleSettings')}
+                />
+              ) : null}
               {FEATURE_FLAGS.vehicleSettings && !userVehicle && !promptDismissed ? (
                 <View style={styles.vehiclePromptChip}>
                   <Ionicons name="car-sport-outline" size={14} color={COLORS.accent} />
@@ -454,6 +482,7 @@ const HomeScreen = ({ navigation }) => {
         initialFuelType={selectedFuel}
         onClose={() => setFlagTarget(null)}
       />
+      <FirstVehicleCelebration vehicle={userVehicle} />
     </SafeAreaView>
   );
 };

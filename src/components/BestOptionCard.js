@@ -7,7 +7,8 @@ import { brandToString, safeText } from '../lib/brand';
 import { normaliseSelectedReason } from '../lib/selectedReason';
 import { chooseBestOption } from '../lib/bestOption';
 import BreakEvenBadge from './BreakEvenBadge';
-import { BEST_OPTION_MODE_KEY } from '../lib/userVehicle';
+import BreakEvenExplainer from './BreakEvenExplainer';
+import { BEST_OPTION_MODE_KEY, loadUserVehicle } from '../lib/userVehicle';
 import { isFeatureEnabled } from '../config/featureFlags';
 
 /**
@@ -66,6 +67,13 @@ export default function BestOptionCard({
   const valueFeatureOn = isFeatureEnabled('breakEven');
   const toggleAvailable = valueFeatureOn && !!bestValue;
   const [mode, setMode] = useState(toggleAvailable ? 'value' : 'closest');
+  const [vehicle, setVehicle] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loadUserVehicle().then((v) => { if (mounted) setVehicle(v); }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   // Load persisted mode on mount; default to "value" when the toggle is
   // actually available, else force "closest".
@@ -175,9 +183,16 @@ export default function BestOptionCard({
           {safeText(activeStation.name) || brandToString(activeStation.brand) || 'Station'}
         </Text>
 
+        {updated ? (
+          <View style={styles.officialPill} accessible accessibilityLabel={`Official price, updated ${updated}`}>
+            <Ionicons name="shield-checkmark-outline" size={10} color={THEME.accent} />
+            <Text style={styles.officialPillText}>Official price · {updated}</Text>
+          </View>
+        ) : null}
+
         {/* Break-even chip takes primary position when in value mode */}
         {mode === 'value' && activeStation.break_even ? (
-          <View style={{ marginBottom: 6 }}>
+          <View style={{ marginBottom: 6, marginTop: 6 }}>
             <BreakEvenBadge breakEven={activeStation.break_even} size="md" />
           </View>
         ) : null}
@@ -210,6 +225,16 @@ export default function BestOptionCard({
           </View>
         )}
       </TouchableOpacity>
+      {mode === 'value' && activeStation.break_even ? (
+        <View style={styles.explainerWrap}>
+          <BreakEvenExplainer
+            station={activeStation}
+            breakEven={activeStation.break_even}
+            fuelType={fuelType}
+            userVehicle={vehicle}
+          />
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -264,7 +289,23 @@ const styles = StyleSheet.create({
   },
   topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   topLabel: { fontSize: 11, fontWeight: '700', color: THEME.accent, marginLeft: 5, letterSpacing: 0.5, textTransform: 'uppercase' },
-  stationName: { fontSize: 16, fontWeight: '700', color: THEME.text, marginBottom: 6 },
+  stationName: { fontSize: 16, fontWeight: '700', color: THEME.text, marginBottom: 4 },
+  officialPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(46,204,113,0.10)',
+    gap: 3,
+  },
+  officialPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2ECC71',
+    letterSpacing: 0.2,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
   price: { fontSize: 15, fontWeight: '700', color: THEME.accent },
   fuelLabel: { fontSize: 12, fontWeight: '500', color: THEME.muted },
@@ -275,4 +316,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   reasonText: { fontSize: 12, color: THEME.muted, flexShrink: 1 },
+  explainerWrap: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    marginTop: -4,
+  },
 });
