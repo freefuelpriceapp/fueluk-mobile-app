@@ -34,7 +34,7 @@ describe('describeBreakEven', () => {
     expect(d.accessibilityLabel).toContain('includes 2.3 mile detour fuel');
   });
 
-  test('worth_the_drive=false renders "Similar value" as neutral', () => {
+  test('worth_the_drive=false renders tied copy when |diff| < £1', () => {
     const d = describeBreakEven({
       worth_the_drive: false,
       savings_pence: 5,
@@ -42,9 +42,65 @@ describe('describeBreakEven', () => {
     });
     expect(d.variant).toBe('similar');
     expect(d.tone).toBe('neutral');
-    expect(d.primary).toBe('Similar value to your closest');
-    expect(d.label).toBe('Similar value');
-    expect(d.accessibilityLabel).toContain('Similar value');
+    expect(d.isTied).toBe(true);
+    expect(d.primary).toBe('Same value as your nearest station');
+    expect(d.secondary).toBe('Under £1 difference per full tank — either works');
+    expect(d.label).toBe('Same value');
+    expect(d.accessibilityLabel).toContain('Same value as your nearest station');
+  });
+
+  test('worth_the_drive=false with |diff| >= £1 renders "Similar price" copy', () => {
+    const d = describeBreakEven({
+      worth_the_drive: false,
+      savings_pence: 71, // £0.71 → tied (< £1)
+    });
+    expect(d.variant).toBe('similar');
+    expect(d.isTied).toBe(true);
+    expect(d.primary).toBe('Same value as your nearest station');
+
+    const d2 = describeBreakEven({
+      worth_the_drive: false,
+      savings_pence: 180, // £1.80 → not tied
+    });
+    expect(d2.variant).toBe('similar');
+    expect(d2.isTied).toBe(false);
+    expect(d2.primary).toBe('Similar price to your nearest station');
+    expect(d2.secondary).toBe('Only £1.80 difference per full tank');
+    expect(d2.label).toBe('Similar price');
+  });
+
+  test('similar secondary always uses formatPounds (never concatenates bare £)', () => {
+    const d = describeBreakEven({
+      worth_the_drive: false,
+      savings_pence: 237,
+    });
+    // £2.37 — must appear as a clean pounds figure, no trailing "p".
+    expect(d.secondary).toContain('£2.37');
+    expect(d.secondary).not.toMatch(/£\d+(\.\d+)?p/);
+  });
+
+  test('similar copy reads as one thought (no middle-dot concat)', () => {
+    const d = describeBreakEven({
+      worth_the_drive: false,
+      savings_pence: 120,
+    });
+    // Neither primary nor secondary should chain via "·" for the similar variant.
+    expect(d.primary).not.toContain(' · ');
+    expect(d.secondary).not.toContain(' · ');
+  });
+
+  test('worth variant best-value copy from PR #37 is preserved', () => {
+    const d = describeBreakEven({
+      worth_the_drive: true,
+      savings_pence: 500,
+      detour_miles: 3.2,
+      fuel_cost_full_tank: 5600,
+      price_per_l_pence: 140,
+      tank_litres: 40,
+    });
+    expect(d.variant).toBe('worth');
+    expect(d.primary).toBe('£5.00 cheaper per tank than your nearest station');
+    expect(d.secondary).toContain('includes 3.2mi detour fuel');
   });
 
   test('is_closest omits comparison, returns "closest" variant', () => {
