@@ -121,6 +121,7 @@ export default function MapScreen({ navigation }) {
   const [showHint, setShowHint] = useState(false);
   const [userVehicle, setUserVehicle] = useState(null);
   const [flagTarget, setFlagTarget] = useState(null);
+  const [showFreshnessPopover, setShowFreshnessPopover] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -153,11 +154,11 @@ export default function MapScreen({ navigation }) {
     };
   }, []);
 
-  // First-run "tap a pin" hint. Shown once; dismissed via AsyncStorage
-  // key map_hint_dismissed_v1 so subsequent mounts skip it.
+  // First-run "tap a pin" hint (v2 copy). Shown once per install; key v2
+  // means users who dismissed v1 still see the upgraded copy once.
   useEffect(() => {
     let cancelled = false;
-    AsyncStorage.getItem('map_hint_dismissed_v1')
+    AsyncStorage.getItem('map_hint_dismissed_v2')
       .then((v) => { if (!cancelled && !v) setShowHint(true); })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -165,7 +166,7 @@ export default function MapScreen({ navigation }) {
 
   const dismissHint = useCallback(() => {
     setShowHint(false);
-    AsyncStorage.setItem('map_hint_dismissed_v1', '1').catch(() => {});
+    AsyncStorage.setItem('map_hint_dismissed_v2', '1').catch(() => {});
   }, []);
 
   const { location, loading: locationLoading, error: locationError } = useLocation();
@@ -755,7 +756,16 @@ export default function MapScreen({ navigation }) {
               </View>
             )}
 
-            <View style={styles.statusCluster}>
+            <TouchableOpacity
+              style={styles.statusCluster}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                setShowFreshnessPopover(v => !v);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Price freshness info. Live prices from the UK Government Fuel Finder register."
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            >
               <Text style={styles.statusDot}>{'·'}</Text>
               <View
                 style={[
@@ -768,7 +778,7 @@ export default function MapScreen({ navigation }) {
               <Text style={styles.statusStripText} numberOfLines={1}>
                 {formatRelativeTime(mapStatus.cheapestStation?.last_updated)}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             {FEATURE_FLAGS.trajectory && stationsMeta?.nationalTrajectory ? (
               <View style={[styles.statusCluster, { marginLeft: 'auto' }]}>
@@ -965,13 +975,35 @@ export default function MapScreen({ navigation }) {
           style={styles.firstRunHint}
           onPress={dismissHint}
           accessibilityRole="button"
-          accessibilityLabel="Tap a pin for station details. Tap to dismiss."
+          accessibilityLabel="Tap any pin to see the real-time price. All data from the official UK fuel register. Tap to dismiss."
         >
-          <Ionicons name="information-circle-outline" size={14} color="#10B981" />
-          <Text style={styles.firstRunHintText}>
-            Tap a pin for details
+          <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+          <Text style={styles.firstRunHintText} numberOfLines={2}>
+            Tap any pin to see the real-time price — all data from the official UK fuel register
           </Text>
           <Ionicons name="close" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 6 }} />
+        </TouchableOpacity>
+      )}
+
+      {showFreshnessPopover && (
+        <TouchableOpacity
+          style={styles.freshnessPopover}
+          activeOpacity={0.9}
+          onPress={() => setShowFreshnessPopover(false)}
+          accessibilityRole="button"
+          accessibilityLabel={`Live prices from the UK Government Fuel Finder register. Updated ${formatRelativeTime(mapStatus.cheapestStation?.last_updated)}. Tap to close.`}
+        >
+          <View style={styles.freshnessPopoverArrow} />
+          <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.freshnessPopoverTitle}>
+              Official UK price data
+            </Text>
+            <Text style={styles.freshnessPopoverBody}>
+              Live from the UK Government Fuel Finder register. Updated {formatRelativeTime(mapStatus.cheapestStation?.last_updated)}.
+            </Text>
+          </View>
+          <Ionicons name="close" size={12} color="rgba(255,255,255,0.55)" />
         </TouchableOpacity>
       )}
     </View>
@@ -1221,10 +1253,56 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   firstRunHintText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#FFFFFF',
     fontWeight: '600',
     letterSpacing: 0.1,
+    maxWidth: 240,
+  },
+  freshnessPopover: {
+    position: 'absolute',
+    top: 210,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,23,30,0.97)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 20,
+  },
+  freshnessPopoverArrow: {
+    position: 'absolute',
+    top: -6,
+    alignSelf: 'center',
+    width: 10,
+    height: 10,
+    backgroundColor: 'rgba(15,23,30,0.97)',
+    borderLeftWidth: 1,
+    borderTopWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    transform: [{ rotate: '45deg' }],
+  },
+  freshnessPopoverTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
+  },
+  freshnessPopoverBody: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 2,
+    lineHeight: 14,
   },
   recenterBtn: {
     position: 'absolute',
