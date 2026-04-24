@@ -126,7 +126,7 @@ export default function BreakEvenExplainer({
   // Animated height cap — pick something tall enough for the content.
   const maxHeight = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 260],
+    outputRange: [0, 360],
   });
   const opacity = anim.interpolate({
     inputRange: [0, 1],
@@ -156,7 +156,14 @@ export default function BreakEvenExplainer({
 
       <Animated.View style={[styles.panel, { maxHeight, opacity }]}>
         <View style={styles.panelInner}>
-          <Text style={styles.vehicleLine}>{vehicleLine}</Text>
+          <Text style={styles.baselineLine}>
+            We compare every station's total cost — a full tank of fuel plus
+            the round-trip detour — against your nearest station in these
+            results. The winner saves you the most money overall.
+          </Text>
+          <Text style={styles.vehicleLine}>
+            {vehicleLine} · {tankL}L tank fill
+          </Text>
 
           <View style={styles.block}>
             <Text style={styles.blockHeader}>
@@ -233,6 +240,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     marginTop: 4,
+  },
+  baselineLine: {
+    fontSize: 11,
+    color: THEME.label,
+    lineHeight: 15,
+    marginBottom: 6,
   },
   vehicleLine: {
     fontSize: 11,

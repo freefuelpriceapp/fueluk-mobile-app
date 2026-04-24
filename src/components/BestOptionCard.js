@@ -8,6 +8,7 @@ import { normaliseSelectedReason } from '../lib/selectedReason';
 import { chooseBestOption } from '../lib/bestOption';
 import BreakEvenBadge from './BreakEvenBadge';
 import BreakEvenExplainer from './BreakEvenExplainer';
+import { describeBreakEven } from '../lib/breakEven';
 import { BEST_OPTION_MODE_KEY, loadUserVehicle } from '../lib/userVehicle';
 import { isFeatureEnabled } from '../config/featureFlags';
 
@@ -104,9 +105,24 @@ export default function BestOptionCard({
       ? bestValue || bestOption || chooseBestOption(null, stations, fuelType)
       : bestOption || chooseBestOption(null, stations, fuelType);
 
+  // In value mode, prefer a client-composed reason built from the structured
+  // break_even block — the server's `best_value_reason` string uses the
+  // legacy "Saves £X net after Xmi detour" copy which we've replaced.
+  // Fall back to the server string only when we have no break_even data.
+  const clientValueReason = (() => {
+    if (mode !== 'value' || !activeStation?.break_even) return null;
+    const d = describeBreakEven(activeStation.break_even);
+    if (!d) return null;
+    if (d.variant === 'worth' && d.primary && d.secondary) {
+      return `${d.primary} · ${d.secondary}`;
+    }
+    return d.primary || null;
+  })();
+
   const activeReason =
     mode === 'value' && bestValue
-      ? (typeof bestValueReason === 'string' && bestValueReason.trim()) || null
+      ? clientValueReason
+        || ((typeof bestValueReason === 'string' && bestValueReason.trim()) || null)
       : normaliseSelectedReason(selectedReason);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;

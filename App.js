@@ -287,30 +287,13 @@ function HomeStack() {
   );
 }
 
-function FavouritesStack() {
+function ToolboxStack() {
   return (
     <Stack.Navigator screenOptions={stackHeader}>
       <Stack.Screen
-        name="FavouritesMain"
-        component={FavouritesScreen}
-        options={{ title: 'Favourites' }}
-      />
-      <Stack.Screen
-        name="StationDetail"
-        component={StationDetailScreen}
-        options={{ title: 'Station Detail' }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-function MoreStack() {
-  return (
-    <Stack.Navigator screenOptions={stackHeader}>
-      <Stack.Screen
-        name="MoreMain"
+        name="ToolboxMain"
         component={MoreScreen}
-        options={{ title: 'More' }}
+        options={{ title: 'Toolbox' }}
       />
       {FEATURES.tripCalculator && (
         <Stack.Screen
@@ -329,6 +312,16 @@ function MoreStack() {
         component={VehicleCheckScreen}
         options={{ title: 'Vehicle Check' }}
       />
+      <Stack.Screen
+        name="Favourites"
+        component={FavouritesScreen}
+        options={{ title: 'Favourites' }}
+      />
+      <Stack.Screen
+        name="StationDetail"
+        component={StationDetailScreen}
+        options={{ title: 'Station Detail' }}
+      />
       {FEATURE_FLAGS.vehicleSettings && (
         <Stack.Screen
           name="VehicleSettings"
@@ -341,6 +334,25 @@ function MoreStack() {
         component={SettingsScreen}
         options={{ title: 'Settings' }}
       />
+    </Stack.Navigator>
+  );
+}
+
+function SettingsStack() {
+  return (
+    <Stack.Navigator screenOptions={stackHeader}>
+      <Stack.Screen
+        name="SettingsMain"
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
+      {FEATURE_FLAGS.vehicleSettings && (
+        <Stack.Screen
+          name="VehicleSettings"
+          component={VehicleSettingsScreen}
+          options={{ title: 'Your Vehicle' }}
+        />
+      )}
     </Stack.Navigator>
   );
 }
@@ -382,6 +394,17 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Toolbox"
+        component={ToolboxStack}
+        options={{
+          tabBarLabel: 'Toolbox',
+          tabBarAccessibilityLabel: 'Toolbox',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="construct-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Search"
         component={SearchScreen}
         options={{
@@ -396,22 +419,12 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Favourites"
-        component={FavouritesStack}
+        name="Settings"
+        component={SettingsStack}
         options={{
-          tabBarLabel: 'Saved',
+          tabBarLabel: 'Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="More"
-        component={MoreStack}
-        options={{
-          tabBarLabel: 'More',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="ellipsis-horizontal" color={color} size={size} />
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
       />

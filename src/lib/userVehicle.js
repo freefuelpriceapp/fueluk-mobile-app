@@ -41,6 +41,13 @@ export async function saveUserVehicle(vehicle) {
     mpg: typeof vehicle.mpg === 'number' && Number.isFinite(vehicle.mpg) ? vehicle.mpg : null,
     make: vehicle.make || undefined,
     model: vehicle.model || undefined,
+    year: typeof vehicle.year === 'number' ? vehicle.year : (vehicle.year || undefined),
+    colour: typeof vehicle.colour === 'string'
+      ? vehicle.colour
+      : (typeof vehicle.color === 'string' ? vehicle.color : undefined),
+    body_type: typeof vehicle.body_type === 'string'
+      ? vehicle.body_type
+      : (typeof vehicle.bodyType === 'string' ? vehicle.bodyType : undefined),
     source: vehicle.source || 'manual',
     updated_at: new Date().toISOString(),
   };

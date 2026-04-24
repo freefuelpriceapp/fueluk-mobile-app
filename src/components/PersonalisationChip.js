@@ -3,28 +3,55 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { describePersonalisation } from '../lib/personalisation';
 import { COLORS } from '../lib/theme';
+import VehicleAvatar, { buildAvatarAccessibilityLabel } from './VehicleAvatar';
 
 /**
- * PersonalisationChip — subtle "🚗  Personalised to your 2022 Mercedes · E10 · 45 mpg"
+ * PersonalisationChip — "Personalised to your 2022 Mercedes · E10 · 45 mpg"
  * chip shown at the top of HomeScreen when we already know the user's vehicle.
  *
- * Returns null when `vehicle` is null or unusable — HomeScreen handles the
- * "tell us your car" chip in that case.
+ * When any visual info is present (colour, make, body type, model) we
+ * render a small VehicleAvatar to the left — a colour-tinted silhouette
+ * with a manufacturer letter-badge. Degrades gracefully to the legacy
+ * Ionicon car glyph when no visual data is available.
  */
 export default function PersonalisationChip({ vehicle, onPress, style }) {
   const desc = describePersonalisation(vehicle);
   if (!desc || !desc.present) return null;
+
+  const make = vehicle?.make;
+  const model = vehicle?.model;
+  const colour = vehicle?.colour || vehicle?.color;
+  const bodyType = vehicle?.body_type || vehicle?.bodyType || vehicle?.type;
+  const year = vehicle?.year;
+  const hasAnyVisual = !!(make || model || colour || bodyType);
+
+  const avatarA11y = buildAvatarAccessibilityLabel({ make, model, colour, bodyType, year });
+  const chipA11y = hasAnyVisual
+    ? `${avatarA11y}. ${desc.accessibilityLabel}`
+    : desc.accessibilityLabel;
 
   return (
     <TouchableOpacity
       style={[styles.wrap, style]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={desc.accessibilityLabel}
+      accessibilityLabel={chipA11y}
       accessibilityHint="Edit your vehicle for more accurate savings"
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
     >
-      <Ionicons name="car-sport-outline" size={14} color={COLORS.accent} />
+      {hasAnyVisual ? (
+        <VehicleAvatar
+          make={make}
+          model={model}
+          colour={colour}
+          bodyType={bodyType}
+          year={year}
+          size={44}
+          accessibilityLabel={avatarA11y}
+        />
+      ) : (
+        <Ionicons name="car-sport-outline" size={14} color={COLORS.accent} />
+      )}
       <View style={styles.textWrap}>
         <Text style={styles.headline} numberOfLines={1}>
           {desc.headline}
@@ -54,7 +81,7 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     marginHorizontal: 12,
     marginTop: 10,
     marginBottom: 4,
