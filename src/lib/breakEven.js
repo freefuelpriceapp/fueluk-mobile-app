@@ -82,7 +82,7 @@ export function describeBreakEven(breakEven) {
     tone = 'neutral';
   } else if (worth_the_drive && hasSavings && savingsPounds > 0) {
     variant = 'worth';
-    primary = `${formatPounds(savingsPounds)} cheaper to fill up here`;
+    primary = `${formatPounds(savingsPounds)} cheaper per tank than your nearest station`;
     tone = 'positive';
   } else if (worth_the_drive === false) {
     variant = 'similar';
@@ -90,7 +90,7 @@ export function describeBreakEven(breakEven) {
     tone = 'neutral';
   } else if (hasSavings && savingsPounds > 0) {
     variant = 'worth';
-    primary = `${formatPounds(savingsPounds)} cheaper to fill up here`;
+    primary = `${formatPounds(savingsPounds)} cheaper per tank than your nearest station`;
     tone = 'positive';
   } else {
     return null;
@@ -108,30 +108,43 @@ export function describeBreakEven(breakEven) {
     typeof detour_miles === 'number' && Number.isFinite(detour_miles) && detour_miles > 0;
 
   const secondaryParts = [];
-  if (fullTankPounds != null) {
-    if (hasTank && hasPpl) {
-      secondaryParts.push(
-        `${formatPounds(fullTankPounds)} to fill (${tank_litres}L @ ${formatPencePerLitre(price_per_l_pence)})`,
-      );
-    } else {
-      secondaryParts.push(`${formatPounds(fullTankPounds)} to fill`);
+  if (variant === 'worth') {
+    // Copy spec: "£X cheaper per tank than your nearest station · includes Xmi detour fuel"
+    // Primary carries the headline; secondary carries the detour caveat + tank cost.
+    if (hasDetour) {
+      secondaryParts.push(`includes ${detour_miles.toFixed(1)}mi detour fuel`);
     }
-  } else if (hasPpl) {
-    secondaryParts.push(formatPencePerLitre(price_per_l_pence));
-  }
-
-  if (variant === 'worth' && hasDetour) {
-    secondaryParts.push(`${detour_miles.toFixed(1)}mi extra drive`);
-  }
-  if (variant === 'worth' && savingsPounds != null) {
-    secondaryParts.push(`net ${formatPounds(savingsPounds)} saved`);
+    if (fullTankPounds != null) {
+      if (hasTank && hasPpl) {
+        secondaryParts.push(
+          `${formatPounds(fullTankPounds)} to fill (${tank_litres}L @ ${formatPencePerLitre(price_per_l_pence)})`,
+        );
+      } else {
+        secondaryParts.push(`${formatPounds(fullTankPounds)} to fill`);
+      }
+    } else if (hasPpl) {
+      secondaryParts.push(formatPencePerLitre(price_per_l_pence));
+    }
+  } else {
+    // similar / closest — unchanged: show tank cost when we have it.
+    if (fullTankPounds != null) {
+      if (hasTank && hasPpl) {
+        secondaryParts.push(
+          `${formatPounds(fullTankPounds)} to fill (${tank_litres}L @ ${formatPencePerLitre(price_per_l_pence)})`,
+        );
+      } else {
+        secondaryParts.push(`${formatPounds(fullTankPounds)} to fill`);
+      }
+    } else if (hasPpl) {
+      secondaryParts.push(formatPencePerLitre(price_per_l_pence));
+    }
   }
   const secondary = secondaryParts.length ? secondaryParts.join(' · ') : null;
 
   // Accessibility label: reads naturally for screen-readers.
   const a11yParts = [];
   if (variant === 'worth' && savingsPounds != null) {
-    a11yParts.push(`${formatPounds(savingsPounds)} cheaper to fill up here`);
+    a11yParts.push(`${formatPounds(savingsPounds)} cheaper per tank than your nearest station`);
   } else if (variant === 'similar') {
     a11yParts.push('Similar value to your closest station');
   } else if (variant === 'closest' && fullTankPounds != null) {
@@ -149,10 +162,7 @@ export function describeBreakEven(breakEven) {
     );
   }
   if (variant === 'worth' && hasDetour) {
-    a11yParts.push(`${detour_miles.toFixed(1)} mile extra drive`);
-  }
-  if (variant === 'worth' && savingsPounds != null) {
-    a11yParts.push(`${formatPounds(savingsPounds)} net saving`);
+    a11yParts.push(`includes ${detour_miles.toFixed(1)} mile detour fuel`);
   }
   if (isEstimated) a11yParts.push('estimated MPG');
   const accessibilityLabel = a11yParts.join('. ') || primary || 'Price comparison';

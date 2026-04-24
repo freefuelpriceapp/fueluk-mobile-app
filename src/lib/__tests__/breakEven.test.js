@@ -23,15 +23,15 @@ describe('describeBreakEven', () => {
     });
     expect(d.variant).toBe('worth');
     expect(d.tone).toBe('positive');
-    expect(d.primary).toBe('£4.20 cheaper to fill up here');
-    expect(d.secondary).toBe('£56.00 to fill (40L @ 140.0p) · 2.3mi extra drive · net £4.20 saved');
+    expect(d.primary).toBe('£4.20 cheaper per tank than your nearest station');
+    expect(d.secondary).toBe('includes 2.3mi detour fuel · £56.00 to fill (40L @ 140.0p)');
     expect(d.label).toBe('+£4.20 saved');
     expect(d.savingsPounds).toBe(4.2);
     expect(d.detourMiles).toBe(2.3);
     expect(d.fullTankPounds).toBe(56);
     expect(d.isEstimated).toBe(false);
-    expect(d.accessibilityLabel).toContain('£4.20 cheaper');
-    expect(d.accessibilityLabel).toContain('2.3 mile extra drive');
+    expect(d.accessibilityLabel).toContain('£4.20 cheaper per tank');
+    expect(d.accessibilityLabel).toContain('includes 2.3 mile detour fuel');
   });
 
   test('worth_the_drive=false renders "Similar value" as neutral', () => {
@@ -89,7 +89,55 @@ describe('describeBreakEven', () => {
     const d = describeBreakEven({ worth_the_drive: true, savings_pence: 237 });
     expect(d.savingsPounds).toBe(2.37);
     expect(d.label).toBe('+£2.37 saved');
-    expect(d.primary).toBe('£2.37 cheaper to fill up here');
+    expect(d.primary).toBe('£2.37 cheaper per tank than your nearest station');
+  });
+
+  test('worth variant secondary includes detour caveat when detour_miles present', () => {
+    const d = describeBreakEven({
+      worth_the_drive: true,
+      savings_pence: 380,
+      detour_miles: 1.2,
+    });
+    expect(d.variant).toBe('worth');
+    expect(d.secondary).toContain('includes 1.2mi detour fuel');
+  });
+
+  test('worth variant with no detour skips the detour caveat', () => {
+    const d = describeBreakEven({
+      worth_the_drive: true,
+      savings_pence: 200,
+      fuel_cost_full_tank: 5600,
+      price_per_l_pence: 140,
+      tank_litres: 40,
+    });
+    expect(d.variant).toBe('worth');
+    expect(d.secondary).not.toMatch(/detour/);
+    expect(d.secondary).toContain('£56.00 to fill');
+  });
+
+  test('worth variant primary never uses the legacy "cheaper to fill up here" copy', () => {
+    const d = describeBreakEven({
+      worth_the_drive: true,
+      savings_pence: 420,
+      detour_miles: 2.3,
+    });
+    expect(d.primary).not.toMatch(/cheaper to fill up here/);
+    expect(d.primary).toMatch(/cheaper per tank than your nearest station/);
+  });
+
+  test('accessibility label for worth variant uses the new per-tank phrasing', () => {
+    const d = describeBreakEven({
+      worth_the_drive: true,
+      savings_pence: 420,
+      detour_miles: 2.3,
+      fuel_cost_full_tank: 5600,
+      price_per_l_pence: 140,
+      tank_litres: 40,
+    });
+    expect(d.accessibilityLabel).toMatch(/£4\.20 cheaper per tank/);
+    expect(d.accessibilityLabel).toMatch(/includes 2\.3 mile detour fuel/);
+    expect(d.accessibilityLabel).not.toMatch(/net saving/);
+    expect(d.accessibilityLabel).not.toMatch(/extra drive/);
   });
 
   // --- Regression: currency formatter never mixes £ and p ---

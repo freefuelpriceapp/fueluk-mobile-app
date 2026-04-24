@@ -58,13 +58,13 @@ export default function MoreScreen({ navigation }) {
           />
         </View>
 
-        <Text style={styles.sectionHeader}>APP</Text>
+        <Text style={styles.sectionHeader}>SAVED</Text>
         <View style={styles.section}>
           <MenuRow
-            icon="settings-outline"
-            label="Settings"
-            sublabel="Privacy, support, app info"
-            onPress={() => navigation.navigate('Settings')}
+            icon="heart-outline"
+            label="Favourites"
+            sublabel="Your saved stations"
+            onPress={() => navigation.navigate('Favourites')}
           />
         </View>
       </ScrollView>
