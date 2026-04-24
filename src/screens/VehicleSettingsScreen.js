@@ -163,7 +163,7 @@ export default function VehicleSettingsScreen({ navigation }) {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Option 1 \u00B7 Reg plate lookup</Text>
+      <Text style={styles.sectionTitle}>Option 1 · Reg plate lookup</Text>
       <View style={styles.regRow}>
         <TextInput
           style={styles.regInput}
@@ -193,7 +193,7 @@ export default function VehicleSettingsScreen({ navigation }) {
 
       <View style={styles.divider} />
 
-      <Text style={styles.sectionTitle}>Option 2 \u00B7 Pick your fuel type</Text>
+      <Text style={styles.sectionTitle}>Option 2 · Pick your fuel type</Text>
       <View style={{ gap: 6 }}>
         {FUEL_OPTIONS.map((ft) => {
           const active = fuelType === ft.key;
@@ -219,7 +219,7 @@ export default function VehicleSettingsScreen({ navigation }) {
         })}
       </View>
 
-      <Text style={styles.sectionTitle}>Option 3 \u00B7 Override mpg (optional)</Text>
+      <Text style={styles.sectionTitle}>Option 3 · Override mpg (optional)</Text>
       <TextInput
         style={styles.mpgInput}
         placeholder={`e.g. ${defaultMpgFor(fuelType) || 45}`}

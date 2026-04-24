@@ -1,7 +1,7 @@
 /**
  * src/lib/trust.js
  *
- * Central "truth layer" for the Free Fuel Price App.
+ * Central "truth layer" for FuelUK.
  *
  * Every price shown in the UI should answer three questions:
  *   1. When was it last updated?
