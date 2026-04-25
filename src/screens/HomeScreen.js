@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Linking,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +32,15 @@ import TrajectoryBadge from '../components/TrajectoryBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
 import PersonalisationChip from '../components/PersonalisationChip';
 import FirstVehicleCelebration from '../components/FirstVehicleCelebration';
+import InstantAnswerHeadline from '../components/InstantAnswerHeadline';
+import MonthlySavingsCard from '../components/MonthlySavingsCard';
+import LifetimeSavingsCard from '../components/LifetimeSavingsCard';
+import LiveDataTile from '../components/LiveDataTile';
+import PriceTrajectorySparkline from '../components/PriceTrajectorySparkline';
+import {
+  LIFETIME_SAVINGS_KEY,
+  appendLifetimeSaving,
+} from '../lib/lifetimeSavings';
 import {
   loadUserVehicle,
   isVehiclePromptDismissed,
@@ -95,6 +105,7 @@ const HomeScreen = ({ navigation }) => {
   const [userVehicle, setUserVehicle] = useState(null);
   const [promptDismissed, setPromptDismissed] = useState(true);
   const [flagTarget, setFlagTarget] = useState(null);
+  const [lifetimeRefreshKey, setLifetimeRefreshKey] = useState(0);
   const { location } = useLocation();
 
   useEffect(() => { trackNearbyScreenView(); }, []);
@@ -225,6 +236,25 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleStationPress = (station) => {
+    // When the user picks a non-nearest station, record the saving so the
+    // LifetimeSavingsCard can tally it. Device-local only.
+    try {
+      const savingPence = Number(station?.break_even?.savings_pence);
+      const isNearest = station?.break_even?.is_closest === true;
+      if (!isNearest && Number.isFinite(savingPence) && savingPence > 0) {
+        AsyncStorage.getItem(LIFETIME_SAVINGS_KEY)
+          .then((raw) => {
+            const list = raw ? JSON.parse(raw) : [];
+            const next = appendLifetimeSaving(Array.isArray(list) ? list : [], {
+              ts: Date.now(),
+              saving_pence: savingPence,
+            });
+            return AsyncStorage.setItem(LIFETIME_SAVINGS_KEY, JSON.stringify(next));
+          })
+          .then(() => setLifetimeRefreshKey((k) => k + 1))
+          .catch(() => {});
+      }
+    } catch (_e) {}
     navigation.navigate('StationDetail', { station });
   };
 
@@ -267,6 +297,68 @@ const HomeScreen = ({ navigation }) => {
     }
     return copy;
   }, [stations, sortMode, selectedFuel]);
+
+  // Cheapest station within current results — used by InstantAnswerHeadline.
+  const headlineStation = useMemo(() => {
+    if (!Array.isArray(stations) || stations.length === 0) return null;
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    const priced = stations.filter((s) => {
+      const p = Number(s[fuelKey] ?? s?.prices?.[selectedFuel]);
+      return Number.isFinite(p) && p > 0;
+    });
+    if (priced.length === 0) return null;
+    return priced.reduce((best, s) => {
+      const sp = Number(s[fuelKey] ?? s?.prices?.[selectedFuel]);
+      const bp = Number(best[fuelKey] ?? best?.prices?.[selectedFuel]);
+      return sp < bp ? s : best;
+    });
+  }, [stations, selectedFuel]);
+
+  // Per-tank saving from break_even on the headline station, or backend's
+  // best_value if shaped differently. Used by both headline + monthly card.
+  const perTankSavingPence = useMemo(() => {
+    const fromHeadline = Number(headlineStation?.break_even?.savings_pence);
+    if (Number.isFinite(fromHeadline) && fromHeadline > 0) return fromHeadline;
+    const fromBestValue = Number(bestValue?.break_even?.savings_pence);
+    if (Number.isFinite(fromBestValue) && fromBestValue > 0) return fromBestValue;
+    return null;
+  }, [headlineStation, bestValue]);
+
+  const tankLitres = useMemo(() => {
+    const n = Number(headlineStation?.break_even?.tank_litres);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [headlineStation]);
+
+  // National average for the no-vehicle fallback in the headline.
+  const nationalAvgPence = useMemo(() => {
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    const prices = (stations || [])
+      .map((s) => Number(s[fuelKey] ?? s?.prices?.[selectedFuel]))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (prices.length === 0) return null;
+    const sum = prices.reduce((a, b) => a + b, 0);
+    return sum / prices.length;
+  }, [stations, selectedFuel]);
+
+  // Sparkline series — derived from national_trajectory if it carries one,
+  // else a synthetic 2-point series from current avg + 7d delta. If
+  // neither exists we pass null and the component renders nothing.
+  const sparklineValues = useMemo(() => {
+    const series = nationalTrajectory?.series_7d || nationalTrajectory?.values_7d;
+    if (Array.isArray(series)) {
+      const clean = series.filter((n) => Number.isFinite(Number(n))).map(Number);
+      if (clean.length >= 2) return clean;
+    }
+    const delta = Number(nationalTrajectory?.delta_pence_per_l_7d);
+    if (Number.isFinite(delta) && Number.isFinite(nationalAvgPence)) {
+      const start = nationalAvgPence - delta;
+      return [start, nationalAvgPence];
+    }
+    return null;
+  }, [nationalTrajectory, nationalAvgPence]);
+
+  const screenWidth = Dimensions.get('window').width;
+  const stackSavingsCards = screenWidth < 360; // iPhone SE is 375; sub-360 = stack
 
   const headerSub = loading
     ? 'Scanning for the best prices near you'
@@ -352,7 +444,7 @@ const HomeScreen = ({ navigation }) => {
         })}
       </View>
 
-      {/* Sort toggle — Nearest / Cheapest */}
+      {/* Sort toggle — Nearest / Cheapest, with regional 7-day sparkline */}
       <View style={styles.sortRow}>
         {SORT_MODES.map(sm => {
           const active = sortMode === sm.key;
@@ -380,6 +472,9 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           );
         })}
+        <View style={styles.sortSparkline}>
+          <PriceTrajectorySparkline values={sparklineValues} />
+        </View>
       </View>
 
       {/* Brand filter */}
@@ -448,6 +543,33 @@ const HomeScreen = ({ navigation }) => {
                   <TrajectoryBadge trajectory={nationalTrajectory} scope="national" size="md" />
                 </View>
               ) : null}
+              <InstantAnswerHeadline
+                loading={loading && !refreshing}
+                station={headlineStation}
+                fuelType={selectedFuel}
+                perTankSavingPence={perTankSavingPence}
+                hasVehicle={!!userVehicle}
+                nationalAvgPence={nationalAvgPence}
+                onPress={handleStationPress}
+              />
+              <View
+                style={[
+                  styles.savingsRow,
+                  stackSavingsCards && styles.savingsRowStacked,
+                ]}
+              >
+                <MonthlySavingsCard
+                  mpg={userVehicle?.mpg}
+                  weeklyMiles={userVehicle?.weekly_miles}
+                  tankSizeLitres={tankLitres}
+                  perTankSavingPence={perTankSavingPence}
+                  compact={stackSavingsCards}
+                />
+                <LifetimeSavingsCard
+                  refreshKey={lifetimeRefreshKey}
+                  compact={stackSavingsCards}
+                />
+              </View>
               <BestOptionCard
                 bestOption={bestOption}
                 bestValue={bestValue}
@@ -468,11 +590,17 @@ const HomeScreen = ({ navigation }) => {
             </View>
           }
           ListFooterComponent={
-            updatedInfo ? (
-              <Text style={[styles.footerText, updatedInfo.stale && styles.footerStale]}>
-                Prices last checked: {updatedInfo.label}{updatedInfo.stale ? ' (data may be out of date \u2014 pull down to refresh)' : ''}
-              </Text>
-            ) : null
+            <>
+              {updatedInfo ? (
+                <Text style={[styles.footerText, updatedInfo.stale && styles.footerStale]}>
+                  Prices last checked: {updatedInfo.label}{updatedInfo.stale ? ' (data may be out of date \u2014 pull down to refresh)' : ''}
+                </Text>
+              ) : null}
+              <LiveDataTile
+                stationCount={stations?.length || 0}
+                lastUpdated={lastUpdated}
+              />
+            </>
           }
         />
       )}
@@ -568,6 +696,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 8,
     flexDirection: 'row',
+  },
+  sortSparkline: {
+    marginLeft: 'auto',
+    paddingRight: 4,
+    justifyContent: 'center',
+  },
+  savingsRow: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 10,
+  },
+  savingsRowStacked: {
+    flexDirection: 'column',
   },
 });
 
