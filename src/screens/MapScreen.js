@@ -45,7 +45,11 @@ import {
   clusterStations,
   computePriceColourScale,
   formatLegendRange,
-  clusterRadiusMetres,
+  computeRegionAverages,
+  selectViewportTier,
+  selectAutoFocusCluster,
+  computeBloomRings,
+  intensityRankFor,
   HEATMAP_COLOURS,
 } from '../lib/heatmap';
 import TrajectoryBadge from '../components/TrajectoryBadge';
@@ -62,6 +66,24 @@ const FUEL_TYPES = [
 ];
 
 const BOTTOM_SHEET_HEIGHT = 240;
+
+// Session-scoped flag — set when the user first toggles into heatmap
+// mode in this app session. Lives in module memory so it survives screen
+// remounts but resets on every fresh app launch (no AsyncStorage by design:
+// the auto-focus delight should re-show every session, not just the first).
+let __heatmapAutoFocusUsedThisSession = false;
+
+const KM_PER_LAT_DEG = 111;
+
+// Approximate viewport span (km) — max of latitudinal and longitudinal
+// extent. Used to pick which heatmap tier should render.
+function viewportSpanKm(region) {
+  if (!region) return 0;
+  const latKm = (Number(region.latitudeDelta) || 0) * KM_PER_LAT_DEG;
+  const cosLat = Math.cos(((Number(region.latitude) || 0) * Math.PI) / 180);
+  const lngKm = (Number(region.longitudeDelta) || 0) * KM_PER_LAT_DEG * Math.max(0.1, cosLat);
+  return Math.max(latKm, lngKm);
+}
 
 function freshnessState(iso) {
   if (!iso) return 'unknown';
@@ -341,24 +363,138 @@ export default function MapScreen({ navigation }) {
     return count;
   }, [filteredStations, visibleStations, visibleRegion, fuelType]);
 
-  // Heatmap clusters — built from the visible cohort so the colour
-  // scale flows with where the user is looking. Capped at 50 visible
-  // circles to avoid over-draw on dense city views.
+  // Heatmap clusters — three rendering tiers based on viewport span:
+  //   A (country, > 300km): UK NUTS-1 regions, computed from the full
+  //     filtered cohort so users zoomed all the way out still see
+  //     national-level heat blooms.
+  //   B (regional, 50–300km): postcode/grid clusters from visible cohort.
+  //   C (local, < 50km): tight grid clusters from visible cohort.
+  // Each cluster carries pre-computed multi-ring bloom data so the
+  // render path is statically derived and cheap.
   const heatmapData = useMemo(() => {
-    if (viewMode !== 'heatmap') return { clusters: [], scale: null, strategy: 'none' };
-    const { clusters, strategy } = clusterStations(visibleStations, fuelType, 1.5);
-    const trimmed = clusters.length > 50
-      ? clusters.slice().sort((a, b) => b.count - a.count).slice(0, 50)
-      : clusters;
+    if (viewMode !== 'heatmap') {
+      return { clusters: [], scale: null, strategy: 'none', tier: 'A' };
+    }
+    const span = viewportSpanKm(visibleRegion);
+    const tier = selectViewportTier(span);
+
+    let rawClusters = [];
+    let strategy = 'none';
+    if (tier === 'A') {
+      rawClusters = computeRegionAverages(filteredStations, fuelType);
+      strategy = 'region';
+    } else {
+      const grid = tier === 'C' ? 1.5 : 4.0;
+      const res = clusterStations(visibleStations, fuelType, grid);
+      rawClusters = res.clusters;
+      strategy = res.strategy;
+    }
+
+    // Trim to a sensible cap — regions max out at 12, postcode/grid can
+    // explode in dense cities. Sort by station count so the visually
+    // important clusters survive the trim.
+    const trimmed = rawClusters.length > 50
+      ? rawClusters.slice().sort((a, b) => b.count - a.count).slice(0, 50)
+      : rawClusters;
+
     const scale = computePriceColourScale(trimmed);
-    return { clusters: trimmed, scale, strategy };
-  }, [viewMode, visibleStations, fuelType]);
+
+    // Pre-compute multi-ring bloom geometry for each cluster. Static —
+    // never re-derived per frame.
+    const blooms = trimmed.map((c) => ({
+      cluster: c,
+      colour: scale ? scale(c.avgPrice) : HEATMAP_COLOURS.uniform,
+      rings: computeBloomRings(c, intensityRankFor(c.avgPrice, trimmed)),
+      lowData: !!c.lowData,
+    }));
+
+    return { clusters: trimmed, scale, strategy, tier, blooms };
+  }, [viewMode, visibleStations, filteredStations, fuelType, visibleRegion]);
 
   const legendRange = useMemo(() => {
     const s = heatmapData.scale;
     if (!s) return null;
     return formatLegendRange(s.min, s.max);
   }, [heatmapData.scale]);
+
+  // Auto-focus delight — first toggle into heatmap mode in this session
+  // pans + zooms to the cheapest region/cluster and shows a 4-second
+  // floating callout. Per-session: tracked in a module-level flag, NOT
+  // AsyncStorage, so it re-shows on every app launch.
+  const [autoFocusCallout, setAutoFocusCallout] = useState(null);
+  const autoFocusTimerRef = useRef(null);
+  const autoFocusFadeAnim = useRef(new Animated.Value(0)).current;
+
+  const dismissAutoFocus = useCallback(() => {
+    if (autoFocusTimerRef.current) {
+      clearTimeout(autoFocusTimerRef.current);
+      autoFocusTimerRef.current = null;
+    }
+    Animated.timing(autoFocusFadeAnim, {
+      toValue: 0,
+      duration: reduceMotion ? 0 : 220,
+      useNativeDriver: true,
+    }).start(() => setAutoFocusCallout(null));
+  }, [autoFocusFadeAnim, reduceMotion]);
+
+  useEffect(() => {
+    if (viewMode !== 'heatmap') return;
+    if (__heatmapAutoFocusUsedThisSession) return;
+    if (!heatmapData.clusters || heatmapData.clusters.length === 0) return;
+    if (!mapRef.current) return;
+
+    const userLoc = stationLocation;
+    const target = selectAutoFocusCluster(heatmapData.clusters, userLoc);
+    if (!target) return;
+
+    __heatmapAutoFocusUsedThisSession = true;
+
+    // Pan/zoom so the cheapest cluster fills ~60% of the viewport.
+    // Region-tier clusters use radiusKm (large), postcode/grid use a
+    // tighter delta. Convert km → degrees latitude.
+    const radiusKm = Number.isFinite(target.radiusKm) && target.radiusKm > 0
+      ? target.radiusKm
+      : 8;
+    const deltaDeg = Math.max(0.05, (radiusKm * 2) / KM_PER_LAT_DEG / 0.6);
+    try {
+      if (typeof mapRef.current.animateCamera === 'function') {
+        mapRef.current.animateCamera(
+          {
+            center: { latitude: target.lat, longitude: target.lon },
+            zoom: undefined,
+            altitude: undefined,
+          },
+          { duration: reduceMotion ? 0 : 1200 }
+        );
+      }
+      mapRef.current.animateToRegion(
+        {
+          latitude: target.lat,
+          longitude: target.lon,
+          latitudeDelta: deltaDeg,
+          longitudeDelta: deltaDeg,
+        },
+        reduceMotion ? 0 : 1200
+      );
+    } catch (_e) {}
+
+    setAutoFocusCallout(target);
+    Animated.timing(autoFocusFadeAnim, {
+      toValue: 1,
+      duration: reduceMotion ? 0 : 240,
+      useNativeDriver: true,
+    }).start();
+    autoFocusTimerRef.current = setTimeout(() => {
+      dismissAutoFocus();
+    }, 4000);
+  // Only re-runs on viewMode change — once we've done it this session,
+  // the guard above short-circuits subsequent runs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
+  useEffect(() => () => {
+    if (autoFocusTimerRef.current) clearTimeout(autoFocusTimerRef.current);
+  }, []);
 
   const initialRegion = useMemo(() => {
     // London as last-resort fallback — always a valid finite region.
@@ -620,7 +756,7 @@ export default function MapScreen({ navigation }) {
           showsUserLocation
           showsMyLocationButton={Platform.OS === 'android'}
           customMapStyle={mapStyle}
-          onPress={() => { dismissSheet(); setSelectedCluster(null); }}
+          onPress={() => { dismissSheet(); setSelectedCluster(null); if (autoFocusCallout) dismissAutoFocus(); }}
           onRegionChangeComplete={onRegionChangeComplete}
           clusterColor={'#10B981'}
           clusterTextColor={'#0B0F14'}
@@ -668,18 +804,29 @@ export default function MapScreen({ navigation }) {
               />
             );
           })}
-          {viewMode === 'heatmap' && Circle && heatmapData.clusters.map((c) => {
-            const colour = heatmapData.scale ? heatmapData.scale(c.avgPrice) : HEATMAP_COLOURS.uniform;
-            return (
-              <Circle
-                key={c.id}
-                center={{ latitude: c.lat, longitude: c.lon }}
-                radius={clusterRadiusMetres(c.count)}
-                fillColor={`${colour}59`}
-                strokeColor={`${colour}AA`}
-                strokeWidth={1}
-              />
-            );
+          {viewMode === 'heatmap' && Circle && (heatmapData.blooms || []).map((b) => {
+            // Multi-ring bloom: 4 concentric Circles per cluster with
+            // progressively smaller radii and increasing opacity. This
+            // produces a soft "heat" gradient using only react-native-maps
+            // primitives — no SVG overlay, no new dependency. Picked
+            // Option A from the brief; Option B (SVG) was unnecessary
+            // because alpha-stacking yields a clean bloom on both iOS
+            // and Android. Low-data regions are dimmed to 30% globally.
+            const dim = b.lowData ? 0.3 : 1.0;
+            return b.rings.map((ring) => {
+              const alphaInt = Math.round(255 * Math.max(0, Math.min(1, ring.opacity * dim)));
+              const alphaHex = alphaInt.toString(16).padStart(2, '0').toUpperCase();
+              return (
+                <Circle
+                  key={`${b.cluster.id}-r${ring.index}`}
+                  center={{ latitude: b.cluster.lat, longitude: b.cluster.lon }}
+                  radius={ring.radius}
+                  fillColor={`${b.colour}${alphaHex}`}
+                  strokeColor={'transparent'}
+                  strokeWidth={0}
+                />
+              );
+            });
           })}
           {viewMode === 'heatmap' && Marker && heatmapData.clusters.map((c) => (
             <Marker
@@ -1130,20 +1277,24 @@ export default function MapScreen({ navigation }) {
         <View
           style={[
             styles.legend,
-            heatmapData.clusters.length < 5 && styles.legendMuted,
+            heatmapData.clusters.length === 0 && styles.legendMuted,
           ]}
-          pointerEvents="none"
+          pointerEvents={heatmapData.clusters.length === 0 ? 'auto' : 'none'}
           accessibilityLabel={
-            heatmapData.clusters.length < 5
-              ? 'Zoom out to see regional trends'
-              : `Heatmap legend. Range ${legendRange || 'unavailable'}.`
+            heatmapData.clusters.length === 0
+              ? 'Heatmap data unavailable. Pull to refresh.'
+              : `Heatmap legend. Range ${legendRange || 'unavailable'}. Tier ${heatmapData.tier}.`
           }
         >
           <Text style={styles.legendTitle}>
-            {selectedFuelMeta.label} · regional avg
+            {selectedFuelMeta.label} · {heatmapData.tier === 'A' ? 'national' : 'regional'} avg
           </Text>
-          {heatmapData.clusters.length < 5 ? (
-            <Text style={styles.legendHint}>Zoom out to see regional trends.</Text>
+          {heatmapData.clusters.length === 0 ? (
+            <TouchableOpacity onPress={refetch} accessibilityRole="button">
+              <Text style={styles.legendHint}>
+                Heatmap data unavailable. Tap to retry.
+              </Text>
+            </TouchableOpacity>
           ) : (
             <>
               <View style={styles.legendBar}>
@@ -1168,6 +1319,40 @@ export default function MapScreen({ navigation }) {
             </>
           )}
         </View>
+      )}
+
+      {viewMode === 'heatmap' && autoFocusCallout && (
+        <Animated.View
+          style={[styles.autoFocusCallout, { opacity: autoFocusFadeAnim }]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            activeOpacity={0.92}
+            style={styles.autoFocusCalloutInner}
+            onPress={() => {
+              const c = autoFocusCallout;
+              dismissAutoFocus();
+              if (c?.cheapest) navigation.navigate('StationDetail', { station: c.cheapest });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              `Cheapest region right now: ${autoFocusCallout.label || 'this area'}. ` +
+              `${autoFocusCallout.avgPrice.toFixed(1)} pence average across ` +
+              `${autoFocusCallout.count} stations. Tap to open the cheapest.`
+            }
+          >
+            <Ionicons name="flame" size={14} color="#10B981" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.autoFocusTitle} numberOfLines={1}>
+                Cheapest right now: {autoFocusCallout.label || 'this area'}
+              </Text>
+              <Text style={styles.autoFocusSub} numberOfLines={1}>
+                {autoFocusCallout.avgPrice.toFixed(1)}p avg · {autoFocusCallout.count} stations
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       {viewMode === 'heatmap' && selectedCluster && (
@@ -1397,6 +1582,45 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  autoFocusCallout: {
+    position: 'absolute',
+    top: 200,
+    left: 16,
+    right: 16,
+    alignItems: 'center',
+    zIndex: 25,
+    elevation: 25,
+  },
+  autoFocusCalloutInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(15,23,30,0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.45)',
+    minWidth: 240,
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  autoFocusTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.1,
+  },
+  autoFocusSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   clusterCallout: {
     position: 'absolute',

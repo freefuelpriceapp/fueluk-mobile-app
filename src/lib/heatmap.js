@@ -17,6 +17,7 @@
  * so we don't fake variation that doesn't exist.
  */
 import { parsePrice } from './price';
+import { UK_REGIONS, haversineKm } from './ukRegions';
 
 export const HEATMAP_COLOURS = {
   cheapest: '#0E7C3A',
@@ -257,6 +258,180 @@ export function clusterRadiusMetres(count) {
   return Math.min(2000, Math.round(r));
 }
 
+/**
+ * Build region-level clusters for the country-zoom tier. Each UK NUTS-1
+ * region becomes a cluster centred on its centroid, averaging the prices
+ * of all stations whose coordinates fall inside the region's radius.
+ *
+ * Regions with zero qualifying stations are dropped. Regions with fewer
+ * than `lowDataThreshold` stations (default 5) are flagged `lowData:true`
+ * so the renderer can dim them — they're retained so the map still shows
+ * something everywhere we have any data.
+ */
+export function computeRegionAverages(stations, fuelType = 'petrol', options = {}) {
+  const regions = options.regions || UK_REGIONS;
+  const lowDataThreshold = Number.isFinite(options.lowDataThreshold)
+    ? options.lowDataThreshold
+    : 5;
+  if (!Array.isArray(stations) || stations.length === 0) return [];
+  const out = [];
+  for (const r of regions) {
+    const members = [];
+    for (const s of stations) {
+      const c = getCoords(s);
+      if (!c) continue;
+      const d = haversineKm(c.lat, c.lng, r.lat, r.lng);
+      if (d <= r.radiusKm) members.push(s);
+    }
+    if (members.length === 0) continue;
+    const avg = avgPrice(members, fuelType);
+    if (avg === null) continue;
+    out.push({
+      id: `region:${r.id}`,
+      label: r.label,
+      lat: r.lat,
+      lon: r.lng,
+      count: members.length,
+      avgPrice: avg,
+      cheapest: cheapestStation(members, fuelType),
+      radiusKm: r.radiusKm,
+      lowData: members.length < lowDataThreshold,
+      tier: 'region',
+    });
+  }
+  return out;
+}
+
+/**
+ * Given the visible viewport span (km, max of lat-span and lng-span),
+ * pick which clustering tier should render:
+ *   A — country zoom   (> 300km): region heat-blooms
+ *   B — regional zoom  (50–300km): postcode/grid clusters
+ *   C — local zoom     (< 50km):   tight grid clusters
+ */
+export function selectViewportTier(viewportSpanKm) {
+  const span = Number(viewportSpanKm);
+  if (!Number.isFinite(span) || span <= 0) return 'A';
+  if (span > 300) return 'A';
+  if (span >= 50) return 'B';
+  return 'C';
+}
+
+/**
+ * Pick a cluster to auto-focus when the user first enters heatmap mode.
+ * Weights cheapness (70%) against proximity to the user (30%) when a
+ * location is supplied; otherwise goes for absolute cheapest.
+ *
+ * Clusters with fewer than `minStations` (default 5) members are
+ * excluded so a 2-station fluke can't win the spotlight.
+ */
+export function selectAutoFocusCluster(clusters, userLocation, options = {}) {
+  const minStations = Number.isFinite(options.minStations) ? options.minStations : 5;
+  if (!Array.isArray(clusters) || clusters.length === 0) return null;
+  const eligible = clusters.filter((c) => (c?.count || 0) >= minStations && Number.isFinite(c?.avgPrice));
+  if (eligible.length === 0) return null;
+
+  const prices = eligible.map((c) => c.avgPrice);
+  const minP = Math.min(...prices);
+
+  const hasLoc = userLocation
+    && Number.isFinite(Number(userLocation.lat))
+    && Number.isFinite(Number(userLocation.lng ?? userLocation.lon));
+  const uLat = hasLoc ? Number(userLocation.lat) : null;
+  const uLng = hasLoc ? Number(userLocation.lng ?? userLocation.lon) : null;
+
+  let distances = null;
+  if (hasLoc) {
+    distances = eligible.map((c) => haversineKm(uLat, uLng, c.lat, c.lon));
+  }
+
+  // Score: cheaper is better. Each pence above the cheapest cluster adds
+  // a unit of cost. Each km of distance adds a fractional unit, scaled so
+  // the price gap dominates unless prices are near-identical (the
+  // "0.2p saving over a 600km drive" case the user explicitly called out).
+  // 70/30 weighting target translates to ~3p == ~80km via the constants
+  // below — i.e. for typical regional gaps the price wins, for sub-pence
+  // gaps proximity tips the balance.
+  const KM_PER_PENCE = 25;
+  let bestIdx = 0;
+  let bestScore = Infinity;
+  for (let i = 0; i < eligible.length; i += 1) {
+    const c = eligible[i];
+    const priceCost = c.avgPrice - minP;
+    let score;
+    if (hasLoc && Number.isFinite(distances[i])) {
+      score = 0.7 * priceCost + 0.3 * (distances[i] / KM_PER_PENCE);
+    } else {
+      score = priceCost;
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+  return eligible[bestIdx];
+}
+
+/**
+ * Build the multi-ring bloom descriptor for a cluster. Rings are returned
+ * outer→inner with progressively smaller radii and greater opacity. The
+ * `intensityRank` is a 0..4 bucket (0 = cheapest quintile) that scales
+ * the overall radius and alpha so cheap blooms read louder than expensive
+ * ones.
+ *
+ * Rings are pre-computed off the render path — do not re-derive per frame.
+ */
+export function computeBloomRings(cluster, intensityRank) {
+  if (!cluster || !Number.isFinite(Number(cluster.lat)) || !Number.isFinite(Number(cluster.lon))) {
+    return [];
+  }
+  const baseRadius = Number.isFinite(cluster.radiusKm) && cluster.radiusKm > 0
+    ? cluster.radiusKm * 1000
+    : clusterRadiusMetres(cluster.count);
+
+  // Intensity rank: 0 cheapest (strong) → 4 priciest (recessive).
+  const rank = Math.max(0, Math.min(4, Number.isFinite(intensityRank) ? intensityRank : 2));
+  const radiusScales = [1.15, 1.05, 1.0, 0.95, 0.85];
+  const alphaScales  = [1.0,  0.85, 0.7, 0.55, 0.4];
+  const radiusScale = radiusScales[rank];
+  const alphaScale  = alphaScales[rank];
+
+  // Outer → inner: 100% / 70% / 45% / 25% radius, 8% / 15% / 25% / 35% alpha.
+  const spec = [
+    { r: 1.00, a: 0.08 },
+    { r: 0.70, a: 0.15 },
+    { r: 0.45, a: 0.25 },
+    { r: 0.25, a: 0.35 },
+  ];
+  return spec.map((s, i) => ({
+    index: i,
+    radius: Math.round(baseRadius * radiusScale * s.r),
+    opacity: Math.max(0, Math.min(1, s.a * alphaScale)),
+  }));
+}
+
+/**
+ * Bucket a price into a 0..4 intensity rank (0 = cheapest quintile).
+ * Falls back to 2 (mid) when the cohort has no spread.
+ */
+export function intensityRankFor(price, clusters) {
+  if (!Number.isFinite(price) || !Array.isArray(clusters) || clusters.length === 0) return 2;
+  const prices = clusters
+    .map((c) => (c && Number.isFinite(c.avgPrice) ? c.avgPrice : null))
+    .filter((p) => p !== null);
+  if (prices.length === 0) return 2;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const spread = max - min;
+  if (spread <= 0) return 2;
+  const t = (price - min) / spread;
+  if (t < 0.2) return 0;
+  if (t < 0.4) return 1;
+  if (t < 0.6) return 2;
+  if (t < 0.8) return 3;
+  return 4;
+}
+
 export default {
   HEATMAP_COLOURS,
   extractPostcodeDistrict,
@@ -266,4 +441,9 @@ export default {
   computePriceColourScale,
   formatLegendRange,
   clusterRadiusMetres,
+  computeRegionAverages,
+  selectViewportTier,
+  selectAutoFocusCluster,
+  computeBloomRings,
+  intensityRankFor,
 };
