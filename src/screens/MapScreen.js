@@ -487,10 +487,10 @@ export default function MapScreen({ navigation }) {
     autoFocusTimerRef.current = setTimeout(() => {
       dismissAutoFocus();
     }, 4000);
-  // Only re-runs on viewMode change — once we've done it this session,
-  // the guard above short-circuits subsequent runs.
+  // Re-runs when viewMode flips or clusters arrive; the session-flag
+  // guard above ensures we only fire once per app launch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode]);
+  }, [viewMode, heatmapData.clusters.length]);
 
   useEffect(() => () => {
     if (autoFocusTimerRef.current) clearTimeout(autoFocusTimerRef.current);
