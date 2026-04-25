@@ -17,10 +17,12 @@ import {
 // Conditional imports — react-native-maps + clustering don't support web
 let MapView;
 let Marker;
+let Circle;
 if (Platform.OS !== 'web') {
   // ClusteredMapView wraps react-native-maps' MapView with built-in supercluster.
   MapView = require('react-native-map-clustering').default;
   Marker = require('react-native-maps').Marker;
+  Circle = require('react-native-maps').Circle;
 }
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,6 +41,13 @@ import { toRenderableString } from '../lib/safeRender';
 import { formatPencePrice, parsePrice, isPlausiblePrice } from '../lib/price';
 import { darkMapStyleRefined, lightMapStyleRefined } from '../lib/mapStyles';
 import { buildTierClassifier, PIN_TIER } from '../lib/priceTiers';
+import {
+  clusterStations,
+  computePriceColourScale,
+  formatLegendRange,
+  clusterRadiusMetres,
+  HEATMAP_COLOURS,
+} from '../lib/heatmap';
 import TrajectoryBadge from '../components/TrajectoryBadge';
 import BreakEvenBadge from '../components/BreakEvenBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
@@ -122,6 +131,24 @@ export default function MapScreen({ navigation }) {
   const [userVehicle, setUserVehicle] = useState(null);
   const [flagTarget, setFlagTarget] = useState(null);
   const [showFreshnessPopover, setShowFreshnessPopover] = useState(false);
+  // 'pins' (default) | 'heatmap'. Persisted under @fueluk/map_view_v1.
+  const [viewMode, setViewMode] = useState('pins');
+  const [selectedCluster, setSelectedCluster] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem('@fueluk/map_view_v1')
+      .then((v) => { if (mounted && (v === 'heatmap' || v === 'pins')) setViewMode(v); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSetViewMode = useCallback((next) => {
+    setViewMode(next);
+    AsyncStorage.setItem('@fueluk/map_view_v1', next).catch(() => {});
+    if (next === 'heatmap') setSelectedStation(null);
+    if (next === 'pins') setSelectedCluster(null);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -313,6 +340,25 @@ export default function MapScreen({ navigation }) {
     }
     return count;
   }, [filteredStations, visibleStations, visibleRegion, fuelType]);
+
+  // Heatmap clusters — built from the visible cohort so the colour
+  // scale flows with where the user is looking. Capped at 50 visible
+  // circles to avoid over-draw on dense city views.
+  const heatmapData = useMemo(() => {
+    if (viewMode !== 'heatmap') return { clusters: [], scale: null, strategy: 'none' };
+    const { clusters, strategy } = clusterStations(visibleStations, fuelType, 1.5);
+    const trimmed = clusters.length > 50
+      ? clusters.slice().sort((a, b) => b.count - a.count).slice(0, 50)
+      : clusters;
+    const scale = computePriceColourScale(trimmed);
+    return { clusters: trimmed, scale, strategy };
+  }, [viewMode, visibleStations, fuelType]);
+
+  const legendRange = useMemo(() => {
+    const s = heatmapData.scale;
+    if (!s) return null;
+    return formatLegendRange(s.min, s.max);
+  }, [heatmapData.scale]);
 
   const initialRegion = useMemo(() => {
     // London as last-resort fallback — always a valid finite region.
@@ -574,7 +620,7 @@ export default function MapScreen({ navigation }) {
           showsUserLocation
           showsMyLocationButton={Platform.OS === 'android'}
           customMapStyle={mapStyle}
-          onPress={dismissSheet}
+          onPress={() => { dismissSheet(); setSelectedCluster(null); }}
           onRegionChangeComplete={onRegionChangeComplete}
           clusterColor={'#10B981'}
           clusterTextColor={'#0B0F14'}
@@ -594,7 +640,7 @@ export default function MapScreen({ navigation }) {
           animationEnabled={!reduceMotion}
           renderCluster={renderCluster}
         >
-          {visibleStations.map((station, idx) => {
+          {viewMode === 'pins' && visibleStations.map((station, idx) => {
             const price = resolvePrice(station, fuelType);
             const parsed = parsePrice(price);
             const tier = station.id === cheapestStationId
@@ -622,6 +668,32 @@ export default function MapScreen({ navigation }) {
               />
             );
           })}
+          {viewMode === 'heatmap' && Circle && heatmapData.clusters.map((c) => {
+            const colour = heatmapData.scale ? heatmapData.scale(c.avgPrice) : HEATMAP_COLOURS.uniform;
+            return (
+              <Circle
+                key={c.id}
+                center={{ latitude: c.lat, longitude: c.lon }}
+                radius={clusterRadiusMetres(c.count)}
+                fillColor={`${colour}59`}
+                strokeColor={`${colour}AA`}
+                strokeWidth={1}
+              />
+            );
+          })}
+          {viewMode === 'heatmap' && Marker && heatmapData.clusters.map((c) => (
+            <Marker
+              key={`hm-tap-${c.id}`}
+              coordinate={{ latitude: c.lat, longitude: c.lon }}
+              opacity={0}
+              anchor={{ x: 0.5, y: 0.5 }}
+              onPress={() => setSelectedCluster(c)}
+              tracksViewChanges={false}
+              accessibilityLabel={
+                `${c.label || 'Area'} · avg ${c.avgPrice.toFixed(1)} pence · ${c.count} stations`
+              }
+            />
+          ))}
         </MapView>
       </MapErrorBoundary>
       )}
@@ -692,6 +764,43 @@ export default function MapScreen({ navigation }) {
             </ScrollView>
           </View>
         )}
+
+        <View style={styles.viewToggleRow}>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, viewMode === 'pins' && styles.viewToggleBtnActive]}
+            onPress={() => handleSetViewMode('pins')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: viewMode === 'pins' }}
+            accessibilityLabel="Show stations as pins"
+          >
+            <Ionicons
+              name="location-outline"
+              size={13}
+              color={viewMode === 'pins' ? COLORS.text : COLORS.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.viewToggleText, viewMode === 'pins' && styles.viewToggleTextActive]}>
+              Pins
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, viewMode === 'heatmap' && styles.viewToggleBtnActive]}
+            onPress={() => handleSetViewMode('heatmap')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: viewMode === 'heatmap' }}
+            accessibilityLabel="Show regional fuel-price heatmap"
+          >
+            <Ionicons
+              name="grid-outline"
+              size={13}
+              color={viewMode === 'heatmap' ? COLORS.text : COLORS.textSecondary}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.viewToggleText, viewMode === 'heatmap' && styles.viewToggleTextActive]}>
+              Heatmap
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.modeRow}>
           <TouchableOpacity
@@ -1017,6 +1126,89 @@ export default function MapScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
+      {viewMode === 'heatmap' && MapView && (
+        <View
+          style={[
+            styles.legend,
+            heatmapData.clusters.length < 5 && styles.legendMuted,
+          ]}
+          pointerEvents="none"
+          accessibilityLabel={
+            heatmapData.clusters.length < 5
+              ? 'Zoom out to see regional trends'
+              : `Heatmap legend. Range ${legendRange || 'unavailable'}.`
+          }
+        >
+          <Text style={styles.legendTitle}>
+            {selectedFuelMeta.label} · regional avg
+          </Text>
+          {heatmapData.clusters.length < 5 ? (
+            <Text style={styles.legendHint}>Zoom out to see regional trends.</Text>
+          ) : (
+            <>
+              <View style={styles.legendBar}>
+                {[
+                  HEATMAP_COLOURS.cheapest,
+                  HEATMAP_COLOURS.cheap,
+                  HEATMAP_COLOURS.mid,
+                  HEATMAP_COLOURS.pricey,
+                  HEATMAP_COLOURS.expensive,
+                ].map((c) => (
+                  <View key={c} style={[styles.legendSwatch, { backgroundColor: c }]} />
+                ))}
+              </View>
+              <View style={styles.legendLabelRow}>
+                <Text style={styles.legendLabel}>cheaper</Text>
+                <Text style={styles.legendRange}>{legendRange || ''}</Text>
+                <Text style={styles.legendLabel}>pricier</Text>
+              </View>
+              {heatmapData.scale && heatmapData.scale.uniform ? (
+                <Text style={styles.legendHint}>Prices barely vary in this area.</Text>
+              ) : null}
+            </>
+          )}
+        </View>
+      )}
+
+      {viewMode === 'heatmap' && selectedCluster && (
+        <TouchableOpacity
+          style={styles.clusterCallout}
+          activeOpacity={0.92}
+          onPress={() => {
+            const cheapest = selectedCluster.cheapest;
+            setSelectedCluster(null);
+            if (cheapest) navigation.navigate('StationDetail', { station: cheapest });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={
+            `${selectedCluster.label || 'Area'} · avg ${selectedFuelMeta.label} ` +
+            `${selectedCluster.avgPrice.toFixed(1)} pence · ${selectedCluster.count} stations` +
+            (selectedCluster.cheapest ? '. Tap to open the cheapest.' : '')
+          }
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.clusterCalloutTitle} numberOfLines={1}>
+              {selectedCluster.label ? `${selectedCluster.label} area` : 'Area'} ·{' '}
+              <Text style={{ color: selectedFuelMeta.color }}>
+                avg {selectedCluster.avgPrice.toFixed(1)}p
+              </Text>
+            </Text>
+            <Text style={styles.clusterCalloutSub} numberOfLines={1}>
+              {selectedCluster.count} stations
+              {selectedCluster.cheapest && Number.isFinite(parsePrice(resolvePrice(selectedCluster.cheapest, fuelType)))
+                ? ` · cheapest ${parsePrice(resolvePrice(selectedCluster.cheapest, fuelType)).toFixed(1)}p →`
+                : ''}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation?.(); setSelectedCluster(null); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={14} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
       {showFreshnessPopover && (
         <TouchableOpacity
           style={styles.freshnessPopover}
@@ -1110,6 +1302,132 @@ const styles = StyleSheet.create({
   },
   brandChipTextActive: {
     color: COLORS.background,
+  },
+  viewToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    backgroundColor: COLORS.mapOverlaySurface,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  viewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: 'rgba(16,185,129,0.18)',
+    borderColor: '#10B981',
+  },
+  viewToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.2,
+  },
+  viewToggleTextActive: {
+    color: COLORS.text,
+  },
+  legend: {
+    position: 'absolute',
+    bottom: 24,
+    left: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15,23,30,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    minWidth: 150,
+    maxWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  legendMuted: {
+    opacity: 0.7,
+  },
+  legendTitle: {
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  legendBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    gap: 0,
+  },
+  legendSwatch: {
+    flex: 1,
+    height: '100%',
+  },
+  legendLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  legendLabel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  legendRange: {
+    color: COLORS.text,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  legendHint: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 10,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  clusterCallout: {
+    position: 'absolute',
+    bottom: 24,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,23,30,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    maxWidth: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  clusterCalloutTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.1,
+  },
+  clusterCalloutSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    marginTop: 2,
   },
   modeRow: {
     flexDirection: 'row',
