@@ -42,14 +42,13 @@ import { formatPencePrice, parsePrice, isPlausiblePrice } from '../lib/price';
 import { darkMapStyleRefined, lightMapStyleRefined } from '../lib/mapStyles';
 import { buildTierClassifier, PIN_TIER } from '../lib/priceTiers';
 import {
-  clusterStations,
   computePriceColourScale,
   formatLegendRange,
-  computeRegionAverages,
-  selectViewportTier,
   selectAutoFocusCluster,
   computeBloomRings,
   intensityRankFor,
+  buildHeatmapClusters,
+  diagnoseHeatmap,
   HEATMAP_COLOURS,
 } from '../lib/heatmap';
 import TrajectoryBadge from '../components/TrajectoryBadge';
@@ -363,44 +362,27 @@ export default function MapScreen({ navigation }) {
     return count;
   }, [filteredStations, visibleStations, visibleRegion, fuelType]);
 
-  // Heatmap clusters — three rendering tiers based on viewport span:
-  //   A (country, > 300km): UK NUTS-1 regions, computed from the full
-  //     filtered cohort so users zoomed all the way out still see
-  //     national-level heat blooms.
-  //   B (regional, 50–300km): postcode/grid clusters from visible cohort.
-  //   C (local, < 50km): tight grid clusters from visible cohort.
-  // Each cluster carries pre-computed multi-ring bloom data so the
-  // render path is statically derived and cheap.
+  // Heatmap clusters — picks a tier from viewport span and cascades through
+  // finer fallbacks so the user never sees "data unavailable" while
+  // stations are loaded. See buildHeatmapClusters for the fallback chain.
   const heatmapData = useMemo(() => {
     if (viewMode !== 'heatmap') {
-      return { clusters: [], scale: null, strategy: 'none', tier: 'A' };
+      return { clusters: [], scale: null, strategy: 'none', tier: 'A', fallbackLevel: 0 };
     }
     const span = viewportSpanKm(visibleRegion);
-    const tier = selectViewportTier(span);
+    const build = buildHeatmapClusters({
+      visibleStations,
+      filteredStations,
+      fuelType,
+      viewportSpanKm: span,
+    });
 
-    let rawClusters = [];
-    let strategy = 'none';
-    if (tier === 'A') {
-      rawClusters = computeRegionAverages(filteredStations, fuelType);
-      strategy = 'region';
-    } else {
-      const grid = tier === 'C' ? 1.5 : 4.0;
-      const res = clusterStations(visibleStations, fuelType, grid);
-      rawClusters = res.clusters;
-      strategy = res.strategy;
-    }
-
-    // Trim to a sensible cap — regions max out at 12, postcode/grid can
-    // explode in dense cities. Sort by station count so the visually
-    // important clusters survive the trim.
-    const trimmed = rawClusters.length > 50
-      ? rawClusters.slice().sort((a, b) => b.count - a.count).slice(0, 50)
-      : rawClusters;
+    const trimmed = build.clusters.length > 50
+      ? build.clusters.slice().sort((a, b) => b.count - a.count).slice(0, 50)
+      : build.clusters;
 
     const scale = computePriceColourScale(trimmed);
 
-    // Pre-compute multi-ring bloom geometry for each cluster. Static —
-    // never re-derived per frame.
     const blooms = trimmed.map((c) => ({
       cluster: c,
       colour: scale ? scale(c.avgPrice) : HEATMAP_COLOURS.uniform,
@@ -408,7 +390,26 @@ export default function MapScreen({ navigation }) {
       lowData: !!c.lowData,
     }));
 
-    return { clusters: trimmed, scale, strategy, tier, blooms };
+    if (__DEV__) {
+      const diag = diagnoseHeatmap({
+        viewportSpanKm: span,
+        visibleStations,
+        filteredStations,
+        build: { ...build, clusters: trimmed },
+      });
+      // eslint-disable-next-line no-console
+      console.log('[heatmap]', diag);
+    }
+
+    return {
+      clusters: trimmed,
+      scale,
+      strategy: build.strategy,
+      tier: build.tier,
+      fallbackLevel: build.fallbackLevel,
+      reason: build.reason,
+      blooms,
+    };
   }, [viewMode, visibleStations, filteredStations, fuelType, visibleRegion]);
 
   const legendRange = useMemo(() => {
@@ -1273,53 +1274,72 @@ export default function MapScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
-      {viewMode === 'heatmap' && MapView && (
-        <View
-          style={[
-            styles.legend,
-            heatmapData.clusters.length === 0 && styles.legendMuted,
-          ]}
-          pointerEvents={heatmapData.clusters.length === 0 ? 'auto' : 'none'}
-          accessibilityLabel={
-            heatmapData.clusters.length === 0
-              ? 'Heatmap data unavailable. Pull to refresh.'
-              : `Heatmap legend. Range ${legendRange || 'unavailable'}. Tier ${heatmapData.tier}.`
-          }
-        >
-          <Text style={styles.legendTitle}>
-            {selectedFuelMeta.label} · {heatmapData.tier === 'A' ? 'national' : 'regional'} avg
-          </Text>
-          {heatmapData.clusters.length === 0 ? (
-            <TouchableOpacity onPress={refetch} accessibilityRole="button">
-              <Text style={styles.legendHint}>
-                Heatmap data unavailable. Tap to retry.
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <View style={styles.legendBar}>
-                {[
-                  HEATMAP_COLOURS.cheapest,
-                  HEATMAP_COLOURS.cheap,
-                  HEATMAP_COLOURS.mid,
-                  HEATMAP_COLOURS.pricey,
-                  HEATMAP_COLOURS.expensive,
-                ].map((c) => (
-                  <View key={c} style={[styles.legendSwatch, { backgroundColor: c }]} />
-                ))}
-              </View>
-              <View style={styles.legendLabelRow}>
-                <Text style={styles.legendLabel}>cheaper</Text>
-                <Text style={styles.legendRange}>{legendRange || ''}</Text>
-                <Text style={styles.legendLabel}>pricier</Text>
-              </View>
-              {heatmapData.scale && heatmapData.scale.uniform ? (
-                <Text style={styles.legendHint}>Prices barely vary in this area.</Text>
-              ) : null}
-            </>
-          )}
-        </View>
-      )}
+      {viewMode === 'heatmap' && MapView && (() => {
+        // Three legend states:
+        //   - apiError: stationsError is set OR (no stations AND not loading)
+        //   - single:   exactly 1 cluster — neutral, no error copy
+        //   - normal:   ≥2 clusters — show the colour scale
+        // We never show "data unavailable" while stations exist.
+        const hasStations = filteredStations.length > 0;
+        const clusterCount = heatmapData.clusters.length;
+        const apiError =
+          (!!stationsError && !stationsLoading) ||
+          (!hasStations && !stationsLoading);
+        const single = !apiError && clusterCount === 1;
+        const muted = apiError || single;
+        return (
+          <View
+            style={[styles.legend, muted && styles.legendMuted]}
+            pointerEvents={apiError ? 'auto' : 'none'}
+            accessibilityLabel={
+              apiError
+                ? (stationsError
+                    ? "Couldn't load fuel data. Tap to retry."
+                    : 'No stations in this area. Tap to retry.')
+                : single
+                  ? `${selectedFuelMeta.label} heatmap. Tap a region to see prices.`
+                  : `Heatmap legend. Range ${legendRange || 'unavailable'}. Tier ${heatmapData.tier}.`
+            }
+          >
+            <Text style={styles.legendTitle}>
+              {selectedFuelMeta.label} · {heatmapData.tier === 'A' ? 'national' : 'regional'} avg
+            </Text>
+            {apiError ? (
+              <TouchableOpacity onPress={refetch} accessibilityRole="button">
+                <Text style={styles.legendHint}>
+                  {stationsError
+                    ? "Couldn't load fuel data. Tap to retry."
+                    : 'No stations in this area. Tap to retry.'}
+                </Text>
+              </TouchableOpacity>
+            ) : single ? (
+              <Text style={styles.legendHint}>Tap a region to see prices.</Text>
+            ) : (
+              <>
+                <View style={styles.legendBar}>
+                  {[
+                    HEATMAP_COLOURS.cheapest,
+                    HEATMAP_COLOURS.cheap,
+                    HEATMAP_COLOURS.mid,
+                    HEATMAP_COLOURS.pricey,
+                    HEATMAP_COLOURS.expensive,
+                  ].map((c) => (
+                    <View key={c} style={[styles.legendSwatch, { backgroundColor: c }]} />
+                  ))}
+                </View>
+                <View style={styles.legendLabelRow}>
+                  <Text style={styles.legendLabel}>cheaper</Text>
+                  <Text style={styles.legendRange}>{legendRange || ''}</Text>
+                  <Text style={styles.legendLabel}>pricier</Text>
+                </View>
+                {heatmapData.scale && heatmapData.scale.uniform ? (
+                  <Text style={styles.legendHint}>Prices barely vary in this area.</Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        );
+      })()}
 
       {viewMode === 'heatmap' && autoFocusCallout && (
         <Animated.View

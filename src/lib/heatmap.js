@@ -432,12 +432,158 @@ export function intensityRankFor(price, clusters) {
   return 4;
 }
 
+/**
+ * Build per-station "micro-bloom" clusters — one cluster per station with
+ * its raw coordinates. Last-resort fallback when no aggregating tier
+ * produces results but stations exist. Visually approaches Pin mode but
+ * keeps the heatmap visual contract (soft blooms, colour scale).
+ */
+export function clusterStationsAsMicroBlooms(stations, fuelType = 'petrol') {
+  if (!Array.isArray(stations) || stations.length === 0) return [];
+  const out = [];
+  for (let i = 0; i < stations.length; i += 1) {
+    const s = stations[i];
+    const c = getCoords(s);
+    if (!c) continue;
+    const raw = s?.prices?.[fuelType] ?? s?.[fuelType] ?? null;
+    const p = parsePrice(raw);
+    if (p === null) continue;
+    out.push({
+      id: `micro:${s?.id ?? i}`,
+      label: null,
+      lat: c.lat,
+      lon: c.lng,
+      count: 1,
+      avgPrice: p,
+      cheapest: s,
+      micro: true,
+    });
+  }
+  return out;
+}
+
+/**
+ * Resilient heatmap cluster builder. Picks a tier from viewportSpanKm and
+ * cascades through finer fallbacks until clusters are produced or stations
+ * are exhausted:
+ *
+ *   tier A → region averages
+ *   tier B → grid 4km, then 2km, then 1km
+ *   tier C → grid 1.5km, then 0.75km, then per-station micro-blooms
+ *
+ * Returns { clusters, strategy, tier, fallbackLevel, reason } where
+ * fallbackLevel records how many escalations were needed (0 = primary).
+ *
+ * Rules of engagement:
+ *  - Caller passes BOTH visible-cohort and full-cohort station sets so we
+ *    can fall back to the broader set when the visible window is thin.
+ *  - We never "give up" while stations exist — the worst case is
+ *    micro-blooms over the visible cohort.
+ */
+export function buildHeatmapClusters({
+  visibleStations,
+  filteredStations,
+  fuelType = 'petrol',
+  viewportSpanKm: spanKm,
+  minClusters = 1,
+  microBloomMinStations = 1,
+}) {
+  const tier = selectViewportTier(spanKm);
+  const visible = Array.isArray(visibleStations) ? visibleStations : [];
+  const filtered = Array.isArray(filteredStations) ? filteredStations : visible;
+
+  const tryGrid = (set, gridKm) => {
+    const res = clusterStations(set, fuelType, gridKm);
+    return { clusters: res.clusters || [], strategy: res.strategy };
+  };
+
+  const attempts = [];
+
+  if (tier === 'A') {
+    const regions = computeRegionAverages(filtered, fuelType);
+    attempts.push({ clusters: regions, strategy: 'region', label: 'tier-A-region' });
+    // If no regional data hits, fall through into tier-B-style grid on the
+    // full cohort so the user never sees a blank country zoom.
+    attempts.push({ ...tryGrid(filtered, 25), label: 'tier-A-grid-25km' });
+    attempts.push({ ...tryGrid(filtered, 10), label: 'tier-A-grid-10km' });
+  } else if (tier === 'B') {
+    attempts.push({ ...tryGrid(visible, 4), label: 'tier-B-grid-4km' });
+    attempts.push({ ...tryGrid(visible, 2), label: 'tier-B-grid-2km' });
+    attempts.push({ ...tryGrid(visible, 1), label: 'tier-B-grid-1km' });
+    // If the visible cohort is too thin, expand to all filtered stations.
+    attempts.push({ ...tryGrid(filtered, 4), label: 'tier-B-grid-4km-fallback-cohort' });
+  } else {
+    attempts.push({ ...tryGrid(visible, 1.5), label: 'tier-C-grid-1.5km' });
+    attempts.push({ ...tryGrid(visible, 0.75), label: 'tier-C-grid-0.75km' });
+    attempts.push({ ...tryGrid(filtered, 1.5), label: 'tier-C-grid-1.5km-fallback-cohort' });
+  }
+
+  for (let i = 0; i < attempts.length; i += 1) {
+    const a = attempts[i];
+    if (a.clusters && a.clusters.length >= minClusters) {
+      return {
+        clusters: a.clusters,
+        strategy: a.strategy || 'grid',
+        tier,
+        fallbackLevel: i,
+        reason: a.label,
+      };
+    }
+  }
+
+  // Last-resort micro-blooms — never lie when stations exist.
+  const baseSet = visible.length >= microBloomMinStations ? visible : filtered;
+  const micro = clusterStationsAsMicroBlooms(baseSet, fuelType);
+  if (micro.length > 0) {
+    return {
+      clusters: micro,
+      strategy: 'micro',
+      tier,
+      fallbackLevel: attempts.length,
+      reason: 'micro-bloom',
+    };
+  }
+
+  return {
+    clusters: [],
+    strategy: 'none',
+    tier,
+    fallbackLevel: attempts.length + 1,
+    reason: 'no-stations',
+  };
+}
+
+/**
+ * Build a small diagnostic record for a heatmap render path. Used by
+ * MapScreen in dev builds only — keeps shipped code free of console spam.
+ */
+export function diagnoseHeatmap({
+  viewportSpanKm: spanKm,
+  visibleStations,
+  filteredStations,
+  build,
+}) {
+  return {
+    spanKm: Number.isFinite(spanKm) ? Math.round(spanKm * 10) / 10 : null,
+    tier: build?.tier ?? null,
+    visibleCount: Array.isArray(visibleStations) ? visibleStations.length : 0,
+    filteredCount: Array.isArray(filteredStations) ? filteredStations.length : 0,
+    clusterCount: Array.isArray(build?.clusters) ? build.clusters.length : 0,
+    strategy: build?.strategy ?? null,
+    fallbackLevel: build?.fallbackLevel ?? null,
+    reason: build?.reason ?? null,
+  };
+}
+
 export default {
   HEATMAP_COLOURS,
   extractPostcodeDistrict,
   clusterStationsByPostcode,
   clusterStationsByGrid,
   clusterStations,
+  clusterStationsAsMicroBlooms,
+  buildHeatmapClusters,
+  diagnoseHeatmap,
   computePriceColourScale,
   formatLegendRange,
   clusterRadiusMetres,
