@@ -10,6 +10,10 @@
       "channel": "development",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "GOOGLE_MAPS_API_KEY_ANDROID": "$GOOGLE_MAPS_API_KEY_ANDROID",
+        "GOOGLE_MAPS_API_KEY_IOS": "$GOOGLE_MAPS_API_KEY_IOS"
       }
     },
     "preview": {
@@ -20,6 +24,10 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "GOOGLE_MAPS_API_KEY_ANDROID": "$GOOGLE_MAPS_API_KEY_ANDROID",
+        "GOOGLE_MAPS_API_KEY_IOS": "$GOOGLE_MAPS_API_KEY_IOS"
       }
     },
     "production": {
@@ -30,6 +38,10 @@
       },
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "GOOGLE_MAPS_API_KEY_ANDROID": "$GOOGLE_MAPS_API_KEY_ANDROID",
+        "GOOGLE_MAPS_API_KEY_IOS": "$GOOGLE_MAPS_API_KEY_IOS"
       }
     }
   },
