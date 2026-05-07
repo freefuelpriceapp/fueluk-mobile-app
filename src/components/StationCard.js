@@ -174,14 +174,19 @@ const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice }) =
     : freshness.label;
 
   // Build other-fuel entries. Exclude the synthetic 'unleaded' key (it
-  // isn't a real wire field) and, when 'unleaded' is selected, also
-  // exclude the underlying column the resolver already used as the
-  // primary so we don't show the same number twice.
-  const skipFuel = fuelType === 'unleaded' && unleadedDetail
-    ? unleadedDetail.fuelType
-    : null;
+  // isn't a real wire field). When 'unleaded' (Petrol) is selected, also
+  // exclude BOTH e10 and petrol columns so the card never exposes the
+  // E10/E5 grade duality on the primary list — that breakdown lives on
+  // the station detail screen.
+  const skipFuels = new Set();
+  skipFuels.add('unleaded');
+  skipFuels.add(fuelType);
+  if (fuelType === 'unleaded') {
+    skipFuels.add('e10');
+    skipFuels.add('petrol');
+  }
   const otherFuels = Object.keys(FUEL_LABELS)
-    .filter((ft) => ft !== 'unleaded' && ft !== fuelType && ft !== skipFuel)
+    .filter((ft) => !skipFuels.has(ft))
     .map((ft) => {
       const ppl = resolvePrice(station, ft);
       const srcField = SOURCE_FIELD[ft];

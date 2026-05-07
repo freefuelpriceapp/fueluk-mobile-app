@@ -149,9 +149,9 @@ export default function BestOptionCard({
   const dist = formatDistance(activeStation);
   const updated = activeStation.last_updated ? timeAgo(activeStation.last_updated) : null;
   const fuelLabel = fuelType === 'diesel' ? 'Diesel'
-    : fuelType === 'e10' ? 'E10'
-    : fuelType === 'unleaded' ? 'Unleaded'
-    : fuelType === 'petrol' ? 'E5 (older cars)'
+    : fuelType === 'e10' ? 'Petrol'
+    : fuelType === 'unleaded' ? 'Petrol'
+    : fuelType === 'petrol' ? 'E5 (premium 97/99)'
     : 'Petrol';
 
   return (
