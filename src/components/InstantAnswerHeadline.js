@@ -18,11 +18,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../lib/theme';
 import { formatPencePerLitre, formatPounds } from '../lib/breakEven';
 import { brandToString, safeText } from '../lib/brand';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
 
 const FUEL_LABELS = {
-  petrol: 'petrol',
+  unleaded: 'petrol',
+  petrol: 'E5 petrol',
   diesel: 'diesel',
-  e10: 'E10',
+  e10: 'petrol',
   super_unleaded: 'super unleaded',
   premium_diesel: 'premium diesel',
 };
@@ -58,6 +60,10 @@ function distanceMiles(station) {
 
 function priceFor(station, fuelType) {
   if (!station) return null;
+  if (fuelType === 'unleaded') {
+    const v = resolveUnleadedPrice(station);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
   const direct = Number(station[`${fuelType}_price`]);
   if (Number.isFinite(direct) && direct > 0) return direct;
   const viaPrices = station.prices ? Number(station.prices[fuelType]) : NaN;
@@ -68,7 +74,7 @@ function priceFor(station, fuelType) {
 export default function InstantAnswerHeadline({
   loading,
   station,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   perTankSavingPence = null,
   hasVehicle = false,
   nationalAvgPence = null,

@@ -59,13 +59,22 @@ async function saveRecent(next) {
  * Gated by the `priceFlags` feature flag — consumers can still render it,
  * but it short-circuits to null when the flag is off.
  */
+// FlagPriceSheet still asks the user for a specific grade — flagging an
+// implausible "Unleaded" price is ambiguous between e10 and petrol on the
+// wire. The synthetic 'unleaded' fuel-type is collapsed to 'e10' for the
+// sheet's default since e10 is the column most UK drivers' cars use.
+function normalizeInitialFuelType(ft) {
+  if (ft === 'unleaded') return 'e10';
+  return ft || 'e10';
+}
+
 export default function FlagPriceSheet({
   visible,
   station,
-  initialFuelType = 'petrol',
+  initialFuelType = 'e10',
   onClose,
 }) {
-  const [fuelType, setFuelType] = useState(initialFuelType);
+  const [fuelType, setFuelType] = useState(normalizeInitialFuelType(initialFuelType));
   const [reason, setReason] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // "ok" | "dup" | "err" | "quarantined"
@@ -73,7 +82,7 @@ export default function FlagPriceSheet({
 
   useEffect(() => {
     if (visible) {
-      setFuelType(initialFuelType || 'petrol');
+      setFuelType(normalizeInitialFuelType(initialFuelType));
       setReason(null);
       setSubmitting(false);
       setResult(null);

@@ -64,6 +64,7 @@ export const COLORS = {
 // ─── Fuel color map (keyed by fuel type string) ───────────────────────────────
 
 export const FUEL_COLORS = {
+  unleaded:        COLORS.e10,
   petrol:          COLORS.petrol,
   diesel:          COLORS.diesel,
   e10:             COLORS.e10,
@@ -73,12 +74,16 @@ export const FUEL_COLORS = {
 
 // ─── Fuel types array ─────────────────────────────────────────────────────────
 
+// Primary fuel-type list shown in the main filter row. Petrol = the
+// cheapest 95-RON unleaded grade per station (resolveUnleadedPrice picks
+// the lower of E10 and E5). E5 ("Premium 97/99") is kept as an opt-in
+// affordance, not a peer tab — see SearchScreen / MapScreen for the
+// "Driving an older car?" link.
 export const FUEL_TYPES = [
-  { key: 'petrol',          label: 'Petrol',          color: COLORS.petrol },
-  { key: 'diesel',          label: 'Diesel',          color: COLORS.diesel },
-  { key: 'e10',             label: 'E10',             color: COLORS.e10 },
-  { key: 'super_unleaded',  label: 'Super Unleaded',  color: COLORS.superUnleaded },
-  { key: 'premium_diesel',  label: 'Premium Diesel',  color: COLORS.premiumDiesel },
+  { key: 'unleaded',        label: 'Petrol',           color: COLORS.e10 },
+  { key: 'diesel',          label: 'Diesel',           color: COLORS.diesel },
+  { key: 'super_unleaded',  label: 'Super Unleaded',   color: COLORS.superUnleaded },
+  { key: 'premium_diesel',  label: 'Premium Diesel',   color: COLORS.premiumDiesel },
 ];
 
 // ─── Spacing ──────────────────────────────────────────────────────────────────

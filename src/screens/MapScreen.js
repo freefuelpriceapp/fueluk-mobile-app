@@ -34,7 +34,16 @@ let StationMarker;
 if (Platform.OS !== 'web') {
   StationMarker = require('../components/StationMarker').default;
 }
-import { resolvePrice } from '../lib/quarantine';
+import { resolvePrice as resolvePriceRaw } from '../lib/quarantine';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
+
+// Drop-in replacement for resolvePrice that respects the synthetic
+// 'unleaded' fuel-type by picking min(e10_price, petrol_price) per
+// station via the resolver. All other fuel types pass through.
+function resolvePrice(station, fuelType) {
+  if (fuelType === 'unleaded') return resolveUnleadedPrice(station);
+  return resolvePriceRaw(station, fuelType);
+}
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
@@ -56,10 +65,13 @@ import BreakEvenBadge from '../components/BreakEvenBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 
+// Primary fuel-type chips. 'Petrol' resolves per-station to the cheapest
+// 95-RON unleaded grade (E10 or E5) so users always see the money-saving
+// price up front. E5 is reachable via the inline "older car?" link, not
+// a peer chip.
 const FUEL_TYPES = [
-  { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
+  { key: 'unleaded',       label: 'Petrol',         color: FUEL_COLORS.e10 || FUEL_COLORS.petrol },
   { key: 'diesel',         label: 'Diesel',         color: FUEL_COLORS.diesel },
-  { key: 'e10',            label: 'E10',            color: FUEL_COLORS.e10 },
   { key: 'super_unleaded', label: 'Super',          color: FUEL_COLORS.super_unleaded },
   { key: 'premium_diesel', label: 'Prem. Diesel',   color: FUEL_COLORS.premium_diesel },
 ];
@@ -142,7 +154,7 @@ class MapErrorBoundary extends React.Component {
 }
 
 export default function MapScreen({ navigation, route }) {
-  const [fuelType, setFuelType] = useState('petrol');
+  const [fuelType, setFuelType] = useState('unleaded');
   const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -889,6 +901,33 @@ export default function MapScreen({ navigation, route }) {
           </ScrollView>
         </View>
 
+        {(fuelType === 'unleaded' || fuelType === 'petrol') && (
+          <TouchableOpacity
+            style={styles.e5OptInRow}
+            onPress={() =>
+              setFuelType(fuelType === 'petrol' ? 'unleaded' : 'petrol')
+            }
+            accessibilityRole="button"
+            accessibilityLabel={
+              fuelType === 'petrol'
+                ? 'Back to standard petrol prices'
+                : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
+            }
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name={fuelType === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
+              size={12}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.e5OptInText} numberOfLines={2}>
+              {fuelType === 'petrol'
+                ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
+                : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {brands.length > 0 && (
           <View style={styles.brandFilterRow}>
             <ScrollView
@@ -1487,6 +1526,23 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   filterChipText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+  e5OptInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 6,
+    backgroundColor: COLORS.mapOverlayMedium,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  e5OptInText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    flex: 1,
+    lineHeight: 15,
+  },
   brandFilterRow: {
     backgroundColor: COLORS.mapOverlayMedium,
     borderBottomWidth: 1,

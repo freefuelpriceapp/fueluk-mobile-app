@@ -15,7 +15,7 @@ import { getNearbyStations, getCheapestStations } from '../api/fuelApi';
 export function useStations(location, options = {}) {
   const {
     radiusKm = 5,
-    fuelType = 'petrol',
+    fuelType = 'unleaded',
     mode = 'nearby',       // 'nearby' | 'cheapest'
     mpg = null,
     tankFillLitres = null,

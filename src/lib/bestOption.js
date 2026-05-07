@@ -11,6 +11,7 @@
  */
 
 const { resolvePrice, evaluateStation } = require('./quarantine');
+const { resolveUnleadedPrice } = require('./fuelResolution');
 
 /**
  * Extract the backend's Best Option station from a /nearby payload.
@@ -31,7 +32,7 @@ function extractBestOption(payload) {
  * Fallback: nearest non-stale station with a resolvable petrol price.
  * Used only when backend omits best_option.
  */
-function pickFallbackBest(stations, fuelType = 'petrol') {
+function pickFallbackBest(stations, fuelType = 'unleaded') {
   if (!Array.isArray(stations) || !stations.length) return null;
   const getDistance = (s) => {
     if (!s) return Infinity;
@@ -41,11 +42,24 @@ function pickFallbackBest(stations, fuelType = 'petrol') {
     if (Number.isFinite(km)) return km / 1.60934;
     return Infinity;
   };
-  const candidates = stations.filter((s) => {
-    const evalResult = evaluateStation(s, fuelType);
-    return !evalResult.quarantined && resolvePrice(s, fuelType) != null;
-  });
+  const priceFor = (s) => (
+    fuelType === 'unleaded'
+      ? resolveUnleadedPrice(s)
+      : (evaluateStation(s, fuelType).quarantined ? null : resolvePrice(s, fuelType))
+  );
+  const candidates = stations.filter((s) => priceFor(s) != null);
   if (!candidates.length) return null;
+  // For 'unleaded' the whole point of the smart-merge is fair price ranking,
+  // so pick by lowest plausible unleaded price; tie-break on distance.
+  // For other fuel types preserve the legacy nearest-non-stale behaviour.
+  if (fuelType === 'unleaded') {
+    return candidates.slice().sort((a, b) => {
+      const pa = priceFor(a);
+      const pb = priceFor(b);
+      if (pa !== pb) return pa - pb;
+      return getDistance(a) - getDistance(b);
+    })[0];
+  }
   return candidates.slice().sort((a, b) => getDistance(a) - getDistance(b))[0];
 }
 
@@ -53,7 +67,7 @@ function pickFallbackBest(stations, fuelType = 'petrol') {
  * Choose the Best Option station. Prefer the backend's choice; fall back to
  * nearest non-stale station only if backend omits it.
  */
-function chooseBestOption(payload, stations, fuelType = 'petrol') {
+function chooseBestOption(payload, stations, fuelType = 'unleaded') {
   const fromBackend = extractBestOption(payload);
   if (fromBackend) return fromBackend;
   return pickFallbackBest(stations, fuelType);

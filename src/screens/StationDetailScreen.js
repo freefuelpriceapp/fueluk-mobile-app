@@ -55,13 +55,13 @@ const COLORS = {
 // Fuel display config — drives which rows render in the fuel section and the
 // alert modal. Only rows with a non-null price for the station are shown.
 // Field mapping per spec:
-//   E10        → e10_price             (Unleaded E10)
-//   E5         → petrol_price          (Super Unleaded E5)
+//   E10        → e10_price             (standard 95-RON unleaded)
+//   E5         → petrol_price          (premium 97/99 RON; pre-2002 cars)
 //   B7         → diesel_price          (Diesel)
 //   B7_PREMIUM → premium_diesel_price  (Premium Diesel)
 const FUEL_DISPLAY = [
-  { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Unleaded (E10)', color: THEME_FUEL_COLORS.e10 },
-  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Super Unleaded (E5)', color: THEME_FUEL_COLORS.super_unleaded },
+  { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Petrol (E10)', color: THEME_FUEL_COLORS.e10 },
+  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Premium petrol (E5 97/99)', color: THEME_FUEL_COLORS.super_unleaded },
   { key: 'diesel', field: 'diesel_price', sourceField: 'diesel_source', label: 'Diesel', color: THEME_FUEL_COLORS.diesel },
   { key: 'premiumDiesel', field: 'premium_diesel_price', sourceField: 'premium_diesel_source', label: 'Premium Diesel', color: THEME_FUEL_COLORS.premium_diesel },
 ];

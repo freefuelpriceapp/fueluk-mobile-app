@@ -39,6 +39,7 @@ module.exports = () => ({
         NSLocationWhenInUseUsageDescription:
           "FuelUK uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
         UIBackgroundModes: ["remote-notification"],
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
@@ -75,6 +76,7 @@ module.exports = () => ({
           defaultChannel: "price-alerts",
         },
       ],
+      "./plugins/withAdiRegistration.js",
     ],
     extra: {
       apiBaseUrl: "https://api.freefuelpriceapp.com",
