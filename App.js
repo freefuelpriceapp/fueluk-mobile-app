@@ -21,6 +21,9 @@ import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
 import PrePurchaseCheckScreen from './src/screens/PrePurchaseCheckScreen';
 import VehicleSettingsScreen from './src/screens/VehicleSettingsScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
+import FuelLogScreen from './src/screens/FuelLogScreen';
+import ReceiptCaptureScreen from './src/screens/ReceiptCaptureScreen';
+import ReceiptReviewScreen from './src/screens/ReceiptReviewScreen';
 import { FEATURES } from './src/lib/featureFlags';
 import { FEATURE_FLAGS } from './src/config/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
@@ -32,7 +35,14 @@ import {
   createPendingQueue,
 } from './src/lib/deepLinks';
 import ConsentBanner from './src/components/ConsentBanner';
+import ReceiptOnboardingSheet from './src/components/ReceiptOnboardingSheet';
 import useConsent from './src/hooks/useConsent';
+import {
+  incrementAppOpenCount,
+  isOnboardingDone,
+  shouldShowOnboarding,
+} from './src/lib/receiptOnboarding';
+import { loadReceipts } from './src/lib/receiptRepository';
 
 const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
 // Bumping this forces a one-shot purge of AsyncStorage caches that might hold
@@ -349,6 +359,21 @@ function ToolboxStack() {
         component={SettingsScreen}
         options={{ title: 'Settings' }}
       />
+      <Stack.Screen
+        name="FuelLog"
+        component={FuelLogScreen}
+        options={{ title: 'Fuel Log' }}
+      />
+      <Stack.Screen
+        name="ReceiptCapture"
+        component={ReceiptCaptureScreen}
+        options={{ title: 'Add Receipt' }}
+      />
+      <Stack.Screen
+        name="ReceiptReview"
+        component={ReceiptReviewScreen}
+        options={{ title: 'Review Receipt' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -484,6 +509,7 @@ export default function App() {
   const [permissionGateChecked, setPermissionGateChecked] = useState(false);
   const [showPermissionGate, setShowPermissionGate] = useState(false);
   const [navReady, setNavReady] = useState(false);
+  const [showReceiptOnboarding, setShowReceiptOnboarding] = useState(false);
   const navigationRef = useRef(null);
 
   useEffect(() => {
@@ -498,6 +524,22 @@ export default function App() {
         setShowPermissionGate(false);
       } finally {
         setPermissionGateChecked(true);
+      }
+
+      // Receipt onboarding: increment open count and evaluate trigger
+      try {
+        const openCount = await incrementAppOpenCount();
+        const done = await isOnboardingDone();
+        const receipts = await loadReceipts();
+        const show = shouldShowOnboarding({
+          openCount,
+          alreadyDone: done,
+          receiptCount: receipts.length,
+          syntheticSavingsPence: 0, // HomeScreen will pass real value if needed
+        });
+        if (show) setShowReceiptOnboarding(true);
+      } catch (_e) {
+        // Non-critical — onboarding failure must not affect app launch
       }
     })();
   }, []);
@@ -577,6 +619,18 @@ export default function App() {
           visible={consentBannerVisible}
           onGrant={consent.grant}
           onDecline={consent.decline}
+        />
+        <ReceiptOnboardingSheet
+          visible={showReceiptOnboarding && navReady}
+          onDismiss={() => setShowReceiptOnboarding(false)}
+          onSetUp={() => {
+            setShowReceiptOnboarding(false);
+            if (navigationRef.current) {
+              navigationRef.current.navigate('Toolbox', {
+                screen: 'FuelLog',
+              });
+            }
+          }}
         />
       </SafeAreaProvider>
     </ErrorBoundary>
