@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import useConsent from '../hooks/useConsent';
+import { FEATURE_FLAGS } from '../config/featureFlags';
 
 const PRIVACY_URL = 'https://api.freefuelpriceapp.com/privacy';
 const SUPPORT_URL = 'https://api.freefuelpriceapp.com/support';
@@ -41,7 +43,25 @@ function SectionHeader({ title }) {
   return <Text style={styles.sectionHeader}>{title}</Text>;
 }
 
+function consentSublabel(status, grantedAt) {
+  if (status === 'granted') {
+    if (grantedAt) {
+      try {
+        const d = new Date(grantedAt);
+        if (!Number.isNaN(d.getTime())) {
+          return `Anonymous data sharing on \u00B7 since ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        }
+      } catch (_e) {}
+    }
+    return 'Anonymous data sharing on';
+  }
+  if (status === 'declined') return 'Anonymous data sharing off';
+  if (status === 'expired') return 'Consent expired \u2014 we\u2019ll ask again';
+  return 'Anonymous data sharing not set';
+}
+
 export default function SettingsScreen() {
+  const consent = useConsent();
   const openURL = async (url) => {
     try {
       const supported = await Linking.canOpenURL(url);
@@ -134,6 +154,45 @@ export default function SettingsScreen() {
           onPress={() => {}}
           showChevron={false}
         />
+        {FEATURE_FLAGS.FEATURE_CONSENT_BANNER ? (
+          <>
+            <View style={styles.divider} />
+            <SettingsRow
+              icon="analytics-outline"
+              label="Privacy"
+              sublabel={consentSublabel(consent.status, consent.grantedAt)}
+              onPress={() => {
+                if (consent.status === 'granted') {
+                  Alert.alert(
+                    'Turn off data sharing',
+                    'Stop sharing anonymous crash and usage data? You can turn it back on at any time.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Turn off',
+                        style: 'destructive',
+                        onPress: () => consent.decline(),
+                      },
+                    ]
+                  );
+                } else if (consent.status === 'declined' || consent.status === 'expired') {
+                  Alert.alert(
+                    'Turn on data sharing',
+                    'Share anonymous crash and usage data so we can fix bugs and improve the app?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Turn on', onPress: () => consent.grant() },
+                    ]
+                  );
+                } else {
+                  // unset / loading — flip to granted (banner will pick up the change)
+                  consent.grant();
+                }
+              }}
+              showChevron
+            />
+          </>
+        ) : null}
       </View>
 
       <SectionHeader title="DATA" />

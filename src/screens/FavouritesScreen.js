@@ -16,6 +16,7 @@ import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { lightHaptic, mediumHaptic } from '../lib/haptics';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import EmptyState from '../components/EmptyState';
 
 const FAVOURITES_KEY = 'user_favourites';
 
@@ -23,9 +24,11 @@ export default function FavouritesScreen({ navigation }) {
   const [favourites, setFavourites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const loadFavourites = useCallback(async () => {
     try {
+      setLoadError(false);
       const stored = await AsyncStorage.getItem(FAVOURITES_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       // Filter out legacy ID-only entries (pre-bugfix) — they lack price/name data.
@@ -49,6 +52,7 @@ export default function FavouritesScreen({ navigation }) {
       setFavourites(normalised);
     } catch (err) {
       console.error('Failed to load favourites:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -165,14 +169,29 @@ export default function FavouritesScreen({ navigation }) {
     );
   }
 
+  if (loadError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <EmptyState
+          type="error"
+          headline="Something went wrong"
+          helper="We couldn't load your saved stations."
+          cta="Try again"
+          onCta={() => { setLoading(true); loadFavourites(); }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (favourites.length === 0) {
     return (
-      <SafeAreaView style={styles.emptyState}>
-        <Ionicons name="heart-outline" size={64} color={COLORS.textDisabled} />
-        <Text style={styles.emptyTitle}>No saved stations</Text>
-        <Text style={styles.emptySubtext}>
-          Tap the heart icon on any station to save it here for quick access.
-        </Text>
+      <SafeAreaView style={styles.container}>
+        <EmptyState
+          type="empty"
+          icon="heart-outline"
+          headline="No saved stations"
+          helper="Tap the heart icon on any station to save it here for quick access."
+        />
       </SafeAreaView>
     );
   }

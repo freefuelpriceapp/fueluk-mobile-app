@@ -2,6 +2,7 @@
   "expo": {
     "name": "FuelUK",
     "slug": "fueluk-mobile-app",
+    "scheme": "fueluk",
     "version": "1.0.0",
     "runtimeVersion": {
       "policy": "appVersion"

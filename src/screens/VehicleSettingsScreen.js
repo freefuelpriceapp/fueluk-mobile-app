@@ -20,6 +20,7 @@ import {
 } from '../lib/userVehicle';
 import { lookupVehicle } from '../api/fuelApi';
 import { formatVehicleHeader } from '../lib/formatVehicleHeader';
+import EmptyState from '../components/EmptyState';
 
 const FUEL_OPTIONS = [
   { key: 'e10', label: 'E10 (regular petrol)', default_mpg: UK_AVG_MPG.e10 },
@@ -37,7 +38,10 @@ const FUEL_OPTIONS = [
  *   2. Manual fuel-type pick (uses UK average mpg)
  *   3. Manual mpg override (power-user)
  */
-export default function VehicleSettingsScreen({ navigation }) {
+export default function VehicleSettingsScreen({ navigation, route }) {
+  const deepLinkReg = route?.params?.reg ? String(route.params.reg).toUpperCase() : null;
+  const fromDeepLink = !!route?.params?.fromDeepLink;
+
   const [loaded, setLoaded] = useState(false);
   const [current, setCurrent] = useState(null);
   const [reg, setReg] = useState('');
@@ -46,6 +50,7 @@ export default function VehicleSettingsScreen({ navigation }) {
   const [fuelType, setFuelType] = useState('e10');
   const [mpgInput, setMpgInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deepLinkMismatch, setDeepLinkMismatch] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -57,10 +62,19 @@ export default function VehicleSettingsScreen({ navigation }) {
         if (v.fuel_type) setFuelType(v.fuel_type);
         if (typeof v.mpg === 'number') setMpgInput(String(v.mpg));
       }
+      // If we arrived via fueluk://car/:reg and the saved vehicle (if any)
+      // doesn't match, surface a "Not found" notice and pre-fill the input.
+      if (deepLinkReg) {
+        const savedReg = v?.reg ? String(v.reg).toUpperCase() : '';
+        if (savedReg !== deepLinkReg) {
+          setDeepLinkMismatch(true);
+          setReg(deepLinkReg);
+        }
+      }
       setLoaded(true);
     });
     return () => { mounted = false; };
-  }, []);
+  }, [deepLinkReg]);
 
   const handleLookup = useCallback(async () => {
     const cleaned = String(reg || '').replace(/\s+/g, '').toUpperCase();
@@ -143,6 +157,16 @@ export default function VehicleSettingsScreen({ navigation }) {
       <Text style={styles.subtitle}>
         We'll use this to show personalised break-even savings at each station.
       </Text>
+
+      {fromDeepLink && deepLinkMismatch ? (
+        <EmptyState
+          type="empty"
+          icon="car-outline"
+          headline={`Vehicle ${deepLinkReg} not found`}
+          helper="No saved vehicle matches that registration. You can look it up below."
+          compact
+        />
+      ) : null}
 
       {current ? (
         <View style={styles.currentCard}>

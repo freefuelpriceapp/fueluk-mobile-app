@@ -141,7 +141,7 @@ class MapErrorBoundary extends React.Component {
   }
 }
 
-export default function MapScreen({ navigation }) {
+export default function MapScreen({ navigation, route }) {
   const [fuelType, setFuelType] = useState('petrol');
   const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
@@ -163,6 +163,15 @@ export default function MapScreen({ navigation }) {
       .catch(() => {});
     return () => { mounted = false; };
   }, []);
+
+  // Honour ?initialMode=heatmap from deep links — overrides the persisted choice.
+  useEffect(() => {
+    const requested = route?.params?.initialMode;
+    if (requested === 'heatmap' || requested === 'pins') {
+      setViewMode(requested);
+      AsyncStorage.setItem('@fueluk/map_view_v1', requested).catch(() => {});
+    }
+  }, [route?.params?.initialMode]);
 
   const handleSetViewMode = useCallback((next) => {
     setViewMode(next);

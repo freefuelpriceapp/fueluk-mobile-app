@@ -12,6 +12,10 @@ export const FEATURE_FLAGS = {
   trajectory: true,
   priceFlags: true,
   vehicleSettings: true,
+  // GDPR consent banner — built ahead of analytics/Sentry wiring. Stays OFF
+  // at launch; flip to true when crash reporting + analytics ship and we
+  // need first-run consent capture.
+  FEATURE_CONSENT_BANNER: false,
 };
 
 export function isFeatureEnabled(name) {

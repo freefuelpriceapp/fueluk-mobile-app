@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import StationCard from '../components/StationCard';
 import { SkeletonList } from '../components/SkeletonCard';
+import EmptyState from '../components/EmptyState';
 import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 import useLocation from '../hooks/useLocation';
@@ -82,8 +83,9 @@ function rankForFuel(stations, fuelKey) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const SearchScreen = ({ navigation }) => {
-  const [query, setQuery] = useState('');
+const SearchScreen = ({ navigation, route }) => {
+  const initialQuery = typeof route?.params?.query === 'string' ? route.params.query : '';
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [nearbyResults, setNearbyResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -150,6 +152,15 @@ const SearchScreen = ({ navigation }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFuel]);
+
+  // Update query when navigated to via deep link with a new ?q= value.
+  useEffect(() => {
+    const incoming = typeof route?.params?.query === 'string' ? route.params.query : null;
+    if (incoming != null && incoming !== query) {
+      setQuery(incoming);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.query]);
 
   // ─── Debounced live search — fires 400ms after user stops typing ─────────────
 
@@ -248,13 +259,13 @@ const SearchScreen = ({ navigation }) => {
         {loading ? (
           <SkeletonList count={4} />
         ) : error ? (
-          <View style={styles.centered}>
-            <Ionicons name="alert-circle-outline" size={36} color={COLORS.danger} />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
-              <Text style={styles.retryBtnText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            type="error"
+            headline="Something went wrong"
+            helper={error}
+            cta="Try again"
+            onCta={handleRetry}
+          />
         ) : (
           <FlatList
             data={searched ? results : nearbyResults}
@@ -275,21 +286,19 @@ const SearchScreen = ({ navigation }) => {
             }
             ListEmptyComponent={
               searched ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="search-outline" size={48} color={COLORS.textDisabled} />
-                  <Text style={styles.emptyText}>No stations found for "{query}"</Text>
-                  <Text style={styles.emptySubtext}>
-                    Try a different postcode, town, or station name.
-                  </Text>
-                </View>
+                <EmptyState
+                  type="empty"
+                  icon="search-outline"
+                  headline={`No stations match "${query}"`}
+                  helper="Try a different postcode, town, or station name."
+                />
               ) : (
-                <View style={styles.emptyState}>
-                  <Ionicons name="map-outline" size={48} color={COLORS.textDisabled} />
-                  <Text style={styles.emptyText}>Search for a fuel station</Text>
-                  <Text style={styles.emptySubtext}>
-                    Enter a postcode, town name, or station brand.
-                  </Text>
-                </View>
+                <EmptyState
+                  type="empty"
+                  icon="map-outline"
+                  headline="Search for a fuel station"
+                  helper="Enter a postcode, town name, or station brand."
+                />
               )
             }
           />
