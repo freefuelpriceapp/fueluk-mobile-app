@@ -27,6 +27,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { lookupVehicle, calculateTrip } from '../api/fuelApi';
+import { formatVehicleHeader } from '../lib/formatVehicleHeader';
 import { COLORS as THEME_COLORS } from '../lib/theme';
 
 // Local alias preserves the short field names used throughout this file.
@@ -197,11 +198,10 @@ export default function TripCalculatorScreen() {
                 <Ionicons name="car-sport-outline" size={22} color={COLORS.accent} />
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={styles.vehicleTitle}>
-                    {vehicle.make || 'Unknown'} {vehicle.model || ''}
+                    {formatVehicleHeader(vehicle) || 'Unknown'}
                   </Text>
                   <Text style={styles.vehicleSub}>
-                    {vehicle.fuel_type || '—'} · {vehicle.year || '—'}
-                    {vehicle.estimated_mpg ? `  ·  ${vehicle.estimated_mpg} mpg` : ''}
+                    {vehicle.estimated_mpg ? `${vehicle.estimated_mpg} mpg` : 'mpg unknown'}
                   </Text>
                 </View>
               </View>

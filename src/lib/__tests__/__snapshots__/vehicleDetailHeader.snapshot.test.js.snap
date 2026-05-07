@@ -1,0 +1,7 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`vehicle detail header — snapshots BMW 320d 1`] = `"BMW 320D · 2.0L Diesel · Black · 2019"`;
+
+exports[`vehicle detail header — snapshots Range Rover Sport 1`] = `"Land Rover Range Rover Sport · 5.0L Petrol · Blue · 2016"`;
+
+exports[`vehicle detail header — snapshots Tesla Model 3 1`] = `"Tesla Model 3 · Electric · White · 2022"`;

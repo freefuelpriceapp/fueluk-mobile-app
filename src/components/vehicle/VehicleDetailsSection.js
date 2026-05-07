@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation } from 'react
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZES } from '../../lib/theme';
 import { lightHaptic } from '../../lib/haptics';
-
-function titleCase(s) {
-  if (!s) return s;
-  return String(s)
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import {
+  formatVehicleHeader,
+  formatMake,
+  formatModel,
+  formatFuel,
+  formatColour,
+  formatEngine,
+} from '../../lib/formatVehicleHeader';
 
 function Row({ label, value }) {
   if (value == null || value === '') return null;
@@ -25,13 +26,14 @@ export default function VehicleDetailsSection({ vehicle }) {
   const [expanded, setExpanded] = useState(true);
   if (!vehicle) return null;
 
-  const make = vehicle.make ? titleCase(vehicle.make) : null;
-  const model = vehicle.model ? titleCase(vehicle.model) : null;
+  const headerLine = formatVehicleHeader(vehicle);
+  const make = formatMake(vehicle.make);
+  const model = formatModel(vehicle.model);
   const makeModel = [make, model].filter(Boolean).join(' ') || null;
-  const colour = vehicle.colour || vehicle.color;
+  const colour = formatColour(vehicle.colour ?? vehicle.color);
   const year = vehicle.year || vehicle.yearOfManufacture;
-  const fuel = vehicle.fuel_type || vehicle.fuelType;
-  const engine = vehicle.engineCapacity || vehicle.engine_capacity;
+  const fuel = formatFuel(vehicle.fuel_type ?? vehicle.fuelType);
+  const engine = formatEngine(vehicle.engineCapacity ?? vehicle.engine_capacity);
   const co2 = vehicle.co2_g_per_km != null ? vehicle.co2_g_per_km : vehicle.co2Emissions;
 
   const toggle = () => {
@@ -53,11 +55,20 @@ export default function VehicleDetailsSection({ vehicle }) {
       </TouchableOpacity>
       {expanded && (
         <View style={styles.body}>
+          {headerLine ? (
+            <Text
+              style={styles.headerLine}
+              accessibilityLabel={headerLine}
+              testID="vehicle-header-line"
+            >
+              {headerLine}
+            </Text>
+          ) : null}
           <Row label="Make & model" value={makeModel} />
-          <Row label="Colour" value={colour ? titleCase(colour) : null} />
+          <Row label="Colour" value={colour} />
           <Row label="Year" value={year} />
-          <Row label="Fuel" value={fuel ? titleCase(fuel) : null} />
-          <Row label="Engine" value={engine ? `${engine} cc` : null} />
+          <Row label="Fuel" value={fuel} />
+          <Row label="Engine" value={engine} />
           <Row label="CO₂" value={co2 != null ? `${co2} g/km` : null} />
         </View>
       )}
@@ -93,6 +104,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
     paddingTop: SPACING.sm,
+  },
+  headerLine: {
+    color: COLORS.text,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   row: {
     flexDirection: 'row',

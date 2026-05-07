@@ -20,6 +20,7 @@ import { COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { lookupVehicle, getInsuranceCheckInfo } from '../api/fuelApi';
 import { lightHaptic, successHaptic } from '../lib/haptics';
 
+import { formatVehicleHeader } from '../lib/formatVehicleHeader';
 import RegInput from '../components/vehicle/RegInput';
 import TaxStatusCard from '../components/vehicle/TaxStatusCard';
 import MotStatusCard from '../components/vehicle/MotStatusCard';
@@ -158,6 +159,17 @@ export default function VehicleCheckScreen() {
 
           {!loading && data && (
             <View style={styles.results}>
+              {(() => {
+                const headerLine = formatVehicleHeader(data);
+                return headerLine ? (
+                  <View style={styles.vehicleHeaderCard} testID="vehicle-header-card">
+                    <Ionicons name="car-sport" size={18} color={COLORS.accent} />
+                    <Text style={styles.vehicleHeaderText} numberOfLines={2}>
+                      {headerLine}
+                    </Text>
+                  </View>
+                ) : null;
+              })()}
               <TaxStatusCard tax={data.tax} unavailable={data.tax?.unavailable} />
               <MotStatusCard
                 mot={data.mot}
@@ -241,6 +253,24 @@ const styles = StyleSheet.create({
   },
   results: {
     marginTop: SPACING.sm,
+  },
+  vehicleHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm + 2,
+    marginBottom: SPACING.md,
+  },
+  vehicleHeaderText: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONT_SIZES.md + 1,
+    fontWeight: '700',
   },
   attribution: {
     marginTop: SPACING.md,
