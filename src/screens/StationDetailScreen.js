@@ -222,7 +222,15 @@ function todayStatus(usualDays) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StationDetailScreen({ route }) {
-  const { station } = route.params;
+  // Support two entry shapes:
+  //   1. route.params.station  → full station object (in-app navigation)
+  //   2. route.params.stationId → id only (deep link cold-launch); we hydrate
+  //      a minimal station record from the prices endpoint so render works.
+  const initialStation = route?.params?.station || null;
+  const deepLinkStationId = route?.params?.stationId || null;
+  const [station, setStation] = useState(
+    initialStation || (deepLinkStationId ? { id: deepLinkStationId } : null)
+  );
 
   const [history, setHistory] = useState({});
   const [livePrices, setLivePrices] = useState([]);
@@ -329,6 +337,11 @@ export default function StationDetailScreen({ route }) {
 
   const loadData = useCallback(async () => {
     setError(null);
+    if (!station?.id) {
+      setError(new Error('No station id'));
+      setLoading(false);
+      return;
+    }
     try {
       const [historyData, currentPrices] = await Promise.all([
         getPriceHistory(station.id),
@@ -343,13 +356,30 @@ export default function StationDetailScreen({ route }) {
           ? currentPrices.prices
           : [];
       setLivePrices(safePrices);
+
+      // If we entered via a deep link with just an id, the prices payload
+      // typically carries station metadata — hydrate so the screen renders
+      // a name/address rather than the bare id stub.
+      if (!initialStation && currentPrices && typeof currentPrices === 'object') {
+        const hydrated = currentPrices.station || currentPrices;
+        setStation((prev) => ({
+          ...(prev || {}),
+          name: hydrated.name ?? prev?.name,
+          brand: hydrated.brand ?? prev?.brand,
+          address: hydrated.address ?? prev?.address,
+          postcode: hydrated.postcode ?? prev?.postcode,
+          petrol_price: hydrated.petrol_price ?? prev?.petrol_price,
+          diesel_price: hydrated.diesel_price ?? prev?.diesel_price,
+          e10_price: hydrated.e10_price ?? prev?.e10_price,
+        }));
+      }
     } catch (e) {
       setError(e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [station.id]);
+  }, [station?.id, initialStation]);
 
   useEffect(() => {
     loadData();

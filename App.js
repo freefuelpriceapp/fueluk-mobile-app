@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -26,6 +26,13 @@ import { FEATURE_FLAGS } from './src/config/featureFlags';
 import { installCrashHandlers, logger } from './src/lib/logger';
 import { initNotifications, registerNotificationResponseHandler } from './src/lib/notifications';
 import { COLORS } from './src/lib/theme';
+import {
+  parseDeepLink,
+  routeForDeepLink,
+  createPendingQueue,
+} from './src/lib/deepLinks';
+import ConsentBanner from './src/components/ConsentBanner';
+import useConsent from './src/hooks/useConsent';
 
 const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
 // Bumping this forces a one-shot purge of AsyncStorage caches that might hold
@@ -440,9 +447,43 @@ function TabNavigator() {
   );
 }
 
+// Module-level pending-link queue. Links that arrive before the navigation
+// tree is ready (cold launch) are buffered here and drained once the ref
+// is set and the user is past the permission gate.
+const pendingLinkQueue = createPendingQueue();
+
+function dispatchDeepLinkRoute(navRef, route) {
+  if (!route || !navRef?.current) return false;
+  try {
+    const { tab, screen, params } = route;
+    if (screen) {
+      // Two-level: jump to a tab, then push the inner stack screen.
+      navRef.current.navigate(tab, { screen, params });
+    } else {
+      navRef.current.navigate(tab, params);
+    }
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function handleIncomingLink(url, navRef, ready) {
+  const parsed = parseDeepLink(url);
+  if (!parsed) return;
+  const route = routeForDeepLink(parsed);
+  if (!route) return;
+  if (!ready || !navRef?.current) {
+    pendingLinkQueue.push(url);
+    return;
+  }
+  dispatchDeepLinkRoute(navRef, route);
+}
+
 export default function App() {
   const [permissionGateChecked, setPermissionGateChecked] = useState(false);
   const [showPermissionGate, setShowPermissionGate] = useState(false);
+  const [navReady, setNavReady] = useState(false);
   const navigationRef = useRef(null);
 
   useEffect(() => {
@@ -466,6 +507,48 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // ─── Deep-link wiring ───────────────────────────────────────────────────────
+  // 1. Read the URL the app was launched with (cold-start). Buffer it if the
+  //    nav tree isn't ready yet; the drain effect below picks it up.
+  // 2. Subscribe to runtime URL events. Same buffer/dispatch rules.
+  useEffect(() => {
+    let cancelled = false;
+    Linking.getInitialURL()
+      .then((url) => {
+        if (cancelled || !url) return;
+        handleIncomingLink(url, navigationRef, false);
+      })
+      .catch(() => {});
+
+    const sub = Linking.addEventListener('url', (evt) => {
+      const url = typeof evt === 'string' ? evt : evt?.url;
+      if (!url) return;
+      handleIncomingLink(url, navigationRef, navReady && !showPermissionGate);
+    });
+    return () => {
+      cancelled = true;
+      try { sub?.remove?.(); } catch (_e) {}
+    };
+  }, [navReady, showPermissionGate]);
+
+  // Drain queued links once nav is ready and we're past the permission gate.
+  useEffect(() => {
+    if (!navReady || showPermissionGate) return;
+    const queued = pendingLinkQueue.drain();
+    queued.forEach((url) => {
+      const parsed = parseDeepLink(url);
+      const route = parsed ? routeForDeepLink(parsed) : null;
+      dispatchDeepLinkRoute(navigationRef, route);
+    });
+  }, [navReady, showPermissionGate]);
+
+  const consent = useConsent();
+  const consentBannerVisible =
+    FEATURE_FLAGS.FEATURE_CONSENT_BANNER === true &&
+    permissionGateChecked &&
+    !showPermissionGate &&
+    (consent.status === 'unset' || consent.status === 'expired');
+
   const dismissPermissionGate = async () => {
     try {
       await AsyncStorage.setItem(LOCATION_PERMISSION_SHOWN_KEY, '1');
@@ -483,10 +566,18 @@ export default function App() {
             onSkip={dismissPermissionGate}
           />
         ) : permissionGateChecked ? (
-          <NavigationContainer ref={navigationRef}>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => setNavReady(true)}
+          >
             <TabNavigator />
           </NavigationContainer>
         ) : null}
+        <ConsentBanner
+          visible={consentBannerVisible}
+          onGrant={consent.grant}
+          onDecline={consent.decline}
+        />
       </SafeAreaProvider>
     </ErrorBoundary>
   );

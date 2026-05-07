@@ -17,6 +17,7 @@ import StationCard from '../components/StationCard';
 import BrandHeader from '../components/BrandHeader';
 import BestOptionCard from '../components/BestOptionCard';
 import BrandFilter from '../components/BrandFilter';
+import EmptyState from '../components/EmptyState';
 import { SkeletonList } from '../components/SkeletonCard';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
@@ -481,13 +482,13 @@ const HomeScreen = ({ navigation }) => {
       <BrandFilter selectedBrand={selectedBrand} onSelectBrand={setSelectedBrand} />
 
       {error ? (
-        <View style={styles.centered}>
-          <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger} />
-          <Text style={styles.errorText}>{toRenderableString(error)}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          type="error"
+          headline="Something went wrong"
+          helper={toRenderableString(error)}
+          cta="Try again"
+          onCta={onRefresh}
+        />
       ) : (
         <FlatList
           data={sortedStations}
@@ -582,12 +583,12 @@ const HomeScreen = ({ navigation }) => {
             </>
           }
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="search-outline" size={48} color={COLORS.accent} />
-              <Text style={styles.emptyTitle}>No stations found</Text>
-              <Text style={styles.emptyText}>No {FUEL_TYPES.find(f => f.key === selectedFuel)?.label} stations found nearby.</Text>
-              <Text style={styles.emptySubtext}>Try switching fuel type or searching a different area.</Text>
-            </View>
+            <EmptyState
+              type="empty"
+              icon="search-outline"
+              headline={`No ${FUEL_TYPES.find(f => f.key === selectedFuel)?.label.toLowerCase() || ''} stations nearby`}
+              helper="Try switching fuel type or widening your search."
+            />
           }
           ListFooterComponent={
             <>

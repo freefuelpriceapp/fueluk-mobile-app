@@ -17,6 +17,7 @@ import * as Notifications from 'expo-notifications';
 import { ensurePushPermission } from '../lib/pushPermission';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import EmptyState from '../components/EmptyState';
 
 const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
 const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
@@ -127,12 +128,12 @@ const AlertsScreen = () => {
   if (!deviceToken && !loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Notifications not enabled</Text>
-          <Text style={styles.emptySubtitle}>
-            Enable push notifications to set up price alerts.
-          </Text>
-        </View>
+        <EmptyState
+          type="empty"
+          icon="notifications-off-outline"
+          headline="Notifications not enabled"
+          helper="Enable push notifications to set up price alerts."
+        />
       </SafeAreaView>
     );
   }
@@ -142,12 +143,13 @@ const AlertsScreen = () => {
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.accent} style={styles.loader} />
       ) : error ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.errorText}>{toRenderableString(error)}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchAlerts}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          type="error"
+          headline="Something went wrong"
+          helper={toRenderableString(error)}
+          cta="Try again"
+          onCta={fetchAlerts}
+        />
       ) : (
         <FlatList
           data={alerts}
@@ -165,13 +167,12 @@ const AlertsScreen = () => {
             </View>
           }
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No alerts set</Text>
-              <Text style={styles.emptySubtitle}>
-                Tap "Set Alert" on a station's detail page to get notified
-                when its fuel price drops to your target.
-              </Text>
-            </View>
+            <EmptyState
+              type="empty"
+              icon="notifications-outline"
+              headline="No alerts set"
+              helper={'Tap "Set Alert" on a station to get notified when its price hits your target.'}
+            />
           }
           contentContainerStyle={alerts.length === 0 && styles.emptyContainer}
         />
