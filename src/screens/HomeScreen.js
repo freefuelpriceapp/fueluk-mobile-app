@@ -55,10 +55,14 @@ import {
 } from '../lib/userVehicle';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 
+// Primary fuel-type chips on the Home/Nearby list. 'Petrol' is the
+// synthetic 'unleaded' key — per-station the resolver returns
+// min(e10_price, petrol_price) so users always see the cheapest 95-RON
+// unleaded price up front (this app is meant to save money, not teach
+// fuel chemistry). E5 access is a demoted opt-in below the chip row.
 const FUEL_TYPES = [
-  { key: 'petrol', label: 'Petrol', color: FUEL_COLORS.petrol },
-  { key: 'diesel', label: 'Diesel', color: FUEL_COLORS.diesel },
-  { key: 'e10',    label: 'E10',    color: FUEL_COLORS.e10 },
+  { key: 'unleaded', label: 'Petrol', color: FUEL_COLORS.unleaded || FUEL_COLORS.e10 },
+  { key: 'diesel',   label: 'Diesel', color: FUEL_COLORS.diesel },
 ];
 
 const SORT_MODES = [
@@ -272,7 +276,7 @@ const HomeScreen = ({ navigation }) => {
 
   const sortedStations = useMemo(() => {
     if (!Array.isArray(stations) || stations.length === 0) return [];
-    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    const fuelKey = FUEL_PRICE_KEY[selectedFuel];
     const getDistance = (s) => {
       if (!s) return Infinity;
       const m = Number(s.distance_miles);
@@ -283,8 +287,17 @@ const HomeScreen = ({ navigation }) => {
     };
     const getPrice = (s) => {
       if (!s) return Infinity;
-      const direct = Number(s[fuelKey]);
-      if (Number.isFinite(direct) && direct > 0) return direct;
+      // For the synthetic 'unleaded' key the resolver picks the cheaper
+      // of E10 / E5 per station — that's the price the user will pay,
+      // and the price by which we must sort.
+      if (selectedFuel === 'unleaded') {
+        const v = Number(resolvePrice(s, 'unleaded'));
+        return Number.isFinite(v) && v > 0 ? v : Infinity;
+      }
+      if (fuelKey) {
+        const direct = Number(s[fuelKey]);
+        if (Number.isFinite(direct) && direct > 0) return direct;
+      }
       const viaPrices = s.prices ? Number(s.prices[selectedFuel]) : NaN;
       if (Number.isFinite(viaPrices) && viaPrices > 0) return viaPrices;
       const viaResolve = Number(resolvePrice(s, selectedFuel));
@@ -306,19 +319,26 @@ const HomeScreen = ({ navigation }) => {
   }, [stations, sortMode, selectedFuel]);
 
   // Cheapest station within current results — used by InstantAnswerHeadline.
+  // For 'unleaded' (Petrol tab) we must rank by resolveUnleadedPrice so the
+  // station with the cheaper of E10/E5 always wins, regardless of which
+  // wire-column it reports under. This is the money-saving guarantee.
   const headlineStation = useMemo(() => {
     if (!Array.isArray(stations) || stations.length === 0) return null;
-    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
-    const priced = stations.filter((s) => {
-      const p = Number(s[fuelKey] ?? s?.prices?.[selectedFuel]);
-      return Number.isFinite(p) && p > 0;
-    });
+    const priceOf = (s) => {
+      if (selectedFuel === 'unleaded') {
+        const v = Number(resolvePrice(s, 'unleaded'));
+        return Number.isFinite(v) && v > 0 ? v : null;
+      }
+      const fuelKey = FUEL_PRICE_KEY[selectedFuel];
+      const direct = fuelKey != null ? Number(s[fuelKey]) : NaN;
+      if (Number.isFinite(direct) && direct > 0) return direct;
+      const viaPrices = Number(s?.prices?.[selectedFuel]);
+      if (Number.isFinite(viaPrices) && viaPrices > 0) return viaPrices;
+      return null;
+    };
+    const priced = stations.filter((s) => priceOf(s) != null);
     if (priced.length === 0) return null;
-    return priced.reduce((best, s) => {
-      const sp = Number(s[fuelKey] ?? s?.prices?.[selectedFuel]);
-      const bp = Number(best[fuelKey] ?? best?.prices?.[selectedFuel]);
-      return sp < bp ? s : best;
-    });
+    return priced.reduce((best, s) => (priceOf(s) < priceOf(best) ? s : best));
   }, [stations, selectedFuel]);
 
   // Per-tank saving from break_even on the headline station, or backend's
@@ -338,9 +358,15 @@ const HomeScreen = ({ navigation }) => {
 
   // National average for the no-vehicle fallback in the headline.
   const nationalAvgPence = useMemo(() => {
-    const fuelKey = FUEL_PRICE_KEY[selectedFuel] || 'petrol_price';
+    const priceOf = (s) => {
+      if (selectedFuel === 'unleaded') return Number(resolvePrice(s, 'unleaded'));
+      const fuelKey = FUEL_PRICE_KEY[selectedFuel];
+      const direct = fuelKey != null ? Number(s[fuelKey]) : NaN;
+      if (Number.isFinite(direct) && direct > 0) return direct;
+      return Number(s?.prices?.[selectedFuel]);
+    };
     const prices = (stations || [])
-      .map((s) => Number(s[fuelKey] ?? s?.prices?.[selectedFuel]))
+      .map(priceOf)
       .filter((n) => Number.isFinite(n) && n > 0);
     if (prices.length === 0) return null;
     const sum = prices.reduce((a, b) => a + b, 0);
@@ -450,6 +476,38 @@ const HomeScreen = ({ navigation }) => {
           );
         })}
       </View>
+
+      {/* E5 (premium 97/99) opt-in. Demoted from a peer tab to a small
+          inline link — most modern cars run on E10 and E5 is more
+          expensive, so the default Petrol view always shows the cheaper
+          grade. Drivers of older cars or those who want premium fuel can
+          tap through. */}
+      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') && (
+        <TouchableOpacity
+          style={styles.e5OptInRow}
+          onPress={() =>
+            setSelectedFuel(selectedFuel === 'petrol' ? 'unleaded' : 'petrol')
+          }
+          accessibilityRole="button"
+          accessibilityLabel={
+            selectedFuel === 'petrol'
+              ? 'Back to standard petrol prices'
+              : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
+          }
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons
+            name={selectedFuel === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
+            size={12}
+            color={COLORS.textSecondary}
+          />
+          <Text style={styles.e5OptInText} numberOfLines={2}>
+            {selectedFuel === 'petrol'
+              ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
+              : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Sort toggle — Nearest / Cheapest, with regional 7-day sparkline */}
       <View style={styles.sortRow}>
@@ -645,6 +703,21 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border, alignItems: 'center', marginHorizontal: 3,
   },
   filterBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  e5OptInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 4,
+    backgroundColor: COLORS.background,
+  },
+  e5OptInText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    flex: 1,
+    lineHeight: 15,
+  },
   sortRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,

@@ -25,12 +25,12 @@ const EXPANDED_SESSION_KEY = 'break_even_expander_opened_session';
 
 function fuelLabelFor(fuelType) {
   if (fuelType === 'diesel') return 'Diesel';
-  if (fuelType === 'e10') return 'E10';
-  if (fuelType === 'unleaded') return 'Unleaded';
-  if (fuelType === 'petrol') return 'E5 (older cars)';
+  if (fuelType === 'e10') return 'Petrol';
+  if (fuelType === 'unleaded') return 'Petrol';
+  if (fuelType === 'petrol') return 'E5 petrol';
   if (fuelType === 'super_unleaded') return 'Super unleaded';
   if (fuelType === 'premium_diesel') return 'Premium diesel';
-  return 'Unleaded';
+  return 'Petrol';
 }
 
 function vehicleDescriptor(vehicle, mpg, fuelType) {
