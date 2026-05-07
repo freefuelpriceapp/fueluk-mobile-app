@@ -14,11 +14,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { lookupVehicle, getInsuranceCheckInfo } from '../api/fuelApi';
 import { lightHaptic, successHaptic } from '../lib/haptics';
+import { FEATURES } from '../lib/featureFlags';
 
 import RegInput from '../components/vehicle/RegInput';
 import TaxStatusCard from '../components/vehicle/TaxStatusCard';
@@ -59,6 +62,7 @@ function classifyError(err) {
 }
 
 export default function VehicleCheckScreen() {
+  const navigation = useNavigation();
   const [reg, setReg] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -167,6 +171,20 @@ export default function VehicleCheckScreen() {
               <InsuranceCard info={insuranceInfo} />
               <VehicleDetailsSection vehicle={data} />
 
+              {FEATURES.FEATURE_PRE_PURCHASE_CHECK && (
+                <TouchableOpacity
+                  style={styles.prePurchaseCta}
+                  onPress={() => navigation.navigate('PrePurchaseCheck', { reg: normaliseReg(reg) })}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Run pre-purchase check"
+                >
+                  <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.accent} />
+                  <Text style={styles.prePurchaseCtaText}>Run pre-purchase check</Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.accent} />
+                </TouchableOpacity>
+              )}
+
               <View style={styles.attribution}>
                 <Text style={styles.attributionText}>
                   Data from DVLA and DVSA
@@ -267,5 +285,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.md,
     lineHeight: 20,
+  },
+  prePurchaseCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(46,204,113,0.10)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.35)',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  prePurchaseCtaText: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZES.md + 1,
+    fontWeight: '700',
+    marginHorizontal: 8,
+    flex: 1,
+    textAlign: 'center',
   },
 });

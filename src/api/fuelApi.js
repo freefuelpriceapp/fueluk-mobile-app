@@ -229,6 +229,20 @@ export async function lookupVehicle(reg) {
 }
 
 /**
+ * DVSA G1: full MOT history for a UK vehicle. Backend caches per-reg for 24h.
+ * Response shape: { registration, make, model, firstUsedDate, fuelType,
+ * primaryColour, motTests: [{ completedDate, testResult, expiryDate,
+ * odometerValue, odometerUnit, motTestNumber, rfrAndComments: [{ text, type, dangerous }] }] }.
+ *
+ * @param {string} reg - UK reg plate.
+ */
+export async function getMotHistory(reg) {
+  const cleaned = String(reg || '').replace(/\s+/g, '').toUpperCase();
+  const resp = await api.get('/api/v1/vehicles/mot', { params: { reg: cleaned } });
+  return resp.data;
+}
+
+/**
  * Get insurance-check metadata (MIB Navigate URL, terms, disclaimer).
  * Kept server-side so the URL can change without an app release.
  * @returns {Promise<{ provider, url, description, terms, disclaimer, contactUrl, checkTypes }>}
