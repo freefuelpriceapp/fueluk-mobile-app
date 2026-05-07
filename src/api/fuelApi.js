@@ -223,8 +223,19 @@ export async function getLastUpdated() {
 
 /**
  * Look up UK vehicle details by registration plate (DVLA / MOT service backed).
+ *
+ * Wave A.8 — authoritative fuel fields (always present as of backend v105+):
+ *   - `fuelType`     {string|null}  Raw DVLA value (camelCase, e.g. "DIESEL"). Kept for
+ *                                   backwards compat. Do NOT use for fuel-price lookups.
+ *   - `fuel_type`    {string|null}  Lowercased copy ("diesel", "petrol", "hybrid electric").
+ *   - `fuel_category` {'diesel'|'unleaded'|'electric'|null}
+ *                                   Canonical taxonomy key for price lookups. Derived
+ *                                   deterministically from DVLA fuelType. Prefer this field.
+ *                                   null means DVLA returned an unknown fuel type — fall
+ *                                   back to mapDvlaFuelToCanonical(fuel_type) or ask user.
+ *
  * @param {string} reg - UK reg plate (spaces/case tolerated; backend normalises)
- * @returns {Promise<{ make, model, fuel_type, estimated_mpg, year, co2_g_per_km }>}
+ * @returns {Promise<{ make, model, fuelType, fuel_type, fuel_category, estimated_mpg, year, co2_g_per_km }>}
  */
 export async function lookupVehicle(reg) {
   const cleaned = String(reg || '').replace(/\s+/g, '').toUpperCase();

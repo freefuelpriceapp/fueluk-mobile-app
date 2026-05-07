@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -34,6 +34,8 @@ import {
   routeForDeepLink,
   createPendingQueue,
 } from './src/lib/deepLinks';
+import { runVehicleTruthBackfill } from './src/lib/userVehicle';
+import { lookupVehicle } from './src/api/fuelApi';
 import ConsentBanner from './src/components/ConsentBanner';
 import ReceiptOnboardingSheet from './src/components/ReceiptOnboardingSheet';
 import useConsent from './src/hooks/useConsent';
@@ -583,6 +585,19 @@ export default function App() {
       dispatchDeepLinkRoute(navigationRef, route);
     });
   }, [navReady, showPermissionGate]);
+
+  // Wave A.8 — silent vehicle truth backfill on foreground.
+  // Runs when the app comes to foreground.  lookupVehicle is injected to
+  // avoid circular deps inside userVehicle.js.
+  useEffect(() => {
+    const handleAppStateChange = (nextState) => {
+      if (nextState === 'active') {
+        runVehicleTruthBackfill({ lookupVehicleFn: lookupVehicle }).catch(() => {});
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove?.();
+  }, []);
 
   const consent = useConsent();
   const consentBannerVisible =

@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { lookupVehicle, calculateTrip } from '../api/fuelApi';
 import { formatVehicleHeader } from '../lib/formatVehicleHeader';
+import { mapDvlaFuelToCanonical } from '../lib/dvlaFuelMapping';
 import { COLORS as THEME_COLORS } from '../lib/theme';
 
 // Local alias preserves the short field names used throughout this file.
@@ -84,7 +85,19 @@ export default function TripCalculatorScreen() {
     return 40; // sensible default fallback for UK petrol cars
   };
 
-  const effectiveFuelType = () => vehicle?.fuel_type || 'petrol';
+  // Wave A.8: use authoritative fuel_category first, then fall back to
+  // mapDvlaFuelToCanonical on fuel_type/fuelType, then 'unleaded' default.
+  const effectiveFuelType = () => {
+    if (!vehicle) return 'unleaded';
+    const VALID = ['diesel', 'unleaded', 'electric'];
+    if (vehicle.fuel_category && VALID.includes(vehicle.fuel_category)) {
+      return vehicle.fuel_category === 'electric' ? 'unleaded' : vehicle.fuel_category;
+    }
+    const rawFuel = vehicle.fuel_type || vehicle.fuelType;
+    const mapped = mapDvlaFuelToCanonical(rawFuel);
+    if (mapped && mapped !== 'electric') return mapped;
+    return vehicle.fuel_type || 'unleaded';
+  };
 
   const handleLookup = async () => {
     const cleaned = regInput.replace(/\s+/g, '').toUpperCase();
