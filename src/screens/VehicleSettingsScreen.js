@@ -22,6 +22,7 @@ import { lookupVehicle } from '../api/fuelApi';
 import { formatVehicleHeader } from '../lib/formatVehicleHeader';
 import EmptyState from '../components/EmptyState';
 import { FUEL_KEY_MIGRATION } from '../lib/fuelTaxonomy';
+import { mapDvlaFuelToCanonical, fuelCategoryToTaxonomyKey } from '../lib/dvlaFuelMapping';
 
 // B-05: Use canonical fuel-type keys from fuelTaxonomy. Old keys ('e5',
 // 'e10', 'petrol') that may be persisted in AsyncStorage are migrated
@@ -96,34 +97,73 @@ export default function VehicleSettingsScreen({ navigation, route }) {
     setLookupErr(null);
     try {
       const resp = await lookupVehicle(cleaned);
-      const apiFuel = (resp?.fuel_type || '').toLowerCase();
-      // B-05: map API fuel type string to canonical taxonomy key
-      const mapped =
-        apiFuel.includes('premium_diesel') || apiFuel.includes('premium diesel') ? 'premium_diesel'
-          : apiFuel.includes('diesel') ? 'diesel'
-          : apiFuel.includes('super') || apiFuel.includes('e5') ? 'super_unleaded'
-          : apiFuel.includes('petrol') || apiFuel.includes('e10') || apiFuel.includes('unleaded') ? 'unleaded'
-          : fuelType;
+
+      // Wave A.8 — deterministic priority read:
+      //   1. resp.fuel_category (new authoritative server-derived key)
+      //   2. mapDvlaFuelToCanonical(resp.fuel_type || resp.fuelType)
+      //   3. null → fall back to user-selected fuelType + show soft notice
+      const VALID_CATEGORIES = ['diesel', 'unleaded', 'electric'];
+      let dvlaCategory = null;
+      let dvlaSource = null;
+
+      if (resp?.fuel_category && VALID_CATEGORIES.includes(resp.fuel_category)) {
+        dvlaCategory = resp.fuel_category;
+        dvlaSource = 'fuel_category';
+      } else {
+        const rawFuel = resp?.fuel_type || resp?.fuelType;
+        const mapped = mapDvlaFuelToCanonical(rawFuel);
+        if (mapped !== null) {
+          dvlaCategory = mapped;
+          dvlaSource = 'fuel_type_mapped';
+        }
+      }
+
+      // Convert canonical category to app taxonomy key.
+      // EVs map to null (no pump fuel); we use user's existing selection.
+      let taxonomyKey;
+      if (dvlaCategory === null) {
+        // DVLA couldn't tell us — fall back to user-selected fuel type
+        taxonomyKey = fuelType;
+        setLookupErr(
+          "We couldn't read DVLA's fuel type for this plate — confirm below"
+        );
+      } else if (dvlaCategory === 'electric') {
+        // EV — there's no pump fuel; keep user choice but surface notice
+        taxonomyKey = fuelType;
+        setLookupErr(
+          'This vehicle is electric — no fuel type applies. Your saved fuel type is unchanged.'
+        );
+      } else {
+        // B-05: diesel and unleaded are valid taxonomy keys directly
+        taxonomyKey = dvlaCategory; // 'diesel' | 'unleaded'
+      }
+
       const mpg =
         typeof resp?.estimated_mpg === 'number' && Number.isFinite(resp.estimated_mpg)
           ? resp.estimated_mpg
-          : defaultMpgFor(mapped);
+          : defaultMpgFor(taxonomyKey);
+
       const saved = await saveUserVehicle({
         reg: cleaned,
-        fuel_type: mapped,
+        fuel_type: taxonomyKey,
         mpg,
         make: resp?.make,
         model: resp?.model,
         source: 'dvla',
+        // Store the raw DVLA category for the backfill validator
+        dvla_fuel_category: dvlaCategory,
       });
       setCurrent(saved);
-      setFuelType(mapped);
+      setFuelType(taxonomyKey);
       if (mpg != null) setMpgInput(String(mpg));
-      const headerLine = formatVehicleHeader(resp) || resp?.make || 'Vehicle';
-      Alert.alert(
-        'Vehicle saved',
-        `${headerLine} (${mapped}, ${mpg} mpg)`
-      );
+
+      if (dvlaCategory !== null && dvlaCategory !== 'electric') {
+        const headerLine = formatVehicleHeader(resp) || resp?.make || 'Vehicle';
+        Alert.alert(
+          'Vehicle saved',
+          `${headerLine} (${taxonomyKey}, ${mpg} mpg)`
+        );
+      }
     } catch (e) {
       setLookupErr(e?.response?.data?.message || e?.message || 'Lookup failed');
     } finally {
