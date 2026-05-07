@@ -1,16 +1,16 @@
-# Privacy Policy — FreeFuelPrice UK
+# Privacy Policy — FuelUK
 
 **Effective date:** 17 April 2026  
 **Last updated:** 17 April 2026  
-**App:** FreeFuelPrice UK (iOS bundle `com.freefuelpriceapp.uk`, Android package `com.freefuelpriceapp.uk`), version 9.0.0  
-**Publisher:** FreeFuelPrice UK  
+**App:** FuelUK (iOS bundle `com.freefuelpriceapp.uk`, Android package `com.freefuelpriceapp.uk`), version 9.0.0  
+**Publisher:** FuelUK  
 **Contact:** support@freefuelpriceapp.com
 
 ---
 
 ## 1. Summary (Plain English)
 
-FreeFuelPrice UK is a fuel price comparison app for UK drivers. It is **privacy-first**:
+FuelUK is a fuel price comparison app for UK drivers. It is **privacy-first**:
 
 - **No account is required.** You do not sign up, sign in, or give us your name, email, or phone number to use the app.
 - **We do not sell, rent, or share your personal data** with advertisers, data brokers, or third-party trackers.
@@ -136,6 +136,6 @@ If this policy changes materially, we will update the "Last updated" date and, w
 
 ## 15. Contact
 
-FreeFuelPrice UK  
+FuelUK  
 Email: support@freefuelpriceapp.com  
 Support: https://api.freefuelpriceapp.com/support

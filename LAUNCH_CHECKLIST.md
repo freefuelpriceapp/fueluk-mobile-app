@@ -1,4 +1,4 @@
-# Free Fuel Price App — Launch Checklist
+# FuelUK — Launch Checklist
 
 > Last updated: 2026-04-17 — Backend audit complete, Sprints 1-7 verified live
 

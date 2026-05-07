@@ -3,7 +3,7 @@
 Branch: `phase-1/trust-and-quarantine`
 
 This branch lands the **pure / additive** foundation for Phases 1–4 of the
-Free Fuel Price App roadmap. Nothing here changes existing screen behaviour
+FuelUK roadmap. Nothing here changes existing screen behaviour
 on its own — each module is dormant until a parent component imports it.
 Integration (wiring into StationCard, StationDetailScreen, BrandHeader,
 etc.) should be done in a Codespace / local dev environment where

@@ -18,8 +18,13 @@ export const FEATURES = {
   search: true,              // Postcode / location search screen
   stationDetail: true,       // Individual station detail screen
   favourites: true,          // Save favourite stations locally
-  priceAlerts: true,         // Set price-drop alerts by station (Sprint 2)
-  priceHistoryCharts: true,  // Visual 30-day price history charts (Sprint 2)
+  // priceAlerts and priceHistoryCharts are STANDARD launch features — free
+  // for all users, no sign-up wall. Audit LB-05 confirmed these are core
+  // money-saving features and must never sit behind a paywall. Future
+  // Fleet-mode gating (multi-vehicle, route optimisation) is the only
+  // place gating should be reintroduced, and it lives elsewhere.
+  priceAlerts: true,         // Set price-drop alerts by station (Sprint 2, ungated)
+  priceHistoryCharts: true,  // Visual 30-day price history charts (Sprint 2, ungated)
   tripCalculator: true,      // Trip cost calculator with reg-plate lookup (Sprint 2)
   settings: true,            // Settings, privacy, support links
 

@@ -1,4 +1,4 @@
-# Deferred Features — FreeFuelPrice UK
+# Deferred Features — FuelUK
 
 This document lists features that **must remain disabled** at launch.
 Do not enable any of these without explicit sprint approval.
