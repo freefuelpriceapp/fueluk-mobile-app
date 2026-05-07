@@ -19,6 +19,7 @@ import {
   UK_AVG_MPG,
 } from '../lib/userVehicle';
 import { lookupVehicle } from '../api/fuelApi';
+import { formatVehicleHeader } from '../lib/formatVehicleHeader';
 
 const FUEL_OPTIONS = [
   { key: 'e10', label: 'E10 (regular petrol)', default_mpg: UK_AVG_MPG.e10 },
@@ -91,9 +92,10 @@ export default function VehicleSettingsScreen({ navigation }) {
       setCurrent(saved);
       setFuelType(mapped);
       if (mpg != null) setMpgInput(String(mpg));
+      const headerLine = formatVehicleHeader(resp) || resp?.make || 'Vehicle';
       Alert.alert(
         'Vehicle saved',
-        `${resp?.make || ''} ${resp?.model || ''} (${mapped}, ${mpg} mpg)`.trim()
+        `${headerLine} (${mapped}, ${mpg} mpg)`
       );
     } catch (e) {
       setLookupErr(e?.response?.data?.message || e?.message || 'Lookup failed');
@@ -147,9 +149,12 @@ export default function VehicleSettingsScreen({ navigation }) {
           <View style={{ flex: 1 }}>
             <Text style={styles.currentLabel}>Saved vehicle</Text>
             <Text style={styles.currentValue}>
-              {current.reg
-                ? `${current.reg} \u00B7 ${current.make || ''} ${current.model || ''}`.trim()
-                : 'Manual settings'}
+              {(() => {
+                const header = formatVehicleHeader(current);
+                if (current.reg && header) return `${current.reg} \u00B7 ${header}`;
+                if (current.reg) return current.reg;
+                return 'Manual settings';
+              })()}
             </Text>
             <Text style={styles.currentMeta}>
               {`${(current.fuel_type || '—').toUpperCase()} \u00B7 ${
