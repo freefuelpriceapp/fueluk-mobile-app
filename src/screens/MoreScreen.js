@@ -56,6 +56,17 @@ export default function MoreScreen({ navigation }) {
             sublabel="Tax, MOT & insurance status"
             onPress={() => navigation.navigate('VehicleCheck')}
           />
+          {FEATURES.FEATURE_PRE_PURCHASE_CHECK ? (
+            <>
+              <View style={styles.divider} />
+              <MenuRow
+                icon="shield-checkmark-outline"
+                label="Pre-purchase check"
+                sublabel="MOT history, mileage & buying verdict"
+                onPress={() => navigation.navigate('PrePurchaseCheck')}
+              />
+            </>
+          ) : null}
         </View>
 
         <Text style={styles.sectionHeader}>SAVED</Text>

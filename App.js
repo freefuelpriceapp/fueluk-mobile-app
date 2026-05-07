@@ -18,6 +18,7 @@ import MapScreen from './src/screens/MapScreen';
 import TripCalculatorScreen from './src/screens/TripCalculatorScreen';
 import MoreScreen from './src/screens/MoreScreen';
 import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
+import PrePurchaseCheckScreen from './src/screens/PrePurchaseCheckScreen';
 import VehicleSettingsScreen from './src/screens/VehicleSettingsScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import { FEATURES } from './src/lib/featureFlags';
@@ -312,6 +313,13 @@ function ToolboxStack() {
         component={VehicleCheckScreen}
         options={{ title: 'Vehicle Check' }}
       />
+      {FEATURES.FEATURE_PRE_PURCHASE_CHECK && (
+        <Stack.Screen
+          name="PrePurchaseCheck"
+          component={PrePurchaseCheckScreen}
+          options={{ title: 'Pre-purchase check' }}
+        />
+      )}
       <Stack.Screen
         name="Favourites"
         component={FavouritesScreen}

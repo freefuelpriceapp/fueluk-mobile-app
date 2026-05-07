@@ -23,6 +23,9 @@ export const FEATURES = {
   tripCalculator: true,      // Trip cost calculator with reg-plate lookup (Sprint 2)
   settings: true,            // Settings, privacy, support links
 
+  // DVSA G1 — Pre-purchase MOT check. Defaulted ON for launch; OTA kill-switch.
+  FEATURE_PRE_PURCHASE_CHECK: true,
+
   // ─────────────────────────────────────────────────
   // FUTURE FEATURES — DISABLED (do not enable without Sprint approval)
   // ─────────────────────────────────────────────────
