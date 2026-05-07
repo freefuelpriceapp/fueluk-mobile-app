@@ -18,7 +18,7 @@ describe('describePersonalisation', () => {
     });
     expect(d.present).toBe(true);
     expect(d.headline).toBe('Personalised to your 2022 Mercedes');
-    expect(d.detail).toBe('E10 · 45 mpg');
+    expect(d.detail).toBe('Petrol · 45 mpg');
     expect(d.verifiedMpg).toBe(true);
     expect(d.defaultMpg).toBe(false);
     expect(d.accessibilityLabel).toContain('Personalised to your 2022 Mercedes');
@@ -44,25 +44,25 @@ describe('describePersonalisation', () => {
       mpg_source: 'default_e10',
     });
     expect(d.defaultMpg).toBe(true);
-    expect(d.detail).toBe('E10 · UK average mpg');
-    expect(d.headline).toBe('Personalised for E10');
+    expect(d.detail).toBe('Petrol · UK average mpg');
+    expect(d.headline).toBe('Personalised for Petrol');
   });
 
   test('fuel only — still returns a usable chip', () => {
-    // Wave A.2: legacy 'petrol' fuel_type now labels as the explicit
-    // "E5 (older cars)" opt-in tier — drivers default to the smart
-    // 'unleaded' tab and pick this only if their car requires E5.
+    // Wave A.3: legacy 'petrol' wire field is the E5 (97/99 RON) grade —
+    // labelled as "E5 petrol" so users see the premium-fuel context
+    // without "older cars" judgement language baked into the chip.
     const d = describePersonalisation({ fuel_type: 'petrol' });
     expect(d.present).toBe(true);
-    expect(d.headline).toBe('Personalised for E5 (older cars)');
-    expect(d.detail).toBe('E5 (older cars)');
+    expect(d.headline).toBe('Personalised for E5 petrol');
+    expect(d.detail).toBe('E5 petrol');
   });
 
-  test('Wave A.2: unleaded fuel_type uses the new label', () => {
+  test('Wave A.3: unleaded fuel_type labels as Petrol (cheapest E10/E5)', () => {
     const d = describePersonalisation({ fuel_type: 'unleaded' });
     expect(d.present).toBe(true);
-    expect(d.headline).toBe('Personalised for Unleaded');
-    expect(d.detail).toBe('Unleaded');
+    expect(d.headline).toBe('Personalised for Petrol');
+    expect(d.detail).toBe('Petrol');
   });
 
   test('make only', () => {

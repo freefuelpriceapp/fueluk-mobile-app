@@ -21,10 +21,10 @@ import { brandToString, safeText } from '../lib/brand';
 import { resolveUnleadedPrice } from '../lib/fuelResolution';
 
 const FUEL_LABELS = {
-  unleaded: 'unleaded',
-  petrol: 'E5 (older cars)',
+  unleaded: 'petrol',
+  petrol: 'E5 petrol',
   diesel: 'diesel',
-  e10: 'E10',
+  e10: 'petrol',
   super_unleaded: 'super unleaded',
   premium_diesel: 'premium diesel',
 };
