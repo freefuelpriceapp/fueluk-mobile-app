@@ -37,7 +37,7 @@
     "production": {
       "ios": {
         "appleId": "refurb79@gmail.com",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
+        "ascAppId": "6767127633",
         "appleTeamId": "KN9CR32Q7T",
         "ascApiKeyPath": "../private/AuthKey_929L38K4U6.p8",
         "ascApiKeyId": "929L38K4U6",
