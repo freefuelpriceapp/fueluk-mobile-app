@@ -75,6 +75,7 @@ module.exports = () => ({
           defaultChannel: "price-alerts",
         },
       ],
+      "./plugins/withAdiRegistration.js",
     ],
     extra: {
       apiBaseUrl: "https://api.freefuelpriceapp.com",
