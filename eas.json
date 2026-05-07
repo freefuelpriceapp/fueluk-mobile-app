@@ -38,7 +38,10 @@
       "ios": {
         "appleId": "refurb79@gmail.com",
         "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "appleTeamId": "KN9CR32Q7T",
+        "ascApiKeyPath": "../private/AuthKey_929L38K4U6.p8",
+        "ascApiKeyId": "929L38K4U6",
+        "ascApiKeyIssuerId": "8471aec1-69ce-43fb-8988-5e3f26141b18"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
