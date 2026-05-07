@@ -63,7 +63,7 @@ function formatDistance(km) {
   return `${miles.toFixed(1)} mi`;
 }
 
-const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice }) => {
+const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice, isCheapestRank = false }) => {
   const {
     id,
     name,
@@ -163,6 +163,20 @@ const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice }) =
   const sourceField = fuelType === 'unleaded' && unleadedDetail
     ? SOURCE_FIELD[unleadedDetail.fuelType]
     : SOURCE_FIELD[fuelType];
+
+  // Wave A.5 — when both E10 and E5 are present, show a tiny grade chip
+  // next to the headline price disclosing which column won. Only render
+  // when there's actual ambiguity to disclose (both columns plausible).
+  const hasBothPetrolGrades =
+    fuelType === 'unleaded'
+    && typeof station?.e10_price === 'number' && station.e10_price > 0
+    && typeof station?.petrol_price === 'number' && station.petrol_price > 0;
+  const gradeBadgeLabel = hasBothPetrolGrades && unleadedDetail
+    ? (unleadedDetail.fuelType === 'e10' ? 'E10' : 'E5')
+    : null;
+  const cheapestSubLabel = isCheapestRank && fuelType === 'unleaded' && unleadedDetail
+    ? (unleadedDetail.fuelType === 'e10' ? 'Cheapest E10 nearby' : 'Cheapest E5 nearby')
+    : (isCheapestRank ? `Cheapest ${FUEL_LABELS[fuelType] || ''} nearby`.trim() : null);
   const fuelSource =
     (sourceField && station?.[sourceField]) || source || null;
   const sourceLabel = fuelSource ? formatSource(fuelSource) : null;
@@ -304,11 +318,24 @@ const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice }) =
           <Text style={styles.primaryFuelLabel}>
             {FUEL_LABELS[fuelType] ?? fuelType}
           </Text>
-          <Text style={[styles.primaryPrice, { color: selectedColor }]}>
-            {selectedPrice !== null
-              ? `${selectedPrice.toFixed(1)}p`
-              : 'N/A'}
-          </Text>
+          <View style={styles.primaryPriceRow}>
+            <Text style={[styles.primaryPrice, { color: selectedColor }]}>
+              {selectedPrice !== null
+                ? `${selectedPrice.toFixed(1)}p`
+                : 'N/A'}
+            </Text>
+            {gradeBadgeLabel ? (
+              <Text
+                style={[styles.gradeBadge, { color: selectedColor, borderColor: selectedColor }]}
+                accessibilityLabel={`Headline price is ${gradeBadgeLabel}`}
+              >
+                {gradeBadgeLabel}
+              </Text>
+            ) : null}
+          </View>
+          {cheapestSubLabel ? (
+            <Text style={styles.cheapestSubLabel}>{cheapestSubLabel}</Text>
+          ) : null}
           {sourceDot ? (
             <View style={styles.sourceBadgeRow}>
               <View
@@ -458,6 +485,29 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xl,
     fontWeight: '800',
     marginTop: 1,
+  },
+  primaryPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  gradeBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  cheapestSubLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   sourceBadgeRow: {
     flexDirection: 'row',

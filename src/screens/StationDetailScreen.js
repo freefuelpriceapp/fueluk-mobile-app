@@ -37,6 +37,8 @@ import FlagPriceSheet from '../components/FlagPriceSheet';
 import StationStatusChip from '../components/StationStatusChip';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { stationTrajectorySecondary } from '../lib/trajectory';
+import { loadUserVehicle } from '../lib/userVehicle';
+import { recommendedFuelKey, alertFuelKeyFor } from '../lib/vehicleFuelDefault';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -242,7 +244,23 @@ export default function StationDetailScreen({ route }) {
   const heartScale = useRef(new Animated.Value(1)).current;
 
   const [alertModalVisible, setAlertModalVisible] = useState(false);
-  const [alertFuelType, setAlertFuelType] = useState('petrol');
+  // Wave A.5 — alert fuel-type defaults to 'e10' (E10 is the post-2021 UK
+  // 95-RON unleaded grade and the recommended default for any post-2011
+  // petrol car). The vehicle-aware effect below upgrades this once the
+  // registered car loads — diesel cars get 'diesel', etc.
+  const [alertFuelType, setAlertFuelType] = useState('e10');
+  const [activeVehicle, setActiveVehicle] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loadUserVehicle().then((v) => {
+      if (!mounted) return;
+      setActiveVehicle(v);
+      const recommended = recommendedFuelKey(v);
+      setAlertFuelType(alertFuelKeyFor(recommended));
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [alertThreshold, setAlertThreshold] = useState('');
   const [alertSaving, setAlertSaving] = useState(false);
   const [deviceToken, setDeviceToken] = useState(null);
@@ -808,7 +826,7 @@ export default function StationDetailScreen({ route }) {
       <FlagPriceSheet
         visible={flagVisible}
         station={station}
-        initialFuelType="petrol"
+        initialFuelType={alertFuelType || 'e10'}
         onClose={() => setFlagVisible(false)}
       />
     </SafeAreaView>

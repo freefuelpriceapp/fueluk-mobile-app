@@ -29,6 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import useLocation from '../hooks/useLocation';
 import useStations from '../hooks/useStations';
 import { loadUserVehicle } from '../lib/userVehicle';
+import { recommendedFuelKey } from '../lib/vehicleFuelDefault';
 // StationMarker also depends on react-native-maps
 let StationMarker;
 if (Platform.OS !== 'web') {
@@ -155,6 +156,7 @@ class MapErrorBoundary extends React.Component {
 
 export default function MapScreen({ navigation, route }) {
   const [fuelType, setFuelType] = useState('unleaded');
+  const [fuelOverrideForReg, setFuelOverrideForReg] = useState(null);
   const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -201,6 +203,30 @@ export default function MapScreen({ navigation, route }) {
     });
     return () => { mounted = false; if (typeof unsub === 'function') unsub(); };
   }, [navigation]);
+
+  // Wave A.5 — vehicle-aware fuel default. On reg change, drop any in-
+  // session manual override so the new car's recommendation takes effect.
+  const vehicleReg = userVehicle?.reg || null;
+  useEffect(() => {
+    const recommended = recommendedFuelKey(userVehicle) || 'unleaded';
+    if (fuelOverrideForReg && fuelOverrideForReg.reg === vehicleReg) {
+      setFuelType(fuelOverrideForReg.fuel);
+    } else {
+      setFuelOverrideForReg(null);
+      setFuelType(recommended);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleReg]);
+
+  const handleSetFuelType = useCallback((key) => {
+    setFuelType(key);
+    const recommended = recommendedFuelKey(userVehicle) || 'unleaded';
+    if (vehicleReg && key !== recommended) {
+      setFuelOverrideForReg({ reg: vehicleReg, fuel: key });
+    } else {
+      setFuelOverrideForReg(null);
+    }
+  }, [userVehicle, vehicleReg]);
 
   const colorScheme = useColorScheme();
   const mapStyle = colorScheme === 'light' ? lightMapStyleRefined : darkMapStyleRefined;
@@ -884,7 +910,7 @@ export default function MapScreen({ navigation, route }) {
                     styles.filterChip,
                     isActive && { backgroundColor: ft.color, borderColor: ft.color },
                   ]}
-                  onPress={() => setFuelType(ft.key)}
+                  onPress={() => handleSetFuelType(ft.key)}
                   accessibilityLabel={`Filter by ${ft.label}`}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
@@ -905,7 +931,7 @@ export default function MapScreen({ navigation, route }) {
           <TouchableOpacity
             style={styles.e5OptInRow}
             onPress={() =>
-              setFuelType(fuelType === 'petrol' ? 'unleaded' : 'petrol')
+              handleSetFuelType(fuelType === 'petrol' ? 'unleaded' : 'petrol')
             }
             accessibilityRole="button"
             accessibilityLabel={
