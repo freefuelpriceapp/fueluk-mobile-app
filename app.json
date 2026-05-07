@@ -69,7 +69,8 @@
           "color": "#00B86B",
           "defaultChannel": "price-alerts"
         }
-      ]
+      ],
+      "./plugins/withAdiRegistration.js"
     ],
     "extra": {
       "apiBaseUrl": "https://api.freefuelpriceapp.com",
