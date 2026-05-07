@@ -11,6 +11,12 @@
  */
 
 import { resolvePrice } from './quarantine';
+import { resolveUnleadedPrice } from './fuelResolution';
+
+function priceForRanking(station, fuelType) {
+  if (fuelType === 'unleaded') return resolveUnleadedPrice(station);
+  return resolvePrice(station, fuelType);
+}
 
 function brandKey(station) {
   const b = station?.brand;
@@ -41,7 +47,7 @@ export function rankBrands(stations, fuelType) {
     bucket.count += 1;
     bucket.stations.push(s);
     if (s?.is_quarantined) continue;
-    const p = resolvePrice(s, fuelType);
+    const p = priceForRanking(s, fuelType);
     if (p !== null) bucket.prices.push(p);
   }
   const out = [];

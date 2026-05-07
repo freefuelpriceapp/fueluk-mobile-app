@@ -34,7 +34,16 @@ let StationMarker;
 if (Platform.OS !== 'web') {
   StationMarker = require('../components/StationMarker').default;
 }
-import { resolvePrice } from '../lib/quarantine';
+import { resolvePrice as resolvePriceRaw } from '../lib/quarantine';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
+
+// Drop-in replacement for resolvePrice that respects the synthetic
+// 'unleaded' fuel-type by picking min(e10_price, petrol_price) per
+// station via the resolver. All other fuel types pass through.
+function resolvePrice(station, fuelType) {
+  if (fuelType === 'unleaded') return resolveUnleadedPrice(station);
+  return resolvePriceRaw(station, fuelType);
+}
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
@@ -57,11 +66,11 @@ import FlagPriceSheet from '../components/FlagPriceSheet';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 
 const FUEL_TYPES = [
-  { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
+  { key: 'unleaded',       label: 'Unleaded',       color: FUEL_COLORS.e10 || FUEL_COLORS.petrol },
   { key: 'diesel',         label: 'Diesel',         color: FUEL_COLORS.diesel },
-  { key: 'e10',            label: 'E10',            color: FUEL_COLORS.e10 },
   { key: 'super_unleaded', label: 'Super',          color: FUEL_COLORS.super_unleaded },
   { key: 'premium_diesel', label: 'Prem. Diesel',   color: FUEL_COLORS.premium_diesel },
+  { key: 'petrol',         label: 'E5 (older cars)', color: FUEL_COLORS.petrol },
 ];
 
 const BOTTOM_SHEET_HEIGHT = 240;
@@ -142,7 +151,7 @@ class MapErrorBoundary extends React.Component {
 }
 
 export default function MapScreen({ navigation, route }) {
-  const [fuelType, setFuelType] = useState('petrol');
+  const [fuelType, setFuelType] = useState('unleaded');
   const [mode, setMode] = useState('nearby');
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
