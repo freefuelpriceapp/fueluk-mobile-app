@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolvePrice, evaluateStation } from '../lib/quarantine';
+import { resolveUnleadedDetail } from '../lib/fuelResolution';
 import {
   getFreshness,
   FRESHNESS_COLOR,
@@ -21,7 +22,8 @@ import { isFeatureEnabled } from '../config/featureFlags';
 const FAVOURITES_KEY = 'user_favourites';
 
 const FUEL_LABELS = {
-  petrol: 'Petrol',
+  unleaded: 'Unleaded',
+  petrol: 'E5 (older cars)',
   diesel: 'Diesel',
   e10: 'E10',
   super_unleaded: 'Super Unleaded',
@@ -68,7 +70,7 @@ function formatDistance(km) {
   return `${miles.toFixed(1)} mi`;
 }
 
-const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => {
+const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice }) => {
   const {
     id,
     name,
@@ -131,12 +133,23 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
     }).start();
   };
 
-  const selectedPrice = resolvePrice(station, fuelType);
+  // For the synthetic 'unleaded' fuel-type the resolver picks the lowest
+  // plausible value between e10_price and petrol_price, so the card shows
+  // the SAME number used for ranking. Quarantine state is implicit: the
+  // resolver already excluded quarantined fields; if it returns null,
+  // there's no plausible unleaded price for this station.
+  const unleadedDetail = fuelType === 'unleaded' ? resolveUnleadedDetail(station) : null;
+  const selectedPrice = fuelType === 'unleaded'
+    ? (unleadedDetail ? unleadedDetail.price : null)
+    : resolvePrice(station, fuelType);
   const selectedColor = FUEL_COLORS[fuelType] ?? COLORS.accent;
   const distanceLabel = formatDistance(distance_km);
 
-  // Quarantine evaluation for the primary fuel
-  const evalResult = evaluateStation(station, fuelType) || {};
+  // Quarantine evaluation for the primary fuel. For 'unleaded' the resolver
+  // already filtered, so the only "quarantined" state is missing-price.
+  const evalResult = fuelType === 'unleaded'
+    ? { quarantined: selectedPrice == null, reason: selectedPrice == null ? 'missing_price' : null, price: selectedPrice }
+    : (evaluateStation(station, fuelType) || {});
   const isQuarantined = !!evalResult.quarantined;
   const quarantineReason = evalResult.reason;
   const quarantineLabel =
@@ -152,8 +165,11 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
   const hasAccentBorder =
     freshness.tier === 'stale' || freshness.tier === 'needs_caution';
 
-  // Per-fuel source for selected fuel
-  const sourceField = SOURCE_FIELD[fuelType];
+  // Per-fuel source for selected fuel. For 'unleaded' use the source
+  // field of whichever underlying column the resolver picked.
+  const sourceField = fuelType === 'unleaded' && unleadedDetail
+    ? SOURCE_FIELD[unleadedDetail.fuelType]
+    : SOURCE_FIELD[fuelType];
   const fuelSource =
     (sourceField && station?.[sourceField]) || source || null;
   const sourceLabel = fuelSource ? formatSource(fuelSource) : null;
@@ -164,9 +180,15 @@ const StationCard = ({ station, fuelType = 'petrol', onPress, onFlagPrice }) => 
     ? `${freshness.label} \u00B7 ${sourceLabel}`
     : freshness.label;
 
-  // Build other-fuel entries
+  // Build other-fuel entries. Exclude the synthetic 'unleaded' key (it
+  // isn't a real wire field) and, when 'unleaded' is selected, also
+  // exclude the underlying column the resolver already used as the
+  // primary so we don't show the same number twice.
+  const skipFuel = fuelType === 'unleaded' && unleadedDetail
+    ? unleadedDetail.fuelType
+    : null;
   const otherFuels = Object.keys(FUEL_LABELS)
-    .filter((ft) => ft !== fuelType)
+    .filter((ft) => ft !== 'unleaded' && ft !== fuelType && ft !== skipFuel)
     .map((ft) => {
       const ppl = resolvePrice(station, ft);
       const srcField = SOURCE_FIELD[ft];

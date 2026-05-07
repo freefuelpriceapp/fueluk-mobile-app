@@ -106,7 +106,7 @@ function buildBrandSubtitle(stations, fuelType) {
 export default function BrandHeader({
   subtitle = 'Finding the best nearby fuel prices',
   stations,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   onSearchPress,
   theme = DEFAULT_THEME,
   showSearch = true,

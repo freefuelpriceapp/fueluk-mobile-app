@@ -23,11 +23,11 @@ import { COLORS, FUEL_COLORS } from '../lib/theme';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FUEL_TYPES = [
-  { key: 'petrol',         label: 'Petrol',         color: FUEL_COLORS.petrol },
+  { key: 'unleaded',       label: 'Unleaded',       color: FUEL_COLORS.e10 || FUEL_COLORS.petrol },
   { key: 'diesel',         label: 'Diesel',         color: FUEL_COLORS.diesel },
-  { key: 'e10',            label: 'E10',            color: FUEL_COLORS.e10 },
   { key: 'super_unleaded', label: 'Super',          color: FUEL_COLORS.super_unleaded },
   { key: 'premium_diesel', label: 'Premium Diesel', color: FUEL_COLORS.premium_diesel },
+  { key: 'petrol',         label: 'E5 (older cars)', color: FUEL_COLORS.petrol },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ const SearchScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedFuel, setSelectedFuel] = useState('petrol');
+  const [selectedFuel, setSelectedFuel] = useState('unleaded');
   const debounceRef = useRef(null);
   const { location } = useLocation();
 

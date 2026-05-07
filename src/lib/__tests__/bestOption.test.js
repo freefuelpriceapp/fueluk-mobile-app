@@ -104,3 +104,56 @@ describe('chooseBestOption — backend authority', () => {
     expect(chooseBestOption(null, null, 'petrol')).toBeNull();
   });
 });
+
+describe('Wave A.2 — Smart Unleaded fallback', () => {
+  // Mirrors the production complaint: Asda fills only e10 and is the
+  // cheapest practical 95-RON unleaded; Esso fills only petrol_price
+  // and is much more expensive. With the legacy 'petrol' default the
+  // Esso row would win the fallback because Asda has no petrol_price;
+  // the smart-min path picks Asda.
+  const asdaB10 = {
+    id: 'asda-b10',
+    name: 'Asda Small Heath',
+    brand: 'Asda',
+    e10_price: 151.9,
+    distance_miles: 0.6,
+    last_updated: new Date().toISOString(),
+  };
+  const essoAston = {
+    id: 'esso-aston-way',
+    name: 'Esso ASDA Aston Way',
+    brand: 'Esso',
+    petrol_price: 178.9,
+    distance_miles: 0.4,
+    last_updated: new Date().toISOString(),
+  };
+
+  test('chooseBestOption with fuelType="unleaded" picks Asda (e10:151.9) over Esso (petrol:178.9)', () => {
+    const stations = [essoAston, asdaB10];
+    const best = chooseBestOption({ stations }, stations, 'unleaded');
+    expect(best).toBe(asdaB10);
+  });
+
+  test('legacy fuelType="petrol" still returns the petrol-only Esso (legacy E5-only path)', () => {
+    const stations = [essoAston, asdaB10];
+    const best = chooseBestOption({ stations }, stations, 'petrol');
+    expect(best).toBe(essoAston);
+  });
+
+  test('pickFallbackBest("unleaded") sorts by lowest unleaded price (tie-break: distance)', () => {
+    const cheaperFar = {
+      id: 'far',
+      e10_price: 140,
+      distance_miles: 5,
+      last_updated: new Date().toISOString(),
+    };
+    const dearerNear = {
+      id: 'near',
+      petrol_price: 160,
+      distance_miles: 0.3,
+      last_updated: new Date().toISOString(),
+    };
+    // 140 < 160 → cheaper-but-far wins under the new fair-price ranking.
+    expect(pickFallbackBest([cheaperFar, dearerNear], 'unleaded')).toBe(cheaperFar);
+  });
+});

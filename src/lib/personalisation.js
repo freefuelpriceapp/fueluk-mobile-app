@@ -7,7 +7,8 @@
  */
 
 const FUEL_LABEL = {
-  petrol: 'Petrol',
+  unleaded: 'Unleaded',
+  petrol: 'E5 (older cars)',
   e10: 'E10',
   e5: 'E5',
   super_unleaded: 'Super',

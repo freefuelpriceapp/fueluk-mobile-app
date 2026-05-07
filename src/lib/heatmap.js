@@ -18,6 +18,7 @@
  */
 import { parsePrice } from './price';
 import { resolvePrice } from './quarantine';
+import { resolveUnleadedPrice } from './fuelResolution';
 import { UK_REGIONS, haversineKm } from './ukRegions';
 
 export const HEATMAP_COLOURS = {
@@ -61,6 +62,11 @@ export function extractPostcodeDistrict(station) {
 }
 
 function readStationPrice(station, fuelType) {
+  // 'unleaded' is the synthetic smart-min of e10 + petrol. See fuelResolution.
+  if (fuelType === 'unleaded') {
+    const v = resolveUnleadedPrice(station);
+    return Number.isFinite(v) ? v : null;
+  }
   // Use the same resolver Pin mode uses so the heatmap reads the SAME
   // wire-format prices (flat `<fuel>_price` fields) — not a stricter
   // subset that returns null for the API's actual shape. This was the
@@ -118,7 +124,7 @@ function cheapestStation(stations, fuelType) {
  * recognisable postcode are dropped — use clusterStationsByGrid as
  * the fallback when this returns an empty list.
  */
-export function clusterStationsByPostcode(stations, fuelType = 'petrol') {
+export function clusterStationsByPostcode(stations, fuelType = 'unleaded') {
   if (!Array.isArray(stations) || stations.length === 0) return [];
   const buckets = new Map();
   for (const s of stations) {
@@ -152,7 +158,7 @@ export function clusterStationsByPostcode(stations, fuelType = 'petrol') {
  * Cluster stations into a lat/lng grid with bucket size given in
  * kilometres. Used when stations don't carry postcodes.
  */
-export function clusterStationsByGrid(stations, fuelType = 'petrol', gridKm = 1.5) {
+export function clusterStationsByGrid(stations, fuelType = 'unleaded', gridKm = 1.5) {
   if (!Array.isArray(stations) || stations.length === 0) return [];
   const km = Number(gridKm);
   const safeKm = Number.isFinite(km) && km > 0 ? km : 1.5;
@@ -191,7 +197,7 @@ export function clusterStationsByGrid(stations, fuelType = 'petrol', gridKm = 1.
  * Pick the best clustering strategy automatically. Postcode wins when
  * at least 60% of stations have a usable postcode, otherwise grid.
  */
-export function clusterStations(stations, fuelType = 'petrol', gridKm = 1.5) {
+export function clusterStations(stations, fuelType = 'unleaded', gridKm = 1.5) {
   if (!Array.isArray(stations) || stations.length === 0) return { clusters: [], strategy: 'none' };
   let withCode = 0;
   for (const s of stations) {
@@ -279,7 +285,7 @@ export function clusterRadiusMetres(count) {
  * so the renderer can dim them — they're retained so the map still shows
  * something everywhere we have any data.
  */
-export function computeRegionAverages(stations, fuelType = 'petrol', options = {}) {
+export function computeRegionAverages(stations, fuelType = 'unleaded', options = {}) {
   const regions = options.regions || UK_REGIONS;
   const lowDataThreshold = Number.isFinite(options.lowDataThreshold)
     ? options.lowDataThreshold
@@ -449,7 +455,7 @@ export function intensityRankFor(price, clusters) {
  * produces results but stations exist. Visually approaches Pin mode but
  * keeps the heatmap visual contract (soft blooms, colour scale).
  */
-export function clusterStationsAsMicroBlooms(stations, fuelType = 'petrol') {
+export function clusterStationsAsMicroBlooms(stations, fuelType = 'unleaded') {
   if (!Array.isArray(stations) || stations.length === 0) return [];
   const out = [];
   for (let i = 0; i < stations.length; i += 1) {
@@ -493,7 +499,7 @@ export function clusterStationsAsMicroBlooms(stations, fuelType = 'petrol') {
 export function buildHeatmapClusters({
   visibleStations,
   filteredStations,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   viewportSpanKm: spanKm,
   minClusters = 1,
   microBloomMinStations = 1,
@@ -571,7 +577,7 @@ export function diagnoseHeatmap({
   viewportSpanKm: spanKm,
   visibleStations,
   filteredStations,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   build,
 }) {
   // Count how many stations have a price the heatmap can actually read for
