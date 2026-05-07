@@ -69,6 +69,16 @@ export default function MoreScreen({ navigation }) {
           ) : null}
         </View>
 
+        <Text style={styles.sectionHeader}>FUEL LOG</Text>
+        <View style={styles.section}>
+          <MenuRow
+            icon="receipt-outline"
+            label="Fuel Log"
+            sublabel="Track receipts · see real £ saved"
+            onPress={() => navigation.navigate('FuelLog')}
+          />
+        </View>
+
         <Text style={styles.sectionHeader}>SAVED</Text>
         <View style={styles.section}>
           <MenuRow
