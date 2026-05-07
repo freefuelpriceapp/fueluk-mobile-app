@@ -347,12 +347,28 @@ const HomeScreen = ({ navigation }) => {
     };
     const copy = [...stations];
     if (sortMode === 'cheapest') {
+      // Wave A.6 — Note: selectedReason is a backend hint for BestOptionCard
+      // only; it does NOT and MUST NOT override the user-chosen Cheapest sort.
+      // When sortMode === 'cheapest' this sort always wins, regardless of any
+      // selectedReason returned by the API.
       copy.sort((a, b) => {
         const pa = getPrice(a);
         const pb = getPrice(b);
         if (pa !== pb) return pa - pb;
         return getDistance(a) - getDistance(b);
       });
+      // __DEV__ diagnostic: print top-3 resolved unleaded prices so we can
+      // verify Costco (e10=147.9p, petrol=null) ranks #1 on a dev build.
+      if (__DEV__) {
+        const top3 = copy.slice(0, 3).map((s) => ({
+          name: s.name || s.brand || s.id,
+          resolvedPrice: getPrice(s),
+          e10: s.e10_price,
+          petrol: s.petrol_price,
+          dist: getDistance(s),
+        }));
+        console.log('[Wave A.6] Cheapest sort top-3:', JSON.stringify(top3));
+      }
     } else {
       copy.sort((a, b) => getDistance(a) - getDistance(b));
     }
@@ -542,8 +558,18 @@ const HomeScreen = ({ navigation }) => {
           inline link — most modern cars run on E10 and E5 is more
           expensive, so the default Petrol view always shows the cheaper
           grade. Drivers of older cars or those who want premium fuel can
-          tap through. */}
-      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') && (
+          tap through.
+
+          Wave A.6 — Hide entirely for E10-eligible vehicles (post-2011
+          petrol/hybrid) where fuelRecommendation === 'unleaded' and a
+          vehicle is registered. They will never need E5 as their default
+          and seeing the link creates confusion. Keep visible when:
+            - No vehicle registered (modal-driver fallback)
+            - Vehicle recommends super_unleaded (pre-2011 petrol)
+            - Vehicle is diesel or EV (link is still useful as opt-in)
+            - User has already tapped through to E5 (selectedFuel === 'petrol') */}
+      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') &&
+        !(fuelRecommendation === 'unleaded' && !!userVehicle && selectedFuel !== 'petrol') && (
         <TouchableOpacity
           style={styles.e5OptInRow}
           onPress={() =>
