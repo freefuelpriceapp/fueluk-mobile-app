@@ -12,9 +12,13 @@
  * Anything that maps a fuel key to a display label, a backend field, or a
  * colour should import from here.
  *
- * Wave A.3 (PR #53) renamed the consumer tab from "petrol/E10" to "unleaded";
- * the backend response field `petrol_price` is still the wire format, so the
- * taxonomy provides BACKEND_FIELD_FOR_KEY for translation.
+ * Wave A.4 — IMPORTANT: BACKEND_FIELD_FOR_KEY['unleaded'] is intentionally
+ * `null`. The synthetic 'unleaded' key cannot be expressed as a single
+ * backend field — it resolves per-station to min(e10_price, petrol_price)
+ * via resolveUnleadedPrice. Callers ranking, sorting or displaying a
+ * headline price for 'unleaded' MUST use resolvePriceForKey from
+ * ./fuelResolution; mapping it to a single column was the root cause of
+ * the E5/E10 sort regression that Wave A.4 fixes.
  */
 
 // Canonical taxonomy keys — what the app uses for fuel-type identifiers in
@@ -38,15 +42,19 @@ export const FUEL_LABELS = {
 };
 
 // Map taxonomy keys → backend response field on the station payload.
-// Keep the legacy keys mapped too so existing call sites (e.g.
-// resolveUnleadedPrice helpers) work without churn.
+// 'unleaded' is null on purpose — it has no single wire field; use
+// resolvePriceForKey from ./fuelResolution instead. Reading
+// BACKEND_FIELD_FOR_KEY['unleaded'] returns null, which is a deliberate
+// fail-loud signal: any caller that does so will hand `null` to the
+// price-lookup pipeline and immediately see a missing-price, rather than
+// silently picking E5 over the cheaper E10.
 export const BACKEND_FIELD_FOR_KEY = {
-  unleaded: 'petrol_price',
+  unleaded: null,
   super_unleaded: 'super_unleaded_price',
   diesel: 'diesel_price',
   premium_diesel: 'premium_diesel_price',
 
-  // Legacy aliases.
+  // Legacy aliases — these are single-grade keys, so a direct field is fine.
   petrol: 'petrol_price',
   e10: 'e10_price',
   e5: 'petrol_price',

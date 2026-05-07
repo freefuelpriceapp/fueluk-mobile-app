@@ -1,6 +1,9 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { sanitizeStations, brandToString, safeText } from '../lib/brand';
+import { wireFuelType } from './wireFuelType';
+
+export { wireFuelType };
 
 const BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://api.freefuelpriceapp.com';
 
@@ -66,13 +69,6 @@ function sanitizeAlertsPayload(data) {
  * @param {string} fuel - Fuel type: petrol | diesel | e10 (default petrol)
  * @param {string} brand - Optional brand filter
  */
-// Translate the synthetic 'unleaded' fuel-type to a wire-compatible value
-// before hitting the backend (which only knows the per-grade keys).
-// Server-side ranking still uses `petrol_price`; the client re-resolves
-// the headline number per-station with resolveUnleadedPrice.
-function wireFuelType(ft) {
-  return ft === 'unleaded' ? 'petrol' : ft;
-}
 
 export async function getNearbyStations({
   lat,

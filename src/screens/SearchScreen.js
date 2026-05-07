@@ -18,6 +18,7 @@ import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 import useLocation from '../hooks/useLocation';
 import { rankStationsByValue } from '../lib/smartDecision';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -75,9 +76,17 @@ function normalizeStation(s) {
  * Rank a list of raw stations for the currently selected fuel by effective
  * price (pump price + amortised round-trip fuel cost). Stations without a
  * price for that fuel are kept but pushed to the bottom.
+ *
+ * Wave A.4 — for the synthetic 'unleaded' key we inject resolveUnleadedPrice
+ * so the ranker uses min(e10_price, petrol_price) per station. Mapping
+ * 'unleaded' to a single wire column was the bug that buried the cheaper
+ * E10 stations behind E5-only entries.
  */
 function rankForFuel(stations, fuelKey) {
   if (!Array.isArray(stations) || stations.length === 0) return stations;
+  if (fuelKey === 'unleaded') {
+    return rankStationsByValue(stations, { priceFn: resolveUnleadedPrice });
+  }
   const field = FUEL_PRICE_KEY[fuelKey];
   if (!field) return stations;
   return rankStationsByValue(stations, { fuelKey: field });
