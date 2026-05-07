@@ -66,8 +66,10 @@ describe('Wave A.5 — HomeScreen-equivalent default fuel resolution', () => {
     expect(deriveSelectedFuel({ vehicle: dieselSkoda, override: null })).toBe('diesel');
   });
 
-  test('Old (pre-2011) petrol car → super_unleaded (E5 super)', () => {
-    expect(deriveSelectedFuel({ vehicle: oldClassic, override: null })).toBe('super_unleaded');
+  test('Old (pre-2011) petrol car → unleaded (Wave A.7: always default to cheapest 95-RON)', () => {
+    // Wave A.7: pre-2011 petrol now defaults to 'unleaded' so users see min(E10,E5)
+    // price. The E5 opt-in link remains visible on the unleaded tab.
+    expect(deriveSelectedFuel({ vehicle: oldClassic, override: null })).toBe('unleaded');
   });
 });
 
