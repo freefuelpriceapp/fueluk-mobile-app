@@ -105,3 +105,51 @@ describe('fuelTaxonomy', () => {
     });
   });
 });
+
+// ─── B-05 FUEL_KEY_MIGRATION (Wave phase-1b) ─────────────────────────
+//
+// Ensures legacy persisted keys migrate correctly to canonical taxonomy keys.
+
+describe('FUEL_KEY_MIGRATION (B-05)', () => {
+  let FUEL_KEY_MIGRATION;
+  beforeAll(() => {
+    ({ FUEL_KEY_MIGRATION } = require('../fuelTaxonomy'));
+  });
+
+  it('exports FUEL_KEY_MIGRATION', () => {
+    expect(FUEL_KEY_MIGRATION).toBeDefined();
+    expect(typeof FUEL_KEY_MIGRATION).toBe('object');
+  });
+
+  it('maps e5 → super_unleaded', () => {
+    expect(FUEL_KEY_MIGRATION['e5']).toBe('super_unleaded');
+  });
+
+  it('maps e10 → unleaded', () => {
+    expect(FUEL_KEY_MIGRATION['e10']).toBe('unleaded');
+  });
+
+  it('maps petrol → super_unleaded', () => {
+    expect(FUEL_KEY_MIGRATION['petrol']).toBe('super_unleaded');
+  });
+
+  it('maps premiumDiesel → premium_diesel', () => {
+    expect(FUEL_KEY_MIGRATION['premiumDiesel']).toBe('premium_diesel');
+  });
+
+  it('migration applied to persisted e5 yields valid canonical key in FUEL_KEYS', () => {
+    const { FUEL_KEYS } = require('../fuelTaxonomy');
+    const rawKey = 'e5';
+    const canonical = FUEL_KEY_MIGRATION[rawKey] ?? rawKey;
+    expect(FUEL_KEYS).toContain(canonical);
+  });
+
+  it('canonical keys (unleaded, super_unleaded, diesel, premium_diesel) are not in migration map (no-op)', () => {
+    // If a canonical key is passed to FUEL_KEY_MIGRATION it should return
+    // undefined (i.e. the caller’s ?? fallback keeps the original key)
+    expect(FUEL_KEY_MIGRATION['unleaded']).toBeUndefined();
+    expect(FUEL_KEY_MIGRATION['super_unleaded']).toBeUndefined();
+    expect(FUEL_KEY_MIGRATION['diesel']).toBeUndefined();
+    expect(FUEL_KEY_MIGRATION['premium_diesel']).toBeUndefined();
+  });
+});

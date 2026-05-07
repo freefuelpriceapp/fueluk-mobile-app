@@ -8,7 +8,14 @@
  * All computations are done against `Europe/London` using `Intl.DateTimeFormat`
  * so BST/GMT transitions are handled without a timezone library. A user in
  * another timezone checking UK stations still sees UK-local status.
+ *
+ * Bank holiday awareness (C3/E7): when today is a UK bank holiday the
+ * opening_hours.bank_holiday block is used if present; otherwise the station
+ * is assumed closed (safest user outcome — better than sending someone on a
+ * wasted journey).
  */
+
+const { isUkBankHoliday } = require('./ukBankHolidays');
 
 const DAY_ORDER = [
   'monday',
@@ -174,6 +181,98 @@ function hasAnyDayData(openingHours) {
 // ─── Main helper ─────────────────────────────────────────────────────────────
 
 /**
+ * Internal helper: evaluate open/closed status given an opening_hours object
+ * and the already-computed zoned `parts`. Does NOT check for bank holidays —
+ * callers that have already handled that path call this directly.
+ *
+ * @param {object} opening_hours  Must pass hasAnyDayData() check.
+ * @param {Date} nowDate
+ * @param {string} tz
+ * @param {object} parts  Result of getZonedParts(nowDate, tz)
+ */
+function _evaluateHours(opening_hours, nowDate, tz, parts) {
+  if (!hasAnyDayData(opening_hours)) {
+    return { status: 'unknown', label: 'Hours unknown', sub: null, nextChangeAt: null };
+  }
+
+  if (isOpen24h(opening_hours)) {
+    return { status: 'open_24h', label: 'Open 24hrs', sub: 'Open 24 hours', nextChangeAt: null };
+  }
+
+  const days = opening_hours.usual_days;
+  const todayIdx = dayIndex(parts.weekday);
+  if (todayIdx < 0) {
+    return { status: 'unknown', label: 'Hours unknown', sub: null, nextChangeAt: null };
+  }
+
+  const nowMins = parts.hour * 60 + parts.minute;
+
+  // ─ Overnight carry-over from yesterday ─
+  const yesterdayKey = dayAt(-1, todayIdx);
+  const yesterday = days[yesterdayKey];
+  if (yesterday && !yesterday.is_24_hours) {
+    const yOpen = parseHHMM(yesterday.open);
+    const yClose = parseHHMM(yesterday.close);
+    if (yOpen != null && yClose != null && yClose <= yOpen) {
+      if (nowMins < yClose) {
+        const nextChangeAt = zonedPartsToDate(parts.year, parts.month, parts.day, Math.floor(yClose / 60), yClose % 60, tz);
+        const closeLabel = formatTimeLabel(padHHMM(yClose));
+        const minutesUntilClose = yClose - nowMins;
+        if (minutesUntilClose <= CLOSING_SOON_MINUTES) {
+          return { status: 'closing_soon', label: `Closing soon · ${closeLabel}`, sub: `Closes ${closeLabel}`, nextChangeAt };
+        }
+        return { status: 'open', label: `Open · closes ${closeLabel}`, sub: `Open · closes ${closeLabel}`, nextChangeAt };
+      }
+    }
+  }
+
+  // ─ Today's own window ─
+  const today = days[DAY_ORDER[todayIdx]];
+  if (today && today.is_24_hours) {
+    const nextChangeAt = findNextStatusChange(days, parts, tz);
+    return { status: 'open', label: 'Open now', sub: 'Open today', nextChangeAt };
+  }
+
+  if (today) {
+    const tOpen = parseHHMM(today.open);
+    const tClose = parseHHMM(today.close);
+    if (tOpen != null && tClose != null) {
+      const overnight = tClose <= tOpen;
+      if (!overnight) {
+        if (nowMins < tOpen) {
+          const openLabel = formatTimeLabel(today.open);
+          const nextChangeAt = zonedPartsToDate(parts.year, parts.month, parts.day, Math.floor(tOpen / 60), tOpen % 60, tz);
+          return { status: 'closed', label: `Closed · opens ${openLabel}`, sub: `Opens ${openLabel} today`, nextChangeAt };
+        }
+        if (nowMins < tClose) {
+          const closeLabel = formatTimeLabel(today.close);
+          const nextChangeAt = zonedPartsToDate(parts.year, parts.month, parts.day, Math.floor(tClose / 60), tClose % 60, tz);
+          const minutesUntilClose = tClose - nowMins;
+          if (minutesUntilClose <= CLOSING_SOON_MINUTES) {
+            return { status: 'closing_soon', label: `Closing soon · ${closeLabel}`, sub: `Closes ${closeLabel}`, nextChangeAt };
+          }
+          return { status: 'open', label: `Open · closes ${closeLabel}`, sub: `Open today ${formatTimeLabel(today.open)}–${closeLabel}`, nextChangeAt };
+        }
+        // Past close — fall through
+      } else {
+        if (nowMins < tOpen) {
+          const openLabel = formatTimeLabel(today.open);
+          const nextChangeAt = zonedPartsToDate(parts.year, parts.month, parts.day, Math.floor(tOpen / 60), tOpen % 60, tz);
+          return { status: 'closed', label: `Closed · opens ${openLabel}`, sub: `Opens ${openLabel} today`, nextChangeAt };
+        }
+        const closeLabel = formatTimeLabel(today.close);
+        const tomorrow = new Date(nowDate.getTime() + 24 * 3600 * 1000);
+        const tomorrowParts = getZonedParts(tomorrow, tz);
+        const nextChangeAt = zonedPartsToDate(tomorrowParts.year, tomorrowParts.month, tomorrowParts.day, Math.floor(tClose / 60), tClose % 60, tz);
+        return { status: 'open', label: `Open · closes ${closeLabel}`, sub: `Open · closes ${closeLabel}`, nextChangeAt };
+      }
+    }
+  }
+
+  return findNextOpenStatus(days, parts, tz);
+}
+
+/**
  * Determine a station's current open/closed status.
  *
  * @param {object|null} opening_hours
@@ -189,10 +288,12 @@ function hasAnyDayData(openingHours) {
  *   nextChangeAt: Date | null,
  * }}
  *
- * TODO: Incorporate a UK bank holiday calendar. For MVP we only surface the
- * `opening_hours.bank_holiday` block when upstream already flags today as one
- * (rare). Building a proper England/Wales/Scotland/NI holiday lookup is future
- * work.
+ * Bank holiday behaviour (C3/E7):
+ *   - If today is a bank holiday and the station has an
+ *     `opening_hours.bank_holiday` block, those hours override usual_days.
+ *   - If today is a bank holiday but no bank_holiday block exists, the station
+ *     is returned as CLOSED (safest default).
+ *   - For non-bank-holiday days the bank_holiday block is ignored entirely.
  */
 function isStationOpenNow(
   opening_hours,
@@ -222,192 +323,39 @@ function isStationOpenNow(
     };
   }
 
-  if (!hasAnyDayData(opening_hours)) {
-    return {
-      status: 'unknown',
-      label: 'Hours unknown',
-      sub: null,
-      nextChangeAt: null,
-    };
-  }
+  // ─ Bank holiday check ─────────────────────────────────────────────────────
+  // Build an ISO date string for "today" in the Europe/London timezone so the
+  // bank holiday look-up compares the correct calendar date regardless of the
+  // runtime's system timezone.
+  const zonedNow = getZonedParts(nowDate, tz);
+  const zonedIso = `${String(zonedNow.year)}-${String(zonedNow.month).padStart(2, '0')}-${String(zonedNow.day).padStart(2, '0')}`;
 
-  if (isOpen24h(opening_hours)) {
-    return {
-      status: 'open_24h',
-      label: 'Open 24hrs',
-      sub: 'Open 24 hours',
-      nextChangeAt: null,
-    };
-  }
-
-  const days = opening_hours.usual_days;
-  const parts = getZonedParts(nowDate, tz);
-  const todayIdx = dayIndex(parts.weekday);
-  if (todayIdx < 0) {
-    // Shouldn't happen — fall back to unknown.
-    return {
-      status: 'unknown',
-      label: 'Hours unknown',
-      sub: null,
-      nextChangeAt: null,
-    };
-  }
-
-  const nowMins = parts.hour * 60 + parts.minute;
-
-  // ─ Overnight carry-over from yesterday ─
-  // If yesterday's close is <= yesterday's open, it spans into today. If we're
-  // still before yesterday's close (viewed from today), the station is open.
-  const yesterdayKey = dayAt(-1, todayIdx);
-  const yesterday = days[yesterdayKey];
-  if (yesterday && !yesterday.is_24_hours) {
-    const yOpen = parseHHMM(yesterday.open);
-    const yClose = parseHHMM(yesterday.close);
-    if (yOpen != null && yClose != null && yClose <= yOpen) {
-      // Overnight window from yesterday ends today at yClose.
-      if (nowMins < yClose) {
-        const nextChangeAt = zonedPartsToDate(
-          parts.year,
-          parts.month,
-          parts.day,
-          Math.floor(yClose / 60),
-          yClose % 60,
-          tz,
-        );
-        const closeLabel = formatTimeLabel(padHHMM(yClose));
-        const minutesUntilClose = yClose - nowMins;
-        if (minutesUntilClose <= CLOSING_SOON_MINUTES) {
-          return {
-            status: 'closing_soon',
-            label: `Closing soon · ${closeLabel}`,
-            sub: `Closes ${closeLabel}`,
-            nextChangeAt,
-          };
-        }
-        return {
-          status: 'open',
-          label: `Open · closes ${closeLabel}`,
-          sub: `Open · closes ${closeLabel}`,
-          nextChangeAt,
-        };
-      }
+  if (isUkBankHoliday(zonedIso)) {
+    const bh = opening_hours && opening_hours.bank_holiday;
+    if (bh && (bh.is_24_hours || (bh.open && bh.close))) {
+      // Build a synthetic opening_hours object from the bank_holiday block and
+      // delegate to the internal hours-evaluation helper. We do NOT recursively
+      // call isStationOpenNow() to avoid re-triggering the bank holiday check.
+      const bhDay = bh.is_24_hours
+        ? { open: '00:00:00', close: '23:59:00', is_24_hours: true }
+        : { open: bh.open, close: bh.close, is_24_hours: false };
+      const syntheticDays = {};
+      for (const dk of DAY_ORDER) syntheticDays[dk] = bhDay;
+      const syntheticOH = { usual_days: syntheticDays, bank_holiday: null };
+      return _evaluateHours(syntheticOH, nowDate, tz, zonedNow);
     }
-  }
-
-  // ─ Today's own window ─
-  const today = days[todayIdx >= 0 ? DAY_ORDER[todayIdx] : null];
-  if (today && today.is_24_hours) {
-    // One 24h day amid non-24h days — treat as open, with next change at
-    // midnight (start of tomorrow's window).
-    const nextChangeAt = findNextStatusChange(days, parts, tz);
+    // No bank_holiday block — station is assumed closed on bank holidays.
     return {
-      status: 'open',
-      label: 'Open now',
-      sub: 'Open today',
-      nextChangeAt,
+      status: 'closed',
+      label: 'Closed · bank holiday',
+      sub: 'Closed (bank holiday — hours may vary)',
+      nextChangeAt: null,
     };
   }
 
-  if (today) {
-    const tOpen = parseHHMM(today.open);
-    const tClose = parseHHMM(today.close);
-    if (tOpen != null && tClose != null) {
-      const overnight = tClose <= tOpen;
-
-      if (!overnight) {
-        // Regular same-day window.
-        if (nowMins < tOpen) {
-          // Closed — opens later today.
-          const openLabel = formatTimeLabel(today.open);
-          const nextChangeAt = zonedPartsToDate(
-            parts.year,
-            parts.month,
-            parts.day,
-            Math.floor(tOpen / 60),
-            tOpen % 60,
-            tz,
-          );
-          return {
-            status: 'closed',
-            label: `Closed · opens ${openLabel}`,
-            sub: `Opens ${openLabel} today`,
-            nextChangeAt,
-          };
-        }
-        if (nowMins < tClose) {
-          // Open right now.
-          const closeLabel = formatTimeLabel(today.close);
-          const nextChangeAt = zonedPartsToDate(
-            parts.year,
-            parts.month,
-            parts.day,
-            Math.floor(tClose / 60),
-            tClose % 60,
-            tz,
-          );
-          const minutesUntilClose = tClose - nowMins;
-          if (minutesUntilClose <= CLOSING_SOON_MINUTES) {
-            return {
-              status: 'closing_soon',
-              label: `Closing soon · ${closeLabel}`,
-              sub: `Closes ${closeLabel}`,
-              nextChangeAt,
-            };
-          }
-          return {
-            status: 'open',
-            label: `Open · closes ${closeLabel}`,
-            sub: `Open today ${formatTimeLabel(today.open)}–${closeLabel}`,
-            nextChangeAt,
-          };
-        }
-        // Past close — fall through to "find next open".
-      } else {
-        // Overnight window starting today (e.g. 06:00–02:00 next day).
-        if (nowMins < tOpen) {
-          // Closed until today's open.
-          const openLabel = formatTimeLabel(today.open);
-          const nextChangeAt = zonedPartsToDate(
-            parts.year,
-            parts.month,
-            parts.day,
-            Math.floor(tOpen / 60),
-            tOpen % 60,
-            tz,
-          );
-          return {
-            status: 'closed',
-            label: `Closed · opens ${openLabel}`,
-            sub: `Opens ${openLabel} today`,
-            nextChangeAt,
-          };
-        }
-        // nowMins >= tOpen — open through midnight into tomorrow.
-        const closeLabel = formatTimeLabel(today.close);
-        // next change is tomorrow at tClose.
-        const tomorrow = new Date(nowDate.getTime() + 24 * 3600 * 1000);
-        const tomorrowParts = getZonedParts(tomorrow, tz);
-        const nextChangeAt = zonedPartsToDate(
-          tomorrowParts.year,
-          tomorrowParts.month,
-          tomorrowParts.day,
-          Math.floor(tClose / 60),
-          tClose % 60,
-          tz,
-        );
-        // closing_soon doesn't apply here — close is tomorrow.
-        return {
-          status: 'open',
-          label: `Open · closes ${closeLabel}`,
-          sub: `Open · closes ${closeLabel}`,
-          nextChangeAt,
-        };
-      }
-    }
-  }
-
-  // ─ Already-past-close or no valid today window: find next opening ─
-  return findNextOpenStatus(days, parts, tz);
+  // Non-bank-holiday day: delegate to _evaluateHours using the already-computed
+  // zonedNow parts so we avoid a redundant getZonedParts() call.
+  return _evaluateHours(opening_hours, nowDate, tz, zonedNow);
 }
 
 /**

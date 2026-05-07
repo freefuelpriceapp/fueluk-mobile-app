@@ -339,14 +339,79 @@ describe('isStationOpenNow — DST transitions', () => {
   });
 });
 
-// ─── Bank holiday — for MVP we ignore the bank_holiday block ────────────────
+// ─── Bank holiday awareness (C3/E7) ────────────────────────────────────────
+// These tests verify the bank holiday calendar is correctly wired into
+// isStationOpenNow. Easter Monday 2026 = Mon 6 Apr; Christmas 2026 = Fri 25 Dec.
 
-describe('isStationOpenNow — bank_holiday MVP behaviour', () => {
-  test('bank_holiday block present but type=standard — uses usual_days', () => {
+describe('isStationOpenNow — bank holiday awareness', () => {
+  // Helper: station with a bank_holiday block 08:00–18:00.
+  function supermarketHoursWithBankHoliday() {
+    return {
+      ...SHOP_HOURS,
+      bank_holiday: { open: '08:00', close: '18:00', is_24_hours: false },
+    };
+  }
+
+  test('Easter Monday 2026 — station WITH bank_holiday block → uses bank_holiday hours, open at 10:00', () => {
+    const oh = supermarketHoursWithBankHoliday();
+    // Easter Monday 2026 = 6 Apr 2026; station open 08:00–18:00 on BH
+    const res = isStationOpenNow(oh, false, false, londonDate(2026, 4, 6, 10, 0));
+    expect(res.status).toBe('open');
+  });
+
+  test('Easter Monday 2026 — station WITH bank_holiday block → uses bank_holiday hours, closed before 08:00', () => {
+    const oh = supermarketHoursWithBankHoliday();
+    const res = isStationOpenNow(oh, false, false, londonDate(2026, 4, 6, 7, 30));
+    // Before 08:00 on BH → closed (usual hours are 06:00–22:00 but BH hours 08:00–18:00 apply)
+    expect(res.status).toBe('closed');
+  });
+
+  test('Christmas Day 2026 — station WITHOUT bank_holiday block → CLOSED', () => {
+    // No bank_holiday block — safest default is closed
+    const oh = {
+      ...SHOP_HOURS,
+      bank_holiday: null,
+    };
+    const res = isStationOpenNow(oh, false, false, londonDate(2026, 12, 25, 12, 0));
+    expect(res.status).toBe('closed');
+    expect(res.label).toBe('Closed · bank holiday');
+  });
+
+  test('Christmas Day 2026 — station with no opening_hours at all → closed (unknown) not open', () => {
+    // opening_hours is null — station has no data, and it is a bank holiday.
+    // The bank holiday check fires first but opening_hours is null so
+    // bh = null → returns closed-bank-holiday.
+    const res = isStationOpenNow(null, false, false, londonDate(2026, 12, 25, 12, 0));
+    // null opening_hours → bank holiday check still fires (safely)
+    // bh = null → CLOSED bank holiday
+    expect(res.status).toBe('closed');
+  });
+
+  test('Regular Tuesday 2026-03-10 — bank holiday list ignored, usual hours apply', () => {
+    const oh = supermarketHoursWithBankHoliday();
+    // 10 March 2026 is not a bank holiday — usual_days should apply
+    const res = isStationOpenNow(oh, false, false, londonDate(2026, 3, 10, 12, 0));
+    expect(res.status).toBe('open');
+    // Should use SHOP_HOURS usual_days (closes 22:00 on Tuesday)
+    expect(res.label).toBe('Open · closes 10pm');
+  });
+
+  test('Easter Monday 2026 — 24h bank_holiday block → open_24h status', () => {
+    const oh = {
+      ...SHOP_HOURS,
+      bank_holiday: { open: '00:00', close: '23:59', is_24_hours: true },
+    };
+    const res = isStationOpenNow(oh, false, false, londonDate(2026, 4, 6, 3, 0));
+    // 24h bank holiday block → open_24h
+    expect(res.status).toBe('open_24h');
+  });
+
+  test('Non-bank-holiday day — bank_holiday block is silently ignored even if present', () => {
     const oh = {
       ...SHOP_HOURS,
       bank_holiday: { type: 'standard', open_time: '08:00:00', close_time: '20:00:00', is_24_hours: false },
     };
+    // 24 Apr 2026 is NOT a bank holiday — usual_days (SHOP_HOURS) should apply
     const res = isStationOpenNow(oh, false, false, londonDate(2026, 4, 24, 12, 0));
     expect(res.status).toBe('open');
     expect(res.label).toBe('Open · closes 10pm');
