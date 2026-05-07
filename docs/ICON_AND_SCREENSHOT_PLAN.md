@@ -1,4 +1,4 @@
-# App Icon & Screenshot Plan — FreeFuelPrice UK
+# App Icon & Screenshot Plan — FuelUK
 
 > Step 11 — Visual submission asset plan for App Store Connect and Google Play Console.
 > Tied to the real MVP flow as defined in `App.js` (v9.0.0).
@@ -111,7 +111,7 @@ Each screenshot gets a short overlay caption at the top or bottom of the framed 
 
 | Asset | Size | Format | Content |
 |-------|------|--------|---------|
-| Feature graphic | 1024×500 px | PNG or JPEG | App name "FreeFuelPrice UK" + tagline "Find cheap fuel near you, fast." + fuel-drop icon on #1a1a2e background with #2ECC71 accent |
+| Feature graphic | 1024×500 px | PNG or JPEG | App name "FuelUK" + tagline "Find cheap fuel near you, fast." + fuel-drop icon on #1a1a2e background with #2ECC71 accent |
 
 ---
 

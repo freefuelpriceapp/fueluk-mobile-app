@@ -1,4 +1,4 @@
-# Release Packet — FreeFuelPrice UK v9.0.0
+# Release Packet — FuelUK v9.0.0
 
 > Step 12 — Everything needed to move from verified account to submitted app.
 > Goal: shorten the final submission path once Apple/Google verification clears.
@@ -13,7 +13,7 @@ All store copy lives in `STORE_METADATA.md` (repo root). Verified contents:
 
 | Item | Location | Status |
 |------|----------|--------|
-| App name | `FreeFuelPrice UK` | Ready |
+| App name | `FuelUK` | Ready |
 | Bundle / Package | `com.freefuelpriceapp.uk` | Ready |
 | Version | `9.0.0` (build 9) | Ready |
 | Category | Navigation / Travel | Ready |

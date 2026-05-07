@@ -20,13 +20,7 @@ import { isFeatureEnabled } from '../config/featureFlags';
 
 const FAVOURITES_KEY = 'user_favourites';
 
-const FUEL_LABELS = {
-  petrol: 'Petrol',
-  diesel: 'Diesel',
-  e10: 'E10',
-  super_unleaded: 'Super Unleaded',
-  premium_diesel: 'Premium Diesel',
-};
+import { FUEL_LABELS } from '../lib/fuelTaxonomy';
 
 const SOURCE_FIELD = {
   petrol: 'petrol_source',

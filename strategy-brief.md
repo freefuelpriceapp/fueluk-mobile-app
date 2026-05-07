@@ -1,4 +1,4 @@
-# Free Fuel Price App — Consolidated Strategy Brief
+# FuelUK — Consolidated Strategy Brief
 
 **Purpose:** Master reference document compiled from all strategy, spec, sprint, and playbook files. This brief governs all coding, architecture, and launch decisions.
 
@@ -583,7 +583,7 @@ Monetisation is **explicitly deferred from the launch product**. No monetisation
 ### Reusable prompt template for scoped edits
 
 ```
-Open the Free Fuel Price App workspace and make a scoped change.
+Open the FuelUK workspace and make a scoped change.
 
 Goal:
 [one clear goal]

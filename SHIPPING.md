@@ -1,4 +1,4 @@
-# FreeFuelPrice UK — Shipping Runbook (v1.0.0)
+# FuelUK — Shipping Runbook (v1.0.0)
 
 > Single source of truth for local-machine steps to ship v1.0.0 to App Store + Play Store.
 > Code-side work is complete on `main`. Everything below requires local CLI + personal credentials.

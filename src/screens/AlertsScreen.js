@@ -18,9 +18,19 @@ import { ensurePushPermission } from '../lib/pushPermission';
 import { brandToString, safeText } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
 import EmptyState from '../components/EmptyState';
+import { FUEL_LABELS, labelForFuelKey } from '../lib/fuelTaxonomy';
 
-const FUEL_LABELS = { petrol: 'Petrol', diesel: 'Diesel', e10: 'E10' };
-const FUEL_COLOURS = { petrol: FUEL_COLORS.petrol, diesel: FUEL_COLORS.diesel, e10: FUEL_COLORS.e10 };
+// Per-key fuel colours for the badge. Falls back to grey when the key is
+// unknown (e.g. a future fuel type the backend introduces).
+const FUEL_COLOURS = {
+  unleaded: FUEL_COLORS.petrol,
+  petrol: FUEL_COLORS.petrol,
+  e10: FUEL_COLORS.e10,
+  super_unleaded: FUEL_COLORS.super_unleaded,
+  e5: FUEL_COLORS.super_unleaded,
+  diesel: FUEL_COLORS.diesel,
+  premium_diesel: FUEL_COLORS.premium_diesel,
+};
 
 /**
  * AlertsScreen — Sprint 4
@@ -82,7 +92,7 @@ const AlertsScreen = () => {
     const stationLabel = safeText(alert.station_name) || brandToString(alert.station_brand) || 'this station';
     Alert.alert(
       'Remove Alert',
-      `Remove the ${FUEL_LABELS[alert.fuel_type] || alert.fuel_type} alert for ${stationLabel}?`,
+      `Remove the ${labelForFuelKey(alert.fuel_type)} alert for ${stationLabel}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -110,7 +120,7 @@ const AlertsScreen = () => {
     <View style={styles.alertCard}>
       <View style={styles.alertHeader}>
         <View style={[styles.fuelBadge, { backgroundColor: FUEL_COLOURS[item.fuel_type] || '#888' }]}>
-          <Text style={styles.fuelBadgeText}>{toRenderableString(FUEL_LABELS[item.fuel_type] || item.fuel_type)}</Text>
+          <Text style={styles.fuelBadgeText}>{toRenderableString(labelForFuelKey(item.fuel_type))}</Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteBtn}>
           <Text style={styles.deleteBtnText}>Remove</Text>

@@ -1,4 +1,4 @@
-# FreeFuelPrice UK — Mobile App
+# FuelUK — Mobile App
 
 > UK fuel price app for iOS & Android, built with React Native (Expo).
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-FreeFuelPrice UK helps UK drivers find the cheapest fuel stations near them using live data from UKPIA, CMA, and Gov.UK sources. Fuel-first, privacy-first, no account required.
+FuelUK helps UK drivers find the cheapest fuel stations near them using live data from UKPIA, CMA, and Gov.UK sources. Fuel-first, privacy-first, no account required.
 
 - **Bundle ID (iOS)**: `com.freefuelpriceapp.uk`
 - **Package (Android)**: `com.freefuelpriceapp.uk`
@@ -142,4 +142,4 @@ Asda, BP, Co-op, Esso, JET, Morrisons, Moto, Motor Fuel Group, Rontec, Sainsbury
 
 ## Licence
 
-Private — All rights reserved. FreeFuelPrice UK © 2026.
+Private — All rights reserved. FuelUK © 2026.
