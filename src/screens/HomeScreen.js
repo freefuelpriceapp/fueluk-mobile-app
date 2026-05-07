@@ -53,6 +53,10 @@ import {
   isVehiclePromptDismissed,
   dismissVehiclePrompt,
 } from '../lib/userVehicle';
+import {
+  recommendedFuelKey,
+  recommendedReason,
+} from '../lib/vehicleFuelDefault';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 
 // Primary fuel-type chips on the Home/Nearby list. 'Petrol' is the
@@ -103,7 +107,12 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [offline, setOffline] = useState(false);
+  // selectedFuel defaults to the modal-driver recommendation. Once a
+  // vehicle is loaded, the effect below promotes it to the vehicle-aware
+  // recommendation; if the user manually picks a different fuel for the
+  // same vehicle reg, we keep their override (until the reg changes).
   const [selectedFuel, setSelectedFuel] = useState('unleaded');
+  const [fuelOverrideForReg, setFuelOverrideForReg] = useState(null);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -154,6 +163,38 @@ const HomeScreen = ({ navigation }) => {
       }
     }).catch(() => {});
   }, [userVehicle]);
+
+  // Wave A.5 — promote the default fuel filter to the vehicle-aware
+  // recommendation. If the registered reg changes, drop any in-session
+  // manual override so the new car's recommendation takes effect.
+  const vehicleReg = userVehicle?.reg || null;
+  useEffect(() => {
+    const recommended = recommendedFuelKey(userVehicle) || 'unleaded';
+    if (fuelOverrideForReg && fuelOverrideForReg.reg === vehicleReg) {
+      setSelectedFuel(fuelOverrideForReg.fuel);
+    } else {
+      setFuelOverrideForReg(null);
+      setSelectedFuel(recommended);
+    }
+    // Intentionally key on reg only — if the user changes car, reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleReg]);
+
+  const fuelRecommendation = recommendedFuelKey(userVehicle) || 'unleaded';
+  const fuelIsAutoSelected =
+    !fuelOverrideForReg && selectedFuel === fuelRecommendation && !!userVehicle;
+  const fuelRecommendationCaption = fuelIsAutoSelected
+    ? recommendedReason(userVehicle)
+    : null;
+
+  const handleFuelChipPress = (key) => {
+    setSelectedFuel(key);
+    if (vehicleReg && key !== fuelRecommendation) {
+      setFuelOverrideForReg({ reg: vehicleReg, fuel: key });
+    } else {
+      setFuelOverrideForReg(null);
+    }
+  };
 
   const fetchStations = useCallback(async () => {
     if (!location) return;
@@ -461,7 +502,7 @@ const HomeScreen = ({ navigation }) => {
                 styles.filterBtn,
                 isActive && { backgroundColor: ft.color, borderColor: ft.color },
               ]}
-              onPress={() => setSelectedFuel(ft.key)}
+              onPress={() => handleFuelChipPress(ft.key)}
               accessibilityLabel={`Filter by ${ft.label}`}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
@@ -476,6 +517,26 @@ const HomeScreen = ({ navigation }) => {
           );
         })}
       </View>
+
+      {/* Wave A.5 — vehicle-aware fuel default caption. Low-emphasis hint
+          shown only when we auto-selected the fuel from the registered
+          vehicle; tap to dismiss (clears the auto-selection by setting an
+          identity override). */}
+      {fuelRecommendationCaption ? (
+        <TouchableOpacity
+          onPress={() => {
+            if (!vehicleReg) return;
+            setFuelOverrideForReg({ reg: vehicleReg, fuel: selectedFuel });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${fuelRecommendationCaption}. Tap to dismiss.`}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Text style={styles.recommendedCaption} numberOfLines={1}>
+            {fuelRecommendationCaption}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {/* E5 (premium 97/99) opt-in. Demoted from a peer tab to a small
           inline link — most modern cars run on E10 and E5 is more
@@ -558,12 +619,13 @@ const HomeScreen = ({ navigation }) => {
           data={sortedStations}
           extraData={`${sortMode}-${selectedFuel}-${selectedBrand || ''}`}
           keyExtractor={(item) => item.id?.toString()}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <StationCard
               station={item}
               fuelType={selectedFuel}
               onPress={() => handleStationPress(item)}
               onFlagPrice={FEATURE_FLAGS.priceFlags ? (s) => setFlagTarget(s) : undefined}
+              isCheapestRank={sortMode === 'cheapest' && index === 0}
             />
           )}
           refreshControl={
@@ -703,6 +765,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border, alignItems: 'center', marginHorizontal: 3,
   },
   filterBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  recommendedCaption: {
+    fontSize: 11,
+    color: COLORS.textMuted || COLORS.textSecondary,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 2,
+    backgroundColor: COLORS.background,
+  },
   e5OptInRow: {
     flexDirection: 'row',
     alignItems: 'center',

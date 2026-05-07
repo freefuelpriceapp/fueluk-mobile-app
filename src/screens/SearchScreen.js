@@ -20,6 +20,8 @@ import useLocation from '../hooks/useLocation';
 import { rankStationsByValue } from '../lib/smartDecision';
 import { resolveUnleadedPrice } from '../lib/fuelResolution';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
+import { loadUserVehicle } from '../lib/userVehicle';
+import { recommendedFuelKey } from '../lib/vehicleFuelDefault';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,8 +105,43 @@ const SearchScreen = ({ navigation, route }) => {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
   const [selectedFuel, setSelectedFuel] = useState('unleaded');
+  const [userVehicle, setUserVehicle] = useState(null);
+  const [fuelOverrideForReg, setFuelOverrideForReg] = useState(null);
   const debounceRef = useRef(null);
   const { location } = useLocation();
+
+  // Wave A.5 — load registered vehicle so the fuel filter can default to
+  // the recommended grade for that car.
+  useEffect(() => {
+    let mounted = true;
+    loadUserVehicle().then((v) => { if (mounted) setUserVehicle(v); }).catch(() => {});
+    const unsub = navigation?.addListener?.('focus', () => {
+      loadUserVehicle().then((v) => { if (mounted) setUserVehicle(v); }).catch(() => {});
+    });
+    return () => { mounted = false; if (typeof unsub === 'function') unsub(); };
+  }, [navigation]);
+
+  const vehicleReg = userVehicle?.reg || null;
+  useEffect(() => {
+    const recommended = recommendedFuelKey(userVehicle) || 'unleaded';
+    if (fuelOverrideForReg && fuelOverrideForReg.reg === vehicleReg) {
+      setSelectedFuel(fuelOverrideForReg.fuel);
+    } else {
+      setFuelOverrideForReg(null);
+      setSelectedFuel(recommended);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleReg]);
+
+  const handleFuelChipPress = useCallback((key) => {
+    setSelectedFuel(key);
+    const recommended = recommendedFuelKey(userVehicle) || 'unleaded';
+    if (vehicleReg && key !== recommended) {
+      setFuelOverrideForReg({ reg: vehicleReg, fuel: key });
+    } else {
+      setFuelOverrideForReg(null);
+    }
+  }, [userVehicle, vehicleReg]);
 
   // ─── Search handler ──────────────────────────────────────────────────────────
 
@@ -248,7 +285,7 @@ const SearchScreen = ({ navigation, route }) => {
                     borderColor: ft.color,
                   },
                 ]}
-                onPress={() => setSelectedFuel(ft.key)}
+                onPress={() => handleFuelChipPress(ft.key)}
                 accessibilityLabel={`Filter by ${ft.label}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
@@ -270,7 +307,7 @@ const SearchScreen = ({ navigation, route }) => {
           <TouchableOpacity
             style={styles.e5OptInRow}
             onPress={() =>
-              setSelectedFuel(selectedFuel === 'petrol' ? 'unleaded' : 'petrol')
+              handleFuelChipPress(selectedFuel === 'petrol' ? 'unleaded' : 'petrol')
             }
             accessibilityRole="button"
             accessibilityLabel={
