@@ -22,7 +22,14 @@ import { SkeletonList } from '../components/SkeletonCard';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
-import { resolvePrice } from '../lib/quarantine';
+import { resolvePrice, evaluateStation } from '../lib/quarantine';
+
+function nullIfImplausible(station, fuelKey, value) {
+  if (value == null) return null;
+  const verdict = evaluateStation(station, fuelKey);
+  if (verdict.quarantined && verdict.reason === 'out_of_range') return null;
+  return value;
+}
 import { extractSelectedReason } from '../lib/selectedReason';
 import { chooseBestOption } from '../lib/bestOption';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
@@ -176,11 +183,11 @@ const HomeScreen = ({ navigation }) => {
         ...s,
         distance_km: typeof s.distance_km === 'number' ? s.distance_km : (typeof s.distance_miles === 'number' ? s.distance_miles * 1.60934 : undefined),
         prices: {
-          petrol: s.petrol_price ?? null,
-          diesel: s.diesel_price ?? null,
-          e10: s.e10_price ?? null,
-          super_unleaded: s.super_unleaded_price ?? null,
-          premium_diesel: s.premium_diesel_price ?? null,
+          petrol: nullIfImplausible(s, 'petrol', s.petrol_price ?? null),
+          diesel: nullIfImplausible(s, 'diesel', s.diesel_price ?? null),
+          e10: nullIfImplausible(s, 'e10', s.e10_price ?? null),
+          super_unleaded: nullIfImplausible(s, 'super_unleaded', s.super_unleaded_price ?? null),
+          premium_diesel: nullIfImplausible(s, 'premium_diesel', s.premium_diesel_price ?? null),
         },
       }));
       setStations(list);

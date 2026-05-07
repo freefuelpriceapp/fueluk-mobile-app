@@ -37,6 +37,15 @@ import FlagPriceSheet from '../components/FlagPriceSheet';
 import StationStatusChip from '../components/StationStatusChip';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { stationTrajectorySecondary } from '../lib/trajectory';
+import { evaluateStation } from '../lib/quarantine';
+
+// Map FUEL_DISPLAY.key (UI) → quarantine.js fuel key.
+const QUARANTINE_FUEL_KEY = {
+  petrol: 'petrol',
+  diesel: 'diesel',
+  e10: 'e10',
+  premiumDiesel: 'premium_diesel',
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -533,7 +542,13 @@ export default function StationDetailScreen({ route }) {
 
   // ─── Main render ─────────────────────────────────────────────────────────────
 
-  const availableFuels = FUEL_DISPLAY.filter((f) => station?.[f.field] != null);
+  const availableFuels = FUEL_DISPLAY.filter((f) => {
+    if (station?.[f.field] == null) return false;
+    const qFuel = QUARANTINE_FUEL_KEY[f.key];
+    if (!qFuel) return true;
+    const verdict = evaluateStation(station, qFuel);
+    return !(verdict.quarantined && verdict.reason === 'out_of_range');
+  });
   const fuelsToRender = availableFuels.length > 0 ? availableFuels : FUEL_DISPLAY;
 
   const usualDays = station?.opening_hours?.usual_days || null;
