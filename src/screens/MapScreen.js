@@ -395,6 +395,7 @@ export default function MapScreen({ navigation }) {
         viewportSpanKm: span,
         visibleStations,
         filteredStations,
+        fuelType,
         build: { ...build, clusters: trimmed },
       });
       // eslint-disable-next-line no-console
