@@ -66,6 +66,14 @@ function sanitizeAlertsPayload(data) {
  * @param {string} fuel - Fuel type: petrol | diesel | e10 (default petrol)
  * @param {string} brand - Optional brand filter
  */
+// Translate the synthetic 'unleaded' fuel-type to a wire-compatible value
+// before hitting the backend (which only knows the per-grade keys).
+// Server-side ranking still uses `petrol_price`; the client re-resolves
+// the headline number per-station with resolveUnleadedPrice.
+function wireFuelType(ft) {
+  return ft === 'unleaded' ? 'petrol' : ft;
+}
+
 export async function getNearbyStations({
   lat,
   lng,
@@ -75,7 +83,7 @@ export async function getNearbyStations({
   mpg = null,
   tankFillLitres = null,
 }) {
-  const params = { lat, lon: lng, radius: radiusKm, fuel_type: fuel };
+  const params = { lat, lon: lng, radius: radiusKm, fuel_type: wireFuelType(fuel) };
   if (brand) params.brand = brandToString(brand) || brand;
   if (mpg != null && Number.isFinite(Number(mpg))) params.mpg = Number(mpg);
   if (tankFillLitres != null && Number.isFinite(Number(tankFillLitres))) {
@@ -101,7 +109,7 @@ export async function getBrands() {
  */
 export async function searchStations(q, { fuelType, lat, lon } = {}) {
   const params = { q };
-  if (fuelType) params.fuel_type = fuelType;
+  if (fuelType) params.fuel_type = wireFuelType(fuelType);
   if (lat != null) params.lat = lat;
   if (lon != null) params.lon = lon;
   const resp = await api.get('/api/v1/stations/search', { params });
@@ -179,11 +187,11 @@ export async function getCheapestStations({
   lat,
   lon,
   radiusKm = 10,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   mpg = null,
   tankFillLitres = null,
 }) {
-  const params = { lat, lon, radius: radiusKm, fuel_type: fuelType };
+  const params = { lat, lon, radius: radiusKm, fuel_type: wireFuelType(fuelType) };
   if (mpg != null && Number.isFinite(Number(mpg))) params.mpg = Number(mpg);
   if (tankFillLitres != null && Number.isFinite(Number(tankFillLitres))) {
     params.tank_fill_litres = Number(tankFillLitres);

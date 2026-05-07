@@ -49,10 +49,20 @@ describe('describePersonalisation', () => {
   });
 
   test('fuel only — still returns a usable chip', () => {
+    // Wave A.2: legacy 'petrol' fuel_type now labels as the explicit
+    // "E5 (older cars)" opt-in tier — drivers default to the smart
+    // 'unleaded' tab and pick this only if their car requires E5.
     const d = describePersonalisation({ fuel_type: 'petrol' });
     expect(d.present).toBe(true);
-    expect(d.headline).toBe('Personalised for Petrol');
-    expect(d.detail).toBe('Petrol');
+    expect(d.headline).toBe('Personalised for E5 (older cars)');
+    expect(d.detail).toBe('E5 (older cars)');
+  });
+
+  test('Wave A.2: unleaded fuel_type uses the new label', () => {
+    const d = describePersonalisation({ fuel_type: 'unleaded' });
+    expect(d.present).toBe(true);
+    expect(d.headline).toBe('Personalised for Unleaded');
+    expect(d.detail).toBe('Unleaded');
   });
 
   test('make only', () => {

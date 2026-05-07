@@ -22,7 +22,13 @@ import { SkeletonList } from '../components/SkeletonCard';
 import { getNearbyStations, searchStations, getLastUpdated } from '../api/fuelApi';
 import useLocation from '../hooks/useLocation';
 import { trackNearbyScreenView, trackRefreshInitiated, trackRefreshCompleted } from '../lib/analytics';
-import { resolvePrice } from '../lib/quarantine';
+import { resolvePrice as resolvePriceRaw } from '../lib/quarantine';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
+
+function resolvePrice(station, fuelType) {
+  if (fuelType === 'unleaded') return resolveUnleadedPrice(station);
+  return resolvePriceRaw(station, fuelType);
+}
 import { extractSelectedReason } from '../lib/selectedReason';
 import { chooseBestOption } from '../lib/bestOption';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
@@ -93,7 +99,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [offline, setOffline] = useState(false);
-  const [selectedFuel, setSelectedFuel] = useState('petrol');
+  const [selectedFuel, setSelectedFuel] = useState('unleaded');
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);

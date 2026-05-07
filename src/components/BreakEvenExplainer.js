@@ -26,9 +26,11 @@ const EXPANDED_SESSION_KEY = 'break_even_expander_opened_session';
 function fuelLabelFor(fuelType) {
   if (fuelType === 'diesel') return 'Diesel';
   if (fuelType === 'e10') return 'E10';
+  if (fuelType === 'unleaded') return 'Unleaded';
+  if (fuelType === 'petrol') return 'E5 (older cars)';
   if (fuelType === 'super_unleaded') return 'Super unleaded';
   if (fuelType === 'premium_diesel') return 'Premium diesel';
-  return 'Petrol';
+  return 'Unleaded';
 }
 
 function vehicleDescriptor(vehicle, mpg, fuelType) {
@@ -62,7 +64,7 @@ function vehicleDescriptor(vehicle, mpg, fuelType) {
 export default function BreakEvenExplainer({
   station,
   breakEven,
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   userVehicle = null,
 }) {
   const desc = describeBreakEven(breakEven);

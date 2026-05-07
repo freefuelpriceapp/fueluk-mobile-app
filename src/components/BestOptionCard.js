@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolvePrice } from '../lib/quarantine';
+import { resolveUnleadedPrice } from '../lib/fuelResolution';
 import { brandToString, safeText } from '../lib/brand';
 import { normaliseSelectedReason } from '../lib/selectedReason';
 import { chooseBestOption } from '../lib/bestOption';
@@ -61,7 +62,7 @@ export default function BestOptionCard({
   bestValue = null,
   bestValueReason = null,
   stations = [],
-  fuelType = 'petrol',
+  fuelType = 'unleaded',
   onPress,
   selectedReason = null,
 }) {
@@ -142,10 +143,16 @@ export default function BestOptionCard({
 
   if (!activeStation) return null;
 
-  const price = resolvePrice(activeStation, fuelType);
+  const price = fuelType === 'unleaded'
+    ? resolveUnleadedPrice(activeStation)
+    : resolvePrice(activeStation, fuelType);
   const dist = formatDistance(activeStation);
   const updated = activeStation.last_updated ? timeAgo(activeStation.last_updated) : null;
-  const fuelLabel = fuelType === 'diesel' ? 'Diesel' : fuelType === 'e10' ? 'E10' : 'Petrol';
+  const fuelLabel = fuelType === 'diesel' ? 'Diesel'
+    : fuelType === 'e10' ? 'E10'
+    : fuelType === 'unleaded' ? 'Unleaded'
+    : fuelType === 'petrol' ? 'E5 (older cars)'
+    : 'Petrol';
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
