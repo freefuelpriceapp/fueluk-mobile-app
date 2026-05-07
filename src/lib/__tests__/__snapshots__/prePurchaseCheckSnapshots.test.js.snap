@@ -1,0 +1,54 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Pre-purchase check verdict snapshots verdict=clean — tidy 4-year MOT history 1`] = `
+{
+  "label": "clean",
+  "scored": {
+    "label": "Looks clean",
+    "reasons": [
+      "No major issues found across the MOT history.",
+    ],
+    "verdict": "clean",
+  },
+}
+`;
+
+exports[`Pre-purchase check verdict snapshots verdict=investigate — failed MOT in last 24 months 1`] = `
+{
+  "label": "investigate",
+  "scored": {
+    "label": "Investigate before buying",
+    "reasons": [
+      "Failed MOT in the last 24 months.",
+    ],
+    "verdict": "investigate",
+  },
+}
+`;
+
+exports[`Pre-purchase check verdict snapshots verdict=minor — two advisories on most recent MOT 1`] = `
+{
+  "label": "minor",
+  "scored": {
+    "label": "Minor concerns",
+    "reasons": [
+      "2 advisories on the most recent MOT.",
+    ],
+    "verdict": "minor",
+  },
+}
+`;
+
+exports[`Pre-purchase check verdict snapshots verdict=walk_away — dangerous defect on latest MOT 1`] = `
+{
+  "label": "walk_away",
+  "scored": {
+    "label": "Walk away",
+    "reasons": [
+      "Latest MOT recorded 1 dangerous defect(s).",
+      "Failed MOT in the last 24 months.",
+    ],
+    "verdict": "walk_away",
+  },
+}
+`;

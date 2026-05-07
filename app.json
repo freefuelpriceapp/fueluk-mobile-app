@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FreeFuelPrice UK",
+    "name": "FuelUK",
     "slug": "fueluk-mobile-app",
     "version": "1.0.0",
     "runtimeVersion": {
@@ -11,8 +11,8 @@
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
+      "resizeMode": "cover",
+      "backgroundColor": "#00B86B"
     },
     "updates": {
       "fallbackToCacheTimeout": 0,
@@ -25,12 +25,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.freefuelpriceapp.uk",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "config": {
         "googleMapsApiKey": "AIzaSyCfTsM8WGFAyEV0zZndVW8EfUycxw024Wk"
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
+        "NSLocationWhenInUseUsageDescription": "FuelUK uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
         "UIBackgroundModes": [
           "remote-notification"
         ]
@@ -39,10 +39,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a2e"
+        "backgroundColor": "#00B86B"
       },
       "package": "com.freefuelpriceapp.uk",
-      "versionCode": 1,
+      "versionCode": 2,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCfTsM8WGFAyEV0zZndVW8EfUycxw024Wk"
@@ -58,14 +58,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "FreeFuelPrice uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared."
+          "locationWhenInUsePermission": "FuelUK uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared."
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#1a1a2e",
+          "color": "#00B86B",
           "defaultChannel": "price-alerts"
         }
       ]
@@ -75,6 +75,7 @@
       "eas": {
         "projectId": "6a52b661-f990-4436-9ecb-49148533d02b"
       }
-    }
+    },
+    "scheme": "fueluk"
   }
 }
