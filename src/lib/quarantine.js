@@ -17,8 +17,19 @@
  */
 
 // Plausible UK pump price range in pence per litre. Tune over time.
-const MIN_PPL = 80;
+// MIN_PPL kept as a backstop; per-fuel floors below are the primary check
+// and mirror the backend Wave A.1 implausibility floors.
+const MIN_PPL = 140;
 const MAX_PPL = 250;
+
+const MIN_PPL_BY_FUEL = {
+  petrol: 150,
+  e10: 130,
+  super_unleaded: 150,
+  diesel: 140,
+  premium_diesel: 150,
+};
+const MIN_PPL_FALLBACK = 130;
 
 // Maximum age (hours) before a price is excluded from ranking.
 const MAX_AGE_H = 24 * 7;
@@ -77,7 +88,8 @@ export function evaluateStation(station, fuelType, cohortMedian = null) {
   if (price === null) {
     return { quarantined: true, reason: 'missing_price', price: null };
   }
-  if (price < MIN_PPL || price > MAX_PPL) {
+  const minPpl = MIN_PPL_BY_FUEL[fuelType] ?? MIN_PPL_FALLBACK;
+  if (price < minPpl || price > MAX_PPL) {
     return { quarantined: true, reason: 'out_of_range', price };
   }
   const age = ageHours(station?.last_updated);
@@ -117,10 +129,21 @@ export function isQuarantined(station, fuelType) {
   return evaluateStation(station, fuelType).quarantined;
 }
 
+export {
+  MIN_PPL,
+  MAX_PPL,
+  MIN_PPL_BY_FUEL,
+  MIN_PPL_FALLBACK,
+};
+
 export default {
   evaluateStation,
   filterRankable,
   isQuarantined,
   resolvePrice,
+  MIN_PPL,
+  MAX_PPL,
+  MIN_PPL_BY_FUEL,
+  MIN_PPL_FALLBACK,
 };
 

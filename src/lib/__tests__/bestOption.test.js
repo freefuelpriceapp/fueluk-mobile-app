@@ -8,7 +8,7 @@ const applegreen = {
   id: 1,
   name: 'Small Heath Applegreen',
   brand: 'Applegreen',
-  petrol_price: 140.0,
+  petrol_price: 158.9,
   distance_miles: 0.44,
   last_updated: new Date().toISOString(),
 };
@@ -27,7 +27,7 @@ const asda = {
   id: 3,
   name: 'Asda Queslett',
   brand: 'Asda',
-  petrol_price: 141.9,
+  petrol_price: 161.9,
   distance_miles: 1.8,
   last_updated: new Date().toISOString(),
 };
@@ -81,7 +81,7 @@ describe('chooseBestOption — backend authority', () => {
     const best = chooseBestOption(payload, stations, 'petrol');
     expect(best).toBe(applegreen);
     expect(best.name).toBe('Small Heath Applegreen');
-    expect(best.petrol_price).toBe(140.0);
+    expect(best.petrol_price).toBe(158.9);
   });
 
   test('backend best_option wins regardless of fuel type tab', () => {

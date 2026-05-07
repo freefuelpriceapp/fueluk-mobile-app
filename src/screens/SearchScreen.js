@@ -18,7 +18,15 @@ import { searchStations, getNearbyStations } from '../api/fuelApi';
 import { trackSearchPerformed } from '../lib/analytics';
 import useLocation from '../hooks/useLocation';
 import { rankStationsByValue } from '../lib/smartDecision';
+import { evaluateStation } from '../lib/quarantine';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
+
+function nullIfImplausible(station, fuelKey, value) {
+  if (value == null) return null;
+  const verdict = evaluateStation(station, fuelKey);
+  if (verdict.quarantined && verdict.reason === 'out_of_range') return null;
+  return value;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,11 +68,11 @@ function normalizeStation(s) {
     ...s,
     distance_km: km,
     prices: {
-      petrol: s.petrol_price ?? null,
-      diesel: s.diesel_price ?? null,
-      e10: s.e10_price ?? null,
-      super_unleaded: s.super_unleaded_price ?? null,
-      premium_diesel: s.premium_diesel_price ?? null,
+      petrol: nullIfImplausible(s, 'petrol', s.petrol_price ?? null),
+      diesel: nullIfImplausible(s, 'diesel', s.diesel_price ?? null),
+      e10: nullIfImplausible(s, 'e10', s.e10_price ?? null),
+      super_unleaded: nullIfImplausible(s, 'super_unleaded', s.super_unleaded_price ?? null),
+      premium_diesel: nullIfImplausible(s, 'premium_diesel', s.premium_diesel_price ?? null),
     },
   };
 }
