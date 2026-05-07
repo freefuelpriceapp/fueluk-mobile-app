@@ -17,6 +17,7 @@
  * so we don't fake variation that doesn't exist.
  */
 import { parsePrice } from './price';
+import { resolvePrice } from './quarantine';
 import { UK_REGIONS, haversineKm } from './ukRegions';
 
 export const HEATMAP_COLOURS = {
@@ -59,12 +60,23 @@ export function extractPostcodeDistrict(station) {
   return null;
 }
 
+function readStationPrice(station, fuelType) {
+  // Use the same resolver Pin mode uses so the heatmap reads the SAME
+  // wire-format prices (flat `<fuel>_price` fields) — not a stricter
+  // subset that returns null for the API's actual shape. This was the
+  // root-cause of the post-PR43 "data unavailable" bug.
+  const resolved = resolvePrice(station, fuelType);
+  if (resolved !== null && Number.isFinite(resolved)) return resolved;
+  // Defensive fallback for tests that pass synthetic shapes.
+  const raw = station?.prices?.[fuelType] ?? station?.[fuelType] ?? null;
+  return parsePrice(raw);
+}
+
 function avgPrice(stations, fuelType) {
   let sum = 0;
   let count = 0;
   for (const s of stations) {
-    const raw = s?.prices?.[fuelType] ?? s?.[fuelType] ?? null;
-    const p = parsePrice(raw);
+    const p = readStationPrice(s, fuelType);
     if (p === null) continue;
     sum += p;
     count += 1;
@@ -92,8 +104,7 @@ function cheapestStation(stations, fuelType) {
   let best = null;
   let bestP = Infinity;
   for (const s of stations) {
-    const raw = s?.prices?.[fuelType] ?? s?.[fuelType] ?? null;
-    const p = parsePrice(raw);
+    const p = readStationPrice(s, fuelType);
     if (p !== null && p < bestP) {
       bestP = p;
       best = s;
@@ -445,8 +456,7 @@ export function clusterStationsAsMicroBlooms(stations, fuelType = 'petrol') {
     const s = stations[i];
     const c = getCoords(s);
     if (!c) continue;
-    const raw = s?.prices?.[fuelType] ?? s?.[fuelType] ?? null;
-    const p = parsePrice(raw);
+    const p = readStationPrice(s, fuelType);
     if (p === null) continue;
     out.push({
       id: `micro:${s?.id ?? i}`,
@@ -561,13 +571,31 @@ export function diagnoseHeatmap({
   viewportSpanKm: spanKm,
   visibleStations,
   filteredStations,
+  fuelType = 'petrol',
   build,
 }) {
+  // Count how many stations have a price the heatmap can actually read for
+  // the chosen fuel. If this is 0 while filteredCount > 0, the wire-format
+  // and the heatmap's price reader have diverged — exactly the post-PR43
+  // bug class.
+  const visList = Array.isArray(visibleStations) ? visibleStations : [];
+  const fullList = Array.isArray(filteredStations) ? filteredStations : [];
+  let visiblePriced = 0;
+  for (const s of visList) {
+    if (readStationPrice(s, fuelType) !== null) visiblePriced += 1;
+  }
+  let filteredPriced = 0;
+  for (const s of fullList) {
+    if (readStationPrice(s, fuelType) !== null) filteredPriced += 1;
+  }
   return {
     spanKm: Number.isFinite(spanKm) ? Math.round(spanKm * 10) / 10 : null,
     tier: build?.tier ?? null,
-    visibleCount: Array.isArray(visibleStations) ? visibleStations.length : 0,
-    filteredCount: Array.isArray(filteredStations) ? filteredStations.length : 0,
+    fuelType,
+    visibleCount: visList.length,
+    visiblePriced,
+    filteredCount: fullList.length,
+    filteredPriced,
     clusterCount: Array.isArray(build?.clusters) ? build.clusters.length : 0,
     strategy: build?.strategy ?? null,
     fallbackLevel: build?.fallbackLevel ?? null,
