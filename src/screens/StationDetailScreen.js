@@ -63,7 +63,8 @@ const COLORS = {
 //   B7_PREMIUM → premium_diesel_price  (Premium Diesel)
 const FUEL_DISPLAY = [
   { key: 'e10', field: 'e10_price', sourceField: 'e10_source', label: 'Petrol (E10)', color: THEME_FUEL_COLORS.e10 },
-  { key: 'petrol', field: 'petrol_price', sourceField: 'petrol_source', label: 'Premium petrol (E5 97/99)', color: THEME_FUEL_COLORS.super_unleaded },
+  // B-05: canonical key is 'super_unleaded'; field remains 'petrol_price' (backend wire column)
+  { key: 'super_unleaded', field: 'petrol_price', sourceField: 'petrol_source', label: 'Premium petrol (E5 97/99)', color: THEME_FUEL_COLORS.super_unleaded },
   { key: 'diesel', field: 'diesel_price', sourceField: 'diesel_source', label: 'Diesel', color: THEME_FUEL_COLORS.diesel },
   { key: 'premiumDiesel', field: 'premium_diesel_price', sourceField: 'premium_diesel_source', label: 'Premium Diesel', color: THEME_FUEL_COLORS.premium_diesel },
 ];

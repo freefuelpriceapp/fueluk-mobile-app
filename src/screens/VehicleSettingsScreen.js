@@ -21,12 +21,16 @@ import {
 import { lookupVehicle } from '../api/fuelApi';
 import { formatVehicleHeader } from '../lib/formatVehicleHeader';
 import EmptyState from '../components/EmptyState';
+import { FUEL_KEY_MIGRATION } from '../lib/fuelTaxonomy';
 
+// B-05: Use canonical fuel-type keys from fuelTaxonomy. Old keys ('e5',
+// 'e10', 'petrol') that may be persisted in AsyncStorage are migrated
+// transparently via FUEL_KEY_MIGRATION on load.
 const FUEL_OPTIONS = [
-  { key: 'e10', label: 'E10 (regular petrol)', default_mpg: UK_AVG_MPG.e10 },
-  { key: 'e5', label: 'E5 / Super unleaded', default_mpg: UK_AVG_MPG.e5 },
-  { key: 'diesel', label: 'B7 / Diesel', default_mpg: UK_AVG_MPG.diesel },
-  { key: 'premium_diesel', label: 'Premium Diesel', default_mpg: UK_AVG_MPG.premium_diesel },
+  { key: 'unleaded',       label: 'E10 (regular petrol)',   default_mpg: UK_AVG_MPG.e10 },
+  { key: 'super_unleaded', label: 'E5 / Super unleaded',    default_mpg: UK_AVG_MPG.super_unleaded },
+  { key: 'diesel',         label: 'B7 / Diesel',            default_mpg: UK_AVG_MPG.diesel },
+  { key: 'premium_diesel', label: 'Premium Diesel',         default_mpg: UK_AVG_MPG.premium_diesel },
 ];
 
 /**
@@ -47,7 +51,7 @@ export default function VehicleSettingsScreen({ navigation, route }) {
   const [reg, setReg] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupErr, setLookupErr] = useState(null);
-  const [fuelType, setFuelType] = useState('e10');
+  const [fuelType, setFuelType] = useState('unleaded'); // B-05: use canonical key
   const [mpgInput, setMpgInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [deepLinkMismatch, setDeepLinkMismatch] = useState(false);
@@ -59,7 +63,13 @@ export default function VehicleSettingsScreen({ navigation, route }) {
       if (v) {
         setCurrent(v);
         if (v.reg) setReg(v.reg);
-        if (v.fuel_type) setFuelType(v.fuel_type);
+        if (v.fuel_type) {
+          // B-05: migrate legacy persisted keys ('e5', 'e10', 'petrol') to
+          // canonical taxonomy keys on load. FUEL_KEY_MIGRATION is a no-op for
+          // keys that are already canonical.
+          const canonicalFuelType = FUEL_KEY_MIGRATION[v.fuel_type] ?? v.fuel_type;
+          setFuelType(canonicalFuelType);
+        }
         if (typeof v.mpg === 'number') setMpgInput(String(v.mpg));
       }
       // If we arrived via fueluk://car/:reg and the saved vehicle (if any)
@@ -87,9 +97,12 @@ export default function VehicleSettingsScreen({ navigation, route }) {
     try {
       const resp = await lookupVehicle(cleaned);
       const apiFuel = (resp?.fuel_type || '').toLowerCase();
+      // B-05: map API fuel type string to canonical taxonomy key
       const mapped =
-        apiFuel.includes('diesel') ? 'diesel'
-          : apiFuel.includes('petrol') || apiFuel.includes('e10') ? 'e10'
+        apiFuel.includes('premium_diesel') || apiFuel.includes('premium diesel') ? 'premium_diesel'
+          : apiFuel.includes('diesel') ? 'diesel'
+          : apiFuel.includes('super') || apiFuel.includes('e5') ? 'super_unleaded'
+          : apiFuel.includes('petrol') || apiFuel.includes('e10') || apiFuel.includes('unleaded') ? 'unleaded'
           : fuelType;
       const mpg =
         typeof resp?.estimated_mpg === 'number' && Number.isFinite(resp.estimated_mpg)
@@ -140,7 +153,7 @@ export default function VehicleSettingsScreen({ navigation, route }) {
     setCurrent(null);
     setReg('');
     setMpgInput('');
-    setFuelType('e10');
+    setFuelType('unleaded'); // B-05: canonical default
   }, []);
 
   if (!loaded) {

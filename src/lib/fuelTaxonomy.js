@@ -61,6 +61,24 @@ export const BACKEND_FIELD_FOR_KEY = {
   premiumDiesel: 'premium_diesel_price',
 };
 
+/**
+ * Migration map: pre-canonicalisation fuel-type keys that may be persisted in
+ * AsyncStorage from older app versions → canonical taxonomy key.
+ *
+ * Usage (VehicleSettingsScreen load path):
+ *   const canonicalKey = FUEL_KEY_MIGRATION[raw] ?? raw;
+ *
+ * 'e5' was used by VehicleSettingsScreen before Wave A.4.
+ * 'e10' was used as a direct canonical key before 'unleaded' was established.
+ * 'petrol' was used in StationDetailScreen FUEL_DISPLAY and some payloads.
+ */
+export const FUEL_KEY_MIGRATION = {
+  e5: 'super_unleaded',
+  e10: 'unleaded',
+  petrol: 'super_unleaded',
+  premiumDiesel: 'premium_diesel',
+};
+
 // Convenience helper — returns the label for a fuel key, falling back to the
 // raw key (Title Cased) so we never render `undefined`.
 export function labelForFuelKey(key) {
@@ -77,5 +95,6 @@ export default {
   FUEL_KEYS,
   FUEL_LABELS,
   BACKEND_FIELD_FOR_KEY,
+  FUEL_KEY_MIGRATION,
   labelForFuelKey,
 };
