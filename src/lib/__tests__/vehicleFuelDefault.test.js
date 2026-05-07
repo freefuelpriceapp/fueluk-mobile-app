@@ -3,7 +3,7 @@
  *
  * Pins:
  *   - Modern petrol (post-2011) → 'unleaded' (E10-safe)
- *   - Old petrol (<2011)        → 'super_unleaded' (E5)
+ *   - Old petrol (<2011)        → 'unleaded' (Wave A.7: always cheapest 95-RON)
  *   - Diesel                    → 'diesel'
  *   - Hybrid                    → 'unleaded'
  *   - Electric                  → null
@@ -40,13 +40,47 @@ describe('recommendedFuelKey — branch matrix', () => {
     ).toBe('unleaded');
   });
 
-  test('pre-2011 petrol → super_unleaded (E5)', () => {
+  test('pre-2011 petrol → unleaded (Wave A.7: always default to E10)', () => {
     expect(
       recommendedFuelKey({ fuel_type_detailed: 'PETROL', monthOfFirstRegistration: '2008-04' }),
-    ).toBe('super_unleaded');
+    ).toBe('unleaded');
     expect(
       recommendedFuelKey({ fuel_type_detailed: 'PETROL', year: 1995 }),
-    ).toBe('super_unleaded');
+    ).toBe('unleaded');
+  });
+
+  test('Wave A.7: 2008 Honda Civic 1.4 petrol → unleaded (pre-2011 sanity check)', () => {
+    expect(
+      recommendedFuelKey({
+        fuel_type_detailed: 'PETROL',
+        monthOfFirstRegistration: '2008-03',
+        make: 'Honda',
+        model: 'Civic',
+        engine_capacity_cc: 1339,
+      }),
+    ).toBe('unleaded');
+  });
+
+  test('Wave A.7: 2024 Toyota Yaris hybrid → unleaded', () => {
+    expect(
+      recommendedFuelKey({
+        fuel_type_detailed: 'HYBRID',
+        monthOfFirstRegistration: '2024-01',
+        make: 'Toyota',
+        model: 'Yaris',
+      }),
+    ).toBe('unleaded');
+  });
+
+  test('Wave A.7: 1997 classic petrol → unleaded (E5 opt-in still available)', () => {
+    expect(
+      recommendedFuelKey({
+        fuel_type_detailed: 'PETROL',
+        year: 1997,
+        make: 'Classic',
+        model: 'Rover',
+      }),
+    ).toBe('unleaded');
   });
 
   test('diesel → diesel (regardless of year)', () => {
@@ -99,9 +133,10 @@ describe('recommendedFuelKey — branch matrix', () => {
   });
 
   test('year derives from monthOfFirstRegistration when present, else year field', () => {
+    // Wave A.7: all petrol defaults to unleaded regardless of year
     expect(
       recommendedFuelKey({ fuel_type_detailed: 'PETROL', year: 2008 }),
-    ).toBe('super_unleaded');
+    ).toBe('unleaded');
     expect(
       recommendedFuelKey({ fuel_type_detailed: 'PETROL', year: '2015' }),
     ).toBe('unleaded');
@@ -143,6 +178,20 @@ describe('recommendedReason — user-facing caption', () => {
     expect(recommendedReason(null)).toBeNull();
     expect(recommendedReason({ fuel_type_detailed: 'ELECTRIC' })).toBeNull();
     expect(recommendedReason({ fuel_type_detailed: 'PETROL' })).toBeNull();
+  });
+
+  test('Wave A.7: pre-2011 petrol reason string says E10 (not Super E5)', () => {
+    const r = recommendedReason({
+      fuel_type_detailed: 'PETROL',
+      monthOfFirstRegistration: '2008-04',
+      make: 'Honda',
+      model: 'Civic',
+    });
+    expect(r).not.toBeNull();
+    expect(r.toLowerCase()).toContain('e10');
+    expect(r.toLowerCase()).not.toContain('super');
+    expect(r).toContain('Honda');
+    expect(r).toContain('2008');
   });
 
   test('diesel reason mentions Diesel', () => {

@@ -16,11 +16,10 @@
  * out at most stations and only remains relevant for older / classic
  * petrol engines that may suffer ethanol corrosion damage.
  *
- * Therefore for any post-2011 petrol vehicle we recommend `'unleaded'`
- * (which the app's smart-resolver collapses to min(E10, E5) at ranking
- * time — see fuelResolution.resolveUnleadedPrice). Pre-2011 petrol
- * vehicles fall back to `'super_unleaded'` (E5 super) since regular E5 is
- * being phased out.
+ * All petrol/hybrid vehicles default to `'unleaded'`; the smart-resolver
+ * returns `min(E10, E5)` so the cheapest 95-RON price wins regardless of
+ * car age. The E5 opt-in link remains visible for pre-2011 drivers who
+ * specifically need E5 super.
  *
  * @typedef {Object} Vehicle
  * @property {string} [fuel_type_detailed]  Backend column, e.g. 'PETROL'
@@ -73,8 +72,8 @@ function matchesAny(haystack, patterns) {
  * Branch order:
  *   1. DIESEL family       → 'diesel'
  *   2. ELECTRIC / EV / BEV → null  (no fuel filter applies)
- *   3. PETROL or HYBRID    → year-aware: 2011+ ⇒ 'unleaded' (E10-safe)
- *                                         <2011 ⇒ 'super_unleaded' (E5)
+ *   3. PETROL or HYBRID    → always 'unleaded'; smart-resolver returns
+ *                             min(E10, E5) so cheapest 95-RON wins
  *   4. Anything unknown    → 'unleaded' (best-guess for the modal UK driver)
  *
  * Returns one of: 'unleaded' | 'super_unleaded' | 'diesel' | 'premium_diesel' | null.
@@ -92,10 +91,12 @@ function recommendedFuelKey(vehicle) {
   // Hybrids and combined "PETROL/ELECTRIC" / "PETROL/EV" labels still need
   // unleaded; check petrol/hybrid BEFORE the EV branch so the slash form
   // doesn't false-match the ELECTRIC pattern.
-  const isHybrid = matchesAny(t, HYBRID_PATTERNS) || /\bPETROL\b/.test(t);
-  if (isHybrid) {
-    const year = deriveYear(vehicle);
-    if (year != null && year < 2011) return 'super_unleaded';
+  const isPetrolOrHybrid = matchesAny(t, HYBRID_PATTERNS) || /\bPETROL\b/.test(t);
+  if (isPetrolOrHybrid) {
+    // Always recommend unleaded. The smart-resolver returns min(E10, E5)
+    // per station so users see the cheapest 95-RON pump price regardless
+    // of vehicle age. Pre-2011 drivers who need E5 specifically have the
+    // explicit E5 opt-in link below the chip row.
     return 'unleaded';
   }
 

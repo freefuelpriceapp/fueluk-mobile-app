@@ -1,13 +1,13 @@
 /**
- * Wave A.6 — E5 inline link visibility rules.
+ * Wave A.7 — E5 inline link visibility rules (Option A).
  *
- * NOTE: Wave A.7 changed the default recommendation for ALL petrol/hybrid
- * vehicles to 'unleaded'. As a result the old "hide for E10-eligible vehicle"
- * gating has been removed (Option A: always show on unleaded tab). These tests
- * have been updated to reflect the new Wave A.7 behaviour. See also:
- * waveA7E5LinkVisibility.test.js for the full Wave A.7 truth table.
+ * After Wave A.7, ALL petrol/hybrid vehicles default to 'unleaded', so the
+ * old "hide for E10-eligible vehicle" gating is removed. The E5 opt-in link
+ * is now ALWAYS shown when selectedFuel === 'unleaded', regardless of vehicle
+ * age or registration status. The only case where the link is absent is when
+ * selectedFuel falls outside the ('unleaded' | 'petrol') set (e.g. 'diesel').
  *
- * Wave A.7 condition (mirrors HomeScreen.js JSX):
+ * Wave A.7 condition (mirrors HomeScreen.js JSX, Option A):
  *
  *   show = selectedFuel === 'unleaded' || selectedFuel === 'petrol'
  *
@@ -19,7 +19,7 @@ const { recommendedFuelKey } = require('../../lib/vehicleFuelDefault');
 
 /**
  * Mirror of the updated HomeScreen.js E5 link visibility condition (Wave A.7).
- * Returns true when the E5 opt-in link should be rendered.
+ * Returns true when the E5 opt-in / back link should be rendered.
  */
 function shouldShowE5Link({ selectedFuel }) {
   return selectedFuel === 'unleaded' || selectedFuel === 'petrol';
@@ -54,13 +54,13 @@ const dieselVehicle = {
 
 // -----------------------------------------------------------------------
 
-describe('Wave A.6/A.7 — E5 link visible for E10-eligible vehicle (post-2011 petrol)', () => {
-  test('Audi A3 2019 (selectedFuel=unleaded, vehicle present) → E5 link IS shown (Wave A.7)', () => {
-    // Wave A.7: all petrol defaults to unleaded; E5 link always visible on unleaded tab
+describe('Wave A.7 — E5 link visible for ALL vehicles on unleaded tab (Option A)', () => {
+  test('Audi A3 2019 (selectedFuel=unleaded, vehicle present) → E5 link IS shown', () => {
+    // Wave A.7: no vehicle-based gating; link always shows on unleaded tab
     expect(shouldShowE5Link({ selectedFuel: 'unleaded', userVehicle: audiA3_2019 })).toBe(true);
   });
 
-  test('Any post-2011 petrol vehicle → E5 link IS shown on unleaded tab (Wave A.7)', () => {
+  test('Any post-2011 petrol vehicle → E5 link IS shown on unleaded tab', () => {
     const modernPetrol = {
       fuel_type_detailed: 'PETROL',
       monthOfFirstRegistration: '2015-03',
@@ -71,21 +71,25 @@ describe('Wave A.6/A.7 — E5 link visible for E10-eligible vehicle (post-2011 p
   test('fuelRecommendation for Audi A3 2019 is unleaded (confirms Wave A.7 default)', () => {
     expect(recommendedFuelKey(audiA3_2019)).toBe('unleaded');
   });
+
+  test('fuelRecommendation for pre-2011 classic petrol is now unleaded (Wave A.7)', () => {
+    expect(recommendedFuelKey(oldClassicPetrol)).toBe('unleaded');
+  });
 });
 
-describe('Wave A.6/A.7 — E5 link remains visible in appropriate scenarios', () => {
-  test('No vehicle registered (modal-driver fallback) → E5 link IS shown', () => {
+describe('Wave A.7 — E5 link remains visible in appropriate scenarios', () => {
+  test('No vehicle registered → E5 link IS shown', () => {
     expect(shouldShowE5Link({ selectedFuel: 'unleaded', userVehicle: null })).toBe(true);
     expect(shouldShowE5Link({ selectedFuel: 'unleaded', userVehicle: undefined })).toBe(true);
   });
 
-  test('Pre-2011 petrol (Wave A.7: unleaded recommendation) → E5 link IS shown', () => {
-    // Wave A.7: pre-2011 cars now recommend 'unleaded' (not super_unleaded)
+  test('Pre-2011 petrol (now unleaded recommendation) → E5 link IS shown', () => {
+    // Wave A.7: pre-2011 cars get unleaded recommendation, link still shows
     expect(recommendedFuelKey(oldClassicPetrol)).toBe('unleaded');
     expect(shouldShowE5Link({ selectedFuel: 'unleaded', userVehicle: oldClassicPetrol })).toBe(true);
   });
 
-  test('Diesel vehicle → E5 link IS shown (useful opt-in)', () => {
+  test('Diesel vehicle + unleaded tab → E5 link IS shown (useful opt-in)', () => {
     expect(shouldShowE5Link({ selectedFuel: 'unleaded', userVehicle: dieselVehicle })).toBe(true);
   });
 
@@ -95,18 +99,35 @@ describe('Wave A.6/A.7 — E5 link remains visible in appropriate scenarios', ()
     expect(shouldShowE5Link({ selectedFuel: 'petrol', userVehicle: audiA3_2019 })).toBe(true);
   });
 
-  test('Diesel fuel tab selected → outer condition false, link not rendered (not petrol tab)', () => {
-    // When selectedFuel='diesel', the entire outer condition is false —
+  test('Diesel fuel tab selected → outer condition false, link not rendered', () => {
+    // When selectedFuel='diesel', the entire condition is false —
     // no E5 link for diesel tab at all (unchanged behaviour).
     expect(shouldShowE5Link({ selectedFuel: 'diesel', userVehicle: null })).toBe(false);
   });
 });
 
-describe('Wave A.7 — E5 link hidden ONLY when selectedFuel is not unleaded or petrol', () => {
-  // Wave A.7 Option A: the ONLY time the E5 link is hidden is when selectedFuel
-  // is outside the ('unleaded' | 'petrol') set (e.g. diesel tab).
+describe('Wave A.7 — E5 link hidden ONLY when on non-petrol/unleaded tabs', () => {
+  test('selectedFuel=diesel → E5 link hidden', () => {
+    expect(shouldShowE5Link({ selectedFuel: 'diesel' })).toBe(false);
+  });
+
+  test('selectedFuel=premium_diesel → E5 link hidden', () => {
+    expect(shouldShowE5Link({ selectedFuel: 'premium_diesel' })).toBe(false);
+  });
+
+  test('selectedFuel=unleaded → E5 link shown (even with vehicle)', () => {
+    expect(shouldShowE5Link({ selectedFuel: 'unleaded' })).toBe(true);
+  });
+
+  test('selectedFuel=petrol → back-link shown (user on E5 tab)', () => {
+    expect(shouldShowE5Link({ selectedFuel: 'petrol' })).toBe(true);
+  });
+});
+
+describe('Wave A.7 — E5 link condition truth table', () => {
+  // Rows: [selectedFuel, userVehicle, expected]
   const cases = [
-    // E10-eligible vehicle + unleaded tab → SHOW (Wave A.7 change from A.6)
+    // E10-eligible vehicle + unleaded tab → SHOW (Wave A.7 change)
     ['unleaded', audiA3_2019,      true],
     // E10-eligible vehicle + petrol tab  → SHOW (back-link)
     ['petrol',   audiA3_2019,      true],

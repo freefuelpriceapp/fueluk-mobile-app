@@ -560,16 +560,12 @@ const HomeScreen = ({ navigation }) => {
           grade. Drivers of older cars or those who want premium fuel can
           tap through.
 
-          Wave A.6 — Hide entirely for E10-eligible vehicles (post-2011
-          petrol/hybrid) where fuelRecommendation === 'unleaded' and a
-          vehicle is registered. They will never need E5 as their default
-          and seeing the link creates confusion. Keep visible when:
-            - No vehicle registered (modal-driver fallback)
-            - Vehicle recommends super_unleaded (pre-2011 petrol)
-            - Vehicle is diesel or EV (link is still useful as opt-in)
-            - User has already tapped through to E5 (selectedFuel === 'petrol') */}
-      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') &&
-        !(fuelRecommendation === 'unleaded' && !!userVehicle && selectedFuel !== 'petrol') && (
+          Wave A.7 — Option A: Always show the E5 link on the unleaded tab
+          (regardless of vehicle age) so pre-2011 drivers retain the E5
+          opt-in. Hide only when the user is already ON the E5 tab
+          (selectedFuel === 'petrol'), where the link flips to a back-link
+          automatically. */}
+      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') && (
         <TouchableOpacity
           style={styles.e5OptInRow}
           onPress={() =>
