@@ -534,7 +534,26 @@ export default function StationDetailScreen({ route }) {
   // ─── Main render ─────────────────────────────────────────────────────────────
 
   const availableFuels = FUEL_DISPLAY.filter((f) => station?.[f.field] != null);
-  const fuelsToRender = availableFuels.length > 0 ? availableFuels : FUEL_DISPLAY;
+  // Wave A.4 — within the petrol family (e10 + petrol/E5) render cheapest
+  // first so the user sees the money-saving grade up top regardless of
+  // which column the station fills. Diesel family stays in its current
+  // {diesel, premiumDiesel} order.
+  const PETROL_FAMILY = new Set(['e10', 'petrol']);
+  const sortedAvailableFuels = (() => {
+    const petrolGroup = availableFuels
+      .filter((f) => PETROL_FAMILY.has(f.key))
+      .slice()
+      .sort((a, b) => {
+        const pa = Number(station?.[a.field]);
+        const pb = Number(station?.[b.field]);
+        if (!Number.isFinite(pa)) return 1;
+        if (!Number.isFinite(pb)) return -1;
+        return pa - pb;
+      });
+    const dieselGroup = availableFuels.filter((f) => !PETROL_FAMILY.has(f.key));
+    return [...petrolGroup, ...dieselGroup];
+  })();
+  const fuelsToRender = sortedAvailableFuels.length > 0 ? sortedAvailableFuels : FUEL_DISPLAY;
 
   const usualDays = station?.opening_hours?.usual_days || null;
   const hoursGroups = groupOpeningHours(usualDays);

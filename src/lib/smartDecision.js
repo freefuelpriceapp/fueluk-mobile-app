@@ -124,6 +124,7 @@ export function rankStationsByValue(stations, {
   mpg = DEFAULT_MPG,
   fillLitres = DEFAULT_FILL_LITRES,
   distancePenalty = DISTANCE_PENALTY_PER_MILE,
+  priceFn = null,
 } = {}) {
   if (!Array.isArray(stations)) return [];
   const effMpg = toNum(mpg) || DEFAULT_MPG;
@@ -132,7 +133,12 @@ export function rankStationsByValue(stations, {
 
   return stations
     .map((station) => {
-      const price = toNum(station && station[fuelKey]);
+      // Wave A.4 — when caller wants synthetic/resolved pricing (e.g.
+      // 'unleaded' = min(e10, petrol)) they pass priceFn. Otherwise we
+      // read the requested wire field directly.
+      const price = typeof priceFn === 'function'
+        ? toNum(priceFn(station))
+        : toNum(station && station[fuelKey]);
       const miles = toNum(station && station.distance_miles);
 
       if (price === null) {

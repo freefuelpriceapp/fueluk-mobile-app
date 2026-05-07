@@ -48,11 +48,17 @@ describe('fuelTaxonomy', () => {
   });
 
   describe('BACKEND_FIELD_FOR_KEY', () => {
-    it('maps each canonical key to the backend response field', () => {
-      expect(BACKEND_FIELD_FOR_KEY.unleaded).toBe('petrol_price');
+    it('maps single-grade canonical keys to their backend response field', () => {
       expect(BACKEND_FIELD_FOR_KEY.super_unleaded).toBe('super_unleaded_price');
       expect(BACKEND_FIELD_FOR_KEY.diesel).toBe('diesel_price');
       expect(BACKEND_FIELD_FOR_KEY.premium_diesel).toBe('premium_diesel_price');
+    });
+
+    it('Wave A.4 — unleaded is null (no single column; use resolvePriceForKey)', () => {
+      // Regression: PR #55 mapped unleaded → petrol_price (E5), which
+      // silently re-introduced the E10/E5 sort bug. Keep this null so any
+      // accidental BACKEND_FIELD_FOR_KEY['unleaded'] caller fails loud.
+      expect(BACKEND_FIELD_FOR_KEY.unleaded).toBeNull();
     });
   });
 
