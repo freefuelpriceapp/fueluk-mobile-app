@@ -21,6 +21,7 @@ import VehicleCheckScreen from './src/screens/VehicleCheckScreen';
 import PrePurchaseCheckScreen from './src/screens/PrePurchaseCheckScreen';
 import VehicleSettingsScreen from './src/screens/VehicleSettingsScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
+import WelcomeFlowScreen, { WELCOME_COMPLETED_KEY } from './src/screens/WelcomeFlowScreen';
 import FuelLogScreen from './src/screens/FuelLogScreen';
 import ReceiptCaptureScreen from './src/screens/ReceiptCaptureScreen';
 import ReceiptReviewScreen from './src/screens/ReceiptReviewScreen';
@@ -47,6 +48,46 @@ import {
 import { loadReceipts } from './src/lib/receiptRepository';
 
 const LOCATION_PERMISSION_SHOWN_KEY = 'location_permission_shown';
+
+// Wave A.9 — Remote config for welcome flow kill-switch.
+// Follows the existing FEATURE_FLAGS pattern in src/config/featureFlags.js.
+// This flag is remotely flippable via /api/v1/config/flags endpoint (cached 1h).
+// Default: ON (true). Set FEATURE_WELCOME_FLOW_ENABLED=false on server to kill.
+const WELCOME_FLOW_FLAGS_KEY = 'welcome_flow_flags_cache';
+const WELCOME_FLOW_FLAGS_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function getWelcomeFlowEnabled() {
+  // Check in-memory / AsyncStorage cache first
+  try {
+    const cached = await AsyncStorage.getItem(WELCOME_FLOW_FLAGS_KEY);
+    if (cached) {
+      const { value, expiresAt } = JSON.parse(cached);
+      if (Date.now() < expiresAt) return value;
+    }
+  } catch (_e) {}
+
+  // Fetch from remote config endpoint
+  try {
+    const BASE_URL = 'https://api.freefuelpriceapp.com';
+    const res = await fetch(`${BASE_URL}/api/v1/config/flags`, {
+      signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined,
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const enabled = json && json.welcome_flow_enabled !== false;
+      // Cache the result
+      await AsyncStorage.setItem(
+        WELCOME_FLOW_FLAGS_KEY,
+        JSON.stringify({ value: enabled, expiresAt: Date.now() + WELCOME_FLOW_FLAGS_TTL_MS })
+      );
+      return enabled;
+    }
+  } catch (_e) {
+    // Network failure — default to ON (never block user unnecessarily)
+  }
+
+  return true; // default ON
+}
 // Bumping this forces a one-shot purge of AsyncStorage caches that might hold
 // the legacy brand-enrichment shape ({ name, count }) from the pre-hardening
 // API. Each bump wipes `cached_nearby_stations` and normalises `user_favourites`.
@@ -514,11 +555,30 @@ export default function App() {
   const [showReceiptOnboarding, setShowReceiptOnboarding] = useState(false);
   const navigationRef = useRef(null);
 
+  // Wave A.9 — Welcome flow state
+  // showWelcomeFlow: null = checking, true = show, false = skip
+  const [welcomeFlowChecked, setWelcomeFlowChecked] = useState(false);
+  const [showWelcomeFlow, setShowWelcomeFlow] = useState(false);
+
   useEffect(() => {
     (async () => {
       // Run cache migration before any screen reads AsyncStorage so stale
       // object-shaped brand/name values can't leak into render.
       await runCacheMigration();
+
+      // Wave A.9 — Check welcome flow gate
+      // Must be checked before permission gate so new users see it first.
+      try {
+        const welcomeDone = await AsyncStorage.getItem(WELCOME_COMPLETED_KEY);
+        const flagEnabled = await getWelcomeFlowEnabled();
+        // Show if: not completed AND flag is ON
+        setShowWelcomeFlow(welcomeDone !== 'true' && flagEnabled);
+      } catch (_e) {
+        setShowWelcomeFlow(false);
+      } finally {
+        setWelcomeFlowChecked(true);
+      }
+
       try {
         const flag = await AsyncStorage.getItem(LOCATION_PERMISSION_SHOWN_KEY);
         setShowPermissionGate(!flag);
@@ -613,16 +673,37 @@ export default function App() {
     setShowPermissionGate(false);
   };
 
+  // Wave A.9 — Welcome flow completion handler
+  const handleWelcomeComplete = (destination) => {
+    setShowWelcomeFlow(false);
+    // After welcome flow, route to the chosen destination via navigation
+    // (navigation ref will be ready once TabNavigator mounts)
+    // We store the pending destination and handle it after nav is ready.
+    if (destination === 'alerts') {
+      // Brief delay to let nav tree mount
+      setTimeout(() => {
+        if (navigationRef.current) {
+          try {
+            navigationRef.current.navigate('Toolbox', { screen: 'Alerts' });
+          } catch (_e) {}
+        }
+      }, 300);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        {permissionGateChecked && showPermissionGate ? (
+        {/* Wave A.9 — Welcome flow gate: checked first, before location permission */}
+        {welcomeFlowChecked && showWelcomeFlow ? (
+          <WelcomeFlowScreen onComplete={handleWelcomeComplete} />
+        ) : welcomeFlowChecked && permissionGateChecked && showPermissionGate ? (
           <LocationPermissionScreen
             onGranted={dismissPermissionGate}
             onSkip={dismissPermissionGate}
           />
-        ) : permissionGateChecked ? (
+        ) : welcomeFlowChecked && permissionGateChecked ? (
           <NavigationContainer
             ref={navigationRef}
             onReady={() => setNavReady(true)}
