@@ -299,3 +299,34 @@ export async function calculateTrip({
   });
   return resp.data;
 }
+
+/**
+ * Wave A.9 — Welcome flow savings estimate.
+ *
+ * Privacy contract:
+ *   - Do NOT pass plate to this function. Mobile resolves plate → vehicle
+ *     details via lookupVehicle first, then passes make/model/fuel_type/mpg here.
+ *   - lat/lon should be truncated to 3 d.p. before calling (done in WelcomeFlowScreen).
+ *
+ * @param {object} params
+ * @param {number} params.lat            - truncated to 3dp by caller
+ * @param {number} params.lon            - truncated to 3dp by caller
+ * @param {string} [params.make]
+ * @param {string} [params.model]
+ * @param {string} [params.fuel_type]
+ * @param {number} [params.mpg]
+ * @param {number} [params.mileage_per_year]
+ * @returns {Promise<{frame, headline, amount_pence, methodology, area_label, percentile}>}
+ */
+export async function getSavingsEstimate({ lat, lon, make, model, fuel_type, mpg, mileage_per_year } = {}) {
+  const body = { lat, lon };
+  if (make) body.make = make;
+  if (model) body.model = model;
+  if (fuel_type) body.fuel_type = fuel_type;
+  if (mpg != null && Number.isFinite(Number(mpg))) body.mpg = Number(mpg);
+  if (mileage_per_year != null && Number.isFinite(Number(mileage_per_year))) {
+    body.mileage_per_year = Number(mileage_per_year);
+  }
+  const resp = await api.post('/api/v1/welcome/savings-estimate', body);
+  return resp.data;
+}
