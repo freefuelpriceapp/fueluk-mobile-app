@@ -820,7 +820,19 @@ export default function MapScreen({ navigation, route }) {
           showsUserLocation
           showsMyLocationButton={Platform.OS === 'android'}
           customMapStyle={mapStyle}
-          onPress={() => { dismissSheet(); setSelectedCluster(null); if (autoFocusCallout) dismissAutoFocus(); }}
+          onPress={(e) => {
+            // Guard against marker taps propagating to MapView onPress.
+            // On both platforms react-native-maps fires this handler with
+            // nativeEvent.action='marker-press' when the press originated
+            // on a Marker, in which case we must NOT dismiss the sheet -
+            // doing so causes the sheet to animate up then immediately
+            // back down (the original "sheet appears for a second then
+            // disappears" bug). Only dismiss on real empty-map taps.
+            if (e?.nativeEvent?.action === 'marker-press') return;
+            dismissSheet();
+            setSelectedCluster(null);
+            if (autoFocusCallout) dismissAutoFocus();
+          }}
           onRegionChangeComplete={onRegionChangeComplete}
           clusterColor={'#10B981'}
           clusterTextColor={'#0B0F14'}
