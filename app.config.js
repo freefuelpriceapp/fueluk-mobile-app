@@ -31,7 +31,7 @@ module.exports = () => ({
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.freefuelpriceapp.uk",
-      buildNumber: "2",
+      buildNumber: "7",
       config: {
         googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY_IOS,
       },
