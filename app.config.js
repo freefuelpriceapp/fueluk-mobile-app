@@ -48,7 +48,7 @@ module.exports = () => ({
         backgroundColor: "#00B86B",
       },
       package: "com.freefuelpriceapp.uk",
-      versionCode: 2,
+      versionCode: 7,
       config: {
         googleMaps: {
           apiKey: process.env.GOOGLE_MAPS_API_KEY_ANDROID,
