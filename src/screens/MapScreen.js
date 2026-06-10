@@ -84,7 +84,14 @@ const FUEL_TYPES = [
   { key: 'premium_diesel', label: 'Prem. Diesel',   color: FUEL_COLORS.premium_diesel },
 ];
 
-const BOTTOM_SHEET_HEIGHT = 240;
+// Bottom-sheet slide distance. This is the translateY value used to
+// hide the sheet off-screen. The sheet has intrinsic height (no fixed
+// height in styles), so this number must be >= the tallest possible
+// sheet content for the action buttons to fully clear the bottom.
+// Tallest case ≈ 380px (handle + header + price pills + break-even
+// badge + primary buttons + util row + padding). 480 gives generous
+// headroom on devices with home-bar safe areas.
+const BOTTOM_SHEET_HEIGHT = 480;
 
 // Session-scoped flag — set when the user first toggles into heatmap
 // mode in this app session. Lives in module memory so it survives screen
