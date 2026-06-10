@@ -13,7 +13,10 @@ const DEFAULT_POSTCODE = 'B1 1AA';
 const DEFAULT_RADIUS_KM = 5;
 // Birmingham as UK fallback — matches the bug-fix spec and keeps /nearby useful.
 const DEFAULT_COORDS = { latitude: 52.4862, longitude: -1.8904 };
-const PERMISSION_TIMEOUT_MS = 6000;
+// Bumped from 6000 — cold-start Android permission dialogs on first install
+// frequently take longer than 6s, which triggered a spurious "location not
+// enabled" fallback even when the user later granted permission.
+const PERMISSION_TIMEOUT_MS = 15000;
 
 const useLocation = () => {
   const [location, setLocation] = useState(null);
@@ -81,6 +84,10 @@ const useLocation = () => {
       }
 
       if (!mountedRef.current) return;
+      // Make sure we don't leave a stale 'timeout' status sitting around
+      // after a successful resolve — the landing page reads this to decide
+      // whether to show the "location not enabled" banner.
+      setPermissionStatus('granted');
       setLocation({
         postcode,
         radiusKm: DEFAULT_RADIUS_KM,
