@@ -140,9 +140,35 @@ const StationMarker = ({
   // before Text nodes have finished measuring, leaving the price
   // clipped to a single glyph. Track changes for the first ~400ms,
   // then freeze so we don't burn battery re-rasterising every frame.
+  //
+  // iOS fix (June 2026): the previous version reset tracking=true every
+  // time priceLabel changed, which fired on re-renders triggered by
+  // selection / bounce animations. While tracking=true on iOS Google
+  // Maps, the native marker view tears down and re-creates, producing
+  // the "pin disappears and reappears elsewhere" behaviour seen on tap.
+  // The new logic uses a ref so we track only ONCE per mount and never
+  // re-enable, while still allowing genuine price-change re-renders to
+  // re-track briefly via a separate effect that compares previous and
+  // current priceLabel explicitly (not via dep array).
   const [tracking, setTracking] = useState(true);
+  const trackingDoneRef = useRef(false);
+  const lastPriceLabelRef = useRef(priceLabel);
   useEffect(() => {
-    const t = setTimeout(() => setTracking(false), 400);
+    if (trackingDoneRef.current) return; // first-mount only
+    const t = setTimeout(() => {
+      setTracking(false);
+      trackingDoneRef.current = true;
+    }, 400);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    // Only re-track when the price label genuinely changes (e.g. new data
+    // arrived for this station), not on every re-render.
+    if (!trackingDoneRef.current) return;
+    if (lastPriceLabelRef.current === priceLabel) return;
+    lastPriceLabelRef.current = priceLabel;
+    setTracking(true);
+    const t = setTimeout(() => setTracking(false), 250);
     return () => clearTimeout(t);
   }, [priceLabel]);
 
