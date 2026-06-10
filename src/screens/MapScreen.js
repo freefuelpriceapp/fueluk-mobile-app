@@ -18,11 +18,18 @@ import {
 let MapView;
 let Marker;
 let Circle;
+let PROVIDER_GOOGLE;
 if (Platform.OS !== 'web') {
   // ClusteredMapView wraps react-native-maps' MapView with built-in supercluster.
   MapView = require('react-native-map-clustering').default;
   Marker = require('react-native-maps').Marker;
   Circle = require('react-native-maps').Circle;
+  // PROVIDER_GOOGLE forces Google Maps on both platforms. On Android this
+  // is required for the API key in app.config.js to take effect — without
+  // it, react-native-maps falls back to a stub that renders tiles but
+  // doesn't bind gesture handlers, so pinch-to-zoom, marker rendering
+  // and animateToRegion all silently no-op.
+  PROVIDER_GOOGLE = require('react-native-maps').PROVIDER_GOOGLE;
 }
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -592,6 +599,13 @@ export default function MapScreen({ navigation, route }) {
     regionDebounceRef.current = setTimeout(() => setVisibleRegion(region), 150);
   }, []);
 
+  // Defensive bootstrap: if onRegionChangeComplete hasn't fired yet (e.g.
+  // race on first mount), seed visibleRegion from initialRegion so pins
+  // can render immediately instead of waiting for the first pan.
+  useEffect(() => {
+    if (!visibleRegion && initialRegion) setVisibleRegion(initialRegion);
+  }, [initialRegion, visibleRegion]);
+
   useEffect(() => () => {
     if (regionDebounceRef.current) clearTimeout(regionDebounceRef.current);
   }, []);
@@ -800,6 +814,7 @@ export default function MapScreen({ navigation, route }) {
       <MapErrorBoundary>
         <MapView
           ref={mapRef}
+          provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
           initialRegion={initialRegion}
           showsUserLocation
