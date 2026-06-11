@@ -21,6 +21,7 @@ import { rankStationsByValue } from '../lib/smartDecision';
 import { resolveUnleadedPrice } from '../lib/fuelResolution';
 import { COLORS, FUEL_COLORS } from '../lib/theme';
 import { loadUserVehicle } from '../lib/userVehicle';
+import GlowInput from '../components/GlowInput';
 import { recommendedFuelKey } from '../lib/vehicleFuelDefault';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -246,8 +247,9 @@ const SearchScreen = ({ navigation, route }) => {
         {/* Search bar */}
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color="#888" style={styles.searchIcon} />
-          <TextInput
+          <GlowInput
             style={styles.searchInput}
+            containerStyle={{ flex: 1 }}
             placeholder="Town, postcode or station name..."
             placeholderTextColor={COLORS.textMuted}
             value={query}

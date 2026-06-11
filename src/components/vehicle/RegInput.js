@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import GlowInput from '../GlowInput';
 import { COLORS, SPACING, FONT_SIZES } from '../../lib/theme';
 
 const PLATE_YELLOW = '#F5D300';
@@ -19,7 +20,7 @@ export default function RegInput({ value, onChangeText, onSubmit, loading, error
           <View style={styles.plateLeftBadge}>
             <Text style={styles.plateLeftText}>GB</Text>
           </View>
-          <TextInput
+          <GlowInput
             value={value}
             onChangeText={handleChange}
             placeholder="AB12 CDE"
@@ -30,6 +31,8 @@ export default function RegInput({ value, onChangeText, onSubmit, loading, error
             returnKeyType="search"
             onSubmitEditing={onSubmit}
             style={styles.plateInput}
+            containerStyle={{ flex: 1 }}
+            glowColor={COLORS.accent}
           />
         </View>
         <TouchableOpacity

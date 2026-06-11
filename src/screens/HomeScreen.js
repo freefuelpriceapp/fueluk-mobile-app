@@ -42,6 +42,8 @@ import FirstVehicleCelebration from '../components/FirstVehicleCelebration';
 import InstantAnswerHeadline from '../components/InstantAnswerHeadline';
 import MonthlySavingsCard from '../components/MonthlySavingsCard';
 import LifetimeSavingsCard from '../components/LifetimeSavingsCard';
+import FuelIntelCard from '../components/FuelIntelCard';
+import ComingNextStrip from '../components/ComingNextStrip';
 import LiveDataTile from '../components/LiveDataTile';
 import PriceTrajectorySparkline from '../components/PriceTrajectorySparkline';
 import {
@@ -656,12 +658,19 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <>
-              {FEATURE_FLAGS.vehicleSettings && userVehicle ? (
-                <PersonalisationChip
-                  vehicle={userVehicle}
-                  onPress={() => navigation.navigate('VehicleSettings')}
-                />
-              ) : null}
+              <FuelIntelCard
+                stations={stations}
+                fuelType={selectedFuel}
+                userVehicle={userVehicle}
+                lastUpdated={lastUpdated}
+                radiusMiles={Math.round((location?.radiusKm || 5) / 1.60934)}
+                perTankSavingPence={perTankSavingPence}
+                tankLitres={tankLitres}
+                lifetimeRefreshKey={lifetimeRefreshKey}
+                onMenuVehicleSettings={() => navigation.navigate('VehicleSettings')}
+                onMenuFilters={() => {}}
+                onMenuE5Prompt={() => setSelectedFuel('petrol')}
+              />
               {FEATURE_FLAGS.vehicleSettings && !userVehicle && !promptDismissed ? (
                 <View style={styles.vehiclePromptChip}>
                   <Ionicons name="car-sport-outline" size={14} color={COLORS.accent} />
@@ -701,24 +710,6 @@ const HomeScreen = ({ navigation }) => {
                 nationalAvgPence={nationalAvgPence}
                 onPress={handleStationPress}
               />
-              <View
-                style={[
-                  styles.savingsRow,
-                  stackSavingsCards && styles.savingsRowStacked,
-                ]}
-              >
-                <MonthlySavingsCard
-                  mpg={userVehicle?.mpg}
-                  weeklyMiles={userVehicle?.weekly_miles}
-                  tankSizeLitres={tankLitres}
-                  perTankSavingPence={perTankSavingPence}
-                  compact={stackSavingsCards}
-                />
-                <LifetimeSavingsCard
-                  refreshKey={lifetimeRefreshKey}
-                  compact={stackSavingsCards}
-                />
-              </View>
               <BestOptionCard
                 bestOption={bestOption}
                 bestValue={bestValue}
@@ -740,6 +731,7 @@ const HomeScreen = ({ navigation }) => {
           }
           ListFooterComponent={
             <>
+              <ComingNextStrip />
               {updatedInfo ? (
                 <Text style={[styles.footerText, updatedInfo.stale && styles.footerStale]}>
                   Prices last checked: {updatedInfo.label}{updatedInfo.stale ? ' (data may be out of date \u2014 pull down to refresh)' : ''}
