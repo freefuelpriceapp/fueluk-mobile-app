@@ -393,8 +393,22 @@ export default function MapScreen({ navigation, route }) {
     // surface as pins. Stations with a null price still show on the list
     // views elsewhere; they're just excluded from the visual map.
     const plausible = base.filter((s) => isPlausiblePrice(resolvePrice(s, fuelType)));
+    // Cheapest mode: keep the bottom 50% by price so the map visibly
+    // de-clutters when the user picks it (previously the Cheapest chip
+    // was a styling no-op which confused the user — they saw the chip
+    // turn green but nothing else changed). We keep at least 8 stations
+    // when possible so tiny viewports don't collapse to 1 pin.
+    if (mode === 'cheapest' && plausible.length > 0) {
+      const withPrices = plausible
+        .map((s) => ({ s, p: parsePrice(resolvePrice(s, fuelType)) }))
+        .filter((x) => Number.isFinite(x.p))
+        .sort((a, b) => a.p - b.p);
+      const keep = Math.max(8, Math.ceil(withPrices.length * 0.5));
+      const cheapest = withPrices.slice(0, keep).map((x) => x.s);
+      return cheapest.length > 150 ? cheapest.slice(0, 150) : cheapest;
+    }
     return plausible.length > 150 ? plausible.slice(0, 150) : plausible;
-  }, [mappableStations, selectedBrand, fuelType]);
+  }, [mappableStations, selectedBrand, fuelType, mode]);
 
   // Regional cohort used for tier thresholds on each pin. Recomputed
   // only when the filtered set or fuel type changes.
@@ -980,7 +994,9 @@ export default function MapScreen({ navigation, route }) {
               onPress={() => setSelectedCluster(c)}
               tracksViewChanges={false}
               accessibilityLabel={
-                `${c.label || 'Area'} · avg ${c.avgPrice.toFixed(1)} pence · ${c.count} stations`
+                // Defensive: c.avgPrice can be null when no member station has a
+                // parseable price for the current fuel — don't crash on .toFixed.
+                `${c.label || 'Area'} · avg ${Number.isFinite(c.avgPrice) ? c.avgPrice.toFixed(1) + ' pence' : 'price unavailable'} · ${c.count} stations`
               }
             />
           ))}
@@ -1367,9 +1383,9 @@ export default function MapScreen({ navigation, route }) {
                 <Text style={styles.sheetAddress} numberOfLines={2}>
                   {safeText(selectedStation.address)}
                 </Text>
-                {selectedStation.distance_km != null && (
+                {Number.isFinite(Number(selectedStation.distance_km)) && (
                   <Text style={styles.sheetDistance}>
-                    {selectedStation.distance_km.toFixed(1)} km away
+                    {Number(selectedStation.distance_km).toFixed(1)} km away
                   </Text>
                 )}
               </View>
@@ -1627,8 +1643,10 @@ export default function MapScreen({ navigation, route }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={
+            // Defensive: avgPrice can be null when no member station has a
+            // parseable price for the current fuel.
             `${selectedCluster.label || 'Area'} · avg ${selectedFuelMeta.label} ` +
-            `${selectedCluster.avgPrice.toFixed(1)} pence · ${selectedCluster.count} stations` +
+            `${Number.isFinite(selectedCluster.avgPrice) ? selectedCluster.avgPrice.toFixed(1) + ' pence' : 'price unavailable'} · ${selectedCluster.count} stations` +
             (selectedCluster.cheapest ? '. Tap to open the cheapest.' : '')
           }
         >
@@ -1636,7 +1654,9 @@ export default function MapScreen({ navigation, route }) {
             <Text style={styles.clusterCalloutTitle} numberOfLines={1}>
               {selectedCluster.label ? `${selectedCluster.label} area` : 'Area'} ·{' '}
               <Text style={{ color: selectedFuelMeta.color }}>
-                avg {selectedCluster.avgPrice.toFixed(1)}p
+                {Number.isFinite(selectedCluster.avgPrice)
+                  ? `avg ${selectedCluster.avgPrice.toFixed(1)}p`
+                  : 'price unavailable'}
               </Text>
             </Text>
             <Text style={styles.clusterCalloutSub} numberOfLines={1}>
