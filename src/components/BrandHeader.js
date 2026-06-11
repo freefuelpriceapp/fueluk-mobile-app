@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cheapestBrand } from '../lib/brandLeadership';
+import { cheapestStationBrand } from '../lib/brandLeadership';
 import { brandToString } from '../lib/brand';
 
 /**
@@ -93,7 +93,12 @@ function LogoMark({ size = 36, accent = '#2ECC71' }) {
  */
 function buildBrandSubtitle(stations, fuelType) {
   if (!Array.isArray(stations) || stations.length === 0) return null;
-  const brand = cheapestBrand(stations, fuelType);
+  // Use the brand of the absolute cheapest station so the header agrees
+  // with the "cheapest at X" body row. Previously we used the brand with
+  // the lowest *average* price, which could disagree with the single
+  // cheapest pin (e.g. header said "Gulf cheapest nearby" while the body
+  // said "cheapest at Asda").
+  const brand = cheapestStationBrand(stations, fuelType);
   if (!brand) return null;
   const brandName = brandToString(brand.brand);
   if (!brandName) return null;

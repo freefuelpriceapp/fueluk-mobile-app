@@ -92,7 +92,39 @@ export function cheapestBrand(stations, fuelType) {
   };
 }
 
+/**
+ * Return the brand of the single absolute-cheapest station for this fuel type.
+ * This is the brand the user sees on the "cheapest at X" body row — using it
+ * in the header subtitle keeps the two pieces of UI in agreement.
+ *
+ * Returns { brand, ppl, leadByPence } where leadByPence is the gap to the
+ * second-cheapest station (not brand). Returns null if nothing is priceable.
+ */
+export function cheapestStationBrand(stations, fuelType) {
+  if (!Array.isArray(stations) || !stations.length) return null;
+  const priced = [];
+  for (const s of stations) {
+    if (s?.is_quarantined) continue;
+    const p = priceForRanking(s, fuelType);
+    if (p === null) continue;
+    priced.push({ station: s, ppl: p });
+  }
+  if (!priced.length) return null;
+  priced.sort((a, b) => a.ppl - b.ppl);
+  const winner = priced[0];
+  const runnerUp = priced[1];
+  const brand = brandKey(winner.station);
+  if (!brand || brand === 'Unknown') return null;
+  const lead = runnerUp ? Math.max(0, runnerUp.ppl - winner.ppl) : 0;
+  return {
+    brand,
+    ppl: winner.ppl,
+    leadByPence: lead,
+  };
+}
+
 export default {
   rankBrands,
   cheapestBrand,
+  cheapestStationBrand,
 };

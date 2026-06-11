@@ -567,32 +567,53 @@ const HomeScreen = ({ navigation }) => {
           opt-in. Hide only when the user is already ON the E5 tab
           (selectedFuel === 'petrol'), where the link flips to a back-link
           automatically. */}
-      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') && (
-        <TouchableOpacity
-          style={styles.e5OptInRow}
-          onPress={() =>
-            setSelectedFuel(selectedFuel === 'petrol' ? 'unleaded' : 'petrol')
-          }
-          accessibilityRole="button"
-          accessibilityLabel={
-            selectedFuel === 'petrol'
-              ? 'Back to standard petrol prices'
-              : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
-          }
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <Ionicons
-            name={selectedFuel === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
-            size={12}
-            color={COLORS.textSecondary}
-          />
-          <Text style={styles.e5OptInText} numberOfLines={2}>
-            {selectedFuel === 'petrol'
-              ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
-              : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
-          </Text>
-        </TouchableOpacity>
-      )}
+      {(selectedFuel === 'unleaded' || selectedFuel === 'petrol') && (() => {
+        // Wave A.7 Option A keeps the link always-shown on the unleaded tab,
+        // but the lede shouldn't shout "pre-2002" unless we actually know the
+        // vehicle is pre-2002. Year may live on userVehicle.year or be derived
+        // from monthOfFirstRegistration (e.g. "2019-09").
+        const yearNum = (() => {
+          const y = userVehicle?.year;
+          if (typeof y === 'number' && Number.isFinite(y)) return y;
+          if (typeof y === 'string' && /^\d{4}/.test(y)) return parseInt(y.slice(0, 4), 10);
+          const m = userVehicle?.monthOfFirstRegistration;
+          if (typeof m === 'string' && /^\d{4}/.test(m)) return parseInt(m.slice(0, 4), 10);
+          return null;
+        })();
+        const isPre2002 = yearNum !== null && yearNum < 2002;
+        const promptCopy = isPre2002
+          ? 'Driving a pre-2002 car? Tap for E5 (premium 97/99) prices.'
+          : 'Want premium 97 or 99 petrol? Tap for E5 prices.';
+        const a11yPrompt = isPre2002
+          ? 'Driving a pre-2002 car. Tap for E5 prices.'
+          : 'Want premium 97 or 99 petrol. Tap for E5 prices.';
+        return (
+          <TouchableOpacity
+            style={styles.e5OptInRow}
+            onPress={() =>
+              setSelectedFuel(selectedFuel === 'petrol' ? 'unleaded' : 'petrol')
+            }
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedFuel === 'petrol'
+                ? 'Back to standard petrol prices'
+                : a11yPrompt
+            }
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name={selectedFuel === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
+              size={12}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.e5OptInText} numberOfLines={2}>
+              {selectedFuel === 'petrol'
+                ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
+                : promptCopy}
+            </Text>
+          </TouchableOpacity>
+        );
+      })()}
 
       {/* Sort toggle — Nearest / Cheapest, with regional 7-day sparkline */}
       <View style={styles.sortRow}>
