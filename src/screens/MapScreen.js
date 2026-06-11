@@ -37,6 +37,7 @@ import useLocation from '../hooks/useLocation';
 import useStations from '../hooks/useStations';
 import { loadUserVehicle } from '../lib/userVehicle';
 import { recommendedFuelKey } from '../lib/vehicleFuelDefault';
+import { isPerformanceTrim } from '../lib/performanceTrim';
 // StationMarker also depends on react-native-maps
 let StationMarker;
 if (Platform.OS !== 'web') {
@@ -1025,7 +1026,8 @@ export default function MapScreen({ navigation, route }) {
         {(fuelType === 'unleaded' || fuelType === 'petrol') && (
           (() => {
             const vehicleYear = userVehicle?.yearOfManufacture ?? userVehicle?.year ?? null;
-            const showE5 = !userVehicle || (vehicleYear && vehicleYear < 2002) || e5RecentlyOpened || fuelType === 'petrol';
+            const performance = isPerformanceTrim(userVehicle);
+            const showE5 = !userVehicle || (vehicleYear && vehicleYear < 2002) || performance || e5RecentlyOpened || fuelType === 'petrol';
             if (!showE5) return null;
             return (
               <TouchableOpacity
@@ -1042,7 +1044,7 @@ export default function MapScreen({ navigation, route }) {
                 accessibilityLabel={
                   fuelType === 'petrol'
                     ? 'Back to standard petrol prices'
-                    : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
+                    : 'Driving an older car or want Super Unleaded? Tap for E5 / 97 / 99 prices.'
                 }
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
@@ -1053,8 +1055,8 @@ export default function MapScreen({ navigation, route }) {
                 />
                 <Text style={styles.e5OptInText} numberOfLines={2}>
                   {fuelType === 'petrol'
-                    ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
-                    : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
+                    ? 'Showing E5 / Super Unleaded (97/99). Tap to go back to standard petrol.'
+                    : 'Driving an older car (pre-2002) or want Super Unleaded? Tap for E5 / 97 / 99 prices.'}
                 </Text>
               </TouchableOpacity>
             );

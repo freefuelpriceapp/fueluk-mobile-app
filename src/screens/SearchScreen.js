@@ -315,7 +315,7 @@ const SearchScreen = ({ navigation, route }) => {
             accessibilityLabel={
               selectedFuel === 'petrol'
                 ? 'Back to standard petrol prices'
-                : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
+                : 'Driving an older car or want Super Unleaded? Tap for E5 / 97 / 99 prices.'
             }
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
@@ -326,8 +326,8 @@ const SearchScreen = ({ navigation, route }) => {
             />
             <Text style={styles.e5OptInText} numberOfLines={2}>
               {selectedFuel === 'petrol'
-                ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
-                : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
+                ? 'Showing E5 / Super Unleaded (97/99). Tap to go back to standard petrol.'
+                : 'Driving an older car (pre-2002) or want Super Unleaded? Tap for E5 / 97 / 99 prices.'}
             </Text>
           </TouchableOpacity>
         )}

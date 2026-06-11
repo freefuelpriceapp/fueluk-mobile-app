@@ -61,6 +61,7 @@ import {
   recommendedFuelKey,
   recommendedReason,
 } from '../lib/vehicleFuelDefault';
+import { isPerformanceTrim } from '../lib/performanceTrim';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 
 // Primary fuel-type chips on the Home/Nearby list. 'Petrol' is the
@@ -584,12 +585,20 @@ const HomeScreen = ({ navigation }) => {
           return null;
         })();
         const isPre2002 = yearNum !== null && yearNum < 2002;
+        // Performance trim = car likely benefits from 97/99 RON (e.g. M3,
+        // Golf R, Type R, AMG, RS, Cooper S). We surface a more specific
+        // lede for these so the prompt feels personalised, not generic.
+        const isPerformance = !isPre2002 && isPerformanceTrim(userVehicle);
         const promptCopy = isPre2002
-          ? 'Driving a pre-2002 car? Tap for E5 (premium 97/99) prices.'
-          : 'Want premium 97 or 99 petrol? Tap for E5 prices.';
+          ? 'Driving a pre-2002 car? Tap for E5 / Super Unleaded (97/99) prices.'
+          : isPerformance
+          ? 'Performance car detected — tap for E5 / Super Unleaded (97/99) prices.'
+          : 'Want Super Unleaded? Tap for E5 / 97 / 99 prices.';
         const a11yPrompt = isPre2002
-          ? 'Driving a pre-2002 car. Tap for E5 prices.'
-          : 'Want premium 97 or 99 petrol. Tap for E5 prices.';
+          ? 'Driving a pre-2002 car. Tap for E5 Super Unleaded prices.'
+          : isPerformance
+          ? 'Performance car detected. Tap for E5 Super Unleaded prices.'
+          : 'Want Super Unleaded. Tap for E5 / 97 / 99 prices.';
         return (
           <TouchableOpacity
             style={styles.e5OptInRow}
@@ -611,7 +620,7 @@ const HomeScreen = ({ navigation }) => {
             />
             <Text style={styles.e5OptInText} numberOfLines={2}>
               {selectedFuel === 'petrol'
-                ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
+                ? 'Showing E5 / Super Unleaded (97/99). Tap to go back to standard petrol.'
                 : promptCopy}
             </Text>
           </TouchableOpacity>

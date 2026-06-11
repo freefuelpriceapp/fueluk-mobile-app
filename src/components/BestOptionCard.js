@@ -151,7 +151,7 @@ export default function BestOptionCard({
   const fuelLabel = fuelType === 'diesel' ? 'Diesel'
     : fuelType === 'e10' ? 'Petrol'
     : fuelType === 'unleaded' ? 'Petrol'
-    : fuelType === 'petrol' ? 'E5 (premium 97/99)'
+    : fuelType === 'petrol' ? 'E5 / Super Unleaded (97/99)'
     : 'Petrol';
 
   return (
