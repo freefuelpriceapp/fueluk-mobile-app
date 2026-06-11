@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { cheapestStationBrand } from '../lib/brandLeadership';
 import { brandToString } from '../lib/brand';
+import AmbientParticles from './AmbientParticles';
 
 /**
  * BrandHeader
@@ -31,58 +32,24 @@ const DEFAULT_THEME = {
   border: '#30363D',
 };
 
+/**
+ * LogoMark — lightning bolt (Ionicons "flash") centred inside the green halo.
+ * Replaced the custom fuel-drop+pin shape; the outer breathing halo (pulse prop)
+ * is unchanged — only the inner body changes here.
+ */
 function LogoMark({ size = 36, accent = '#2ECC71' }) {
-  const dropSize = size;
-  const innerPin = size * 0.42;
   return (
-    <View style={{ width: dropSize, height: dropSize, alignItems: 'center', justifyContent: 'center' }}>
-      <View
-        style={{
-          position: 'absolute',
-          width: dropSize,
-          height: dropSize,
-          borderRadius: dropSize / 2,
-          backgroundColor: accent + '22',
-        }}
-      />
-      <View
-        style={{
-          width: dropSize * 0.72,
-          height: dropSize * 0.72,
-          borderTopLeftRadius: dropSize,
-          borderTopRightRadius: dropSize,
-          borderBottomLeftRadius: dropSize * 0.35,
-          borderBottomRightRadius: dropSize * 0.35,
-          backgroundColor: accent,
-          transform: [{ rotate: '-12deg' }],
-          alignItems: 'center',
-          justifyContent: 'center',
-          shadowColor: accent,
-          shadowOpacity: 0.35,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
-        }}
-      >
-        <View
-          style={{
-            width: innerPin,
-            height: innerPin,
-            borderRadius: innerPin / 2,
-            backgroundColor: '#0D1117',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <View
-            style={{
-              width: innerPin * 0.42,
-              height: innerPin * 0.42,
-              borderRadius: innerPin,
-              backgroundColor: accent,
-            }}
-          />
-        </View>
-      </View>
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: accent + '22',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Ionicons name="flash" size={Math.round(size * 0.61)} color={accent} />
     </View>
   );
 }
@@ -116,6 +83,7 @@ export default function BrandHeader({
   theme = DEFAULT_THEME,
   showSearch = true,
   pulse = false,
+  enableParticles = true,
 }) {
   // Derive brand-leadership subtitle when station data is available.
   const brandSubtitle = useMemo(
@@ -167,6 +135,9 @@ export default function BrandHeader({
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      {enableParticles ? (
+        <AmbientParticles accent={theme.accent} height={68} />
+      ) : null}
       <View style={styles.row}>
         <View style={styles.logoBlock}>
           <Animated.View

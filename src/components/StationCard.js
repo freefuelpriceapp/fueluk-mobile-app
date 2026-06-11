@@ -15,6 +15,7 @@ import { mediumHaptic } from '../lib/haptics';
 import { brandToString, safeText } from '../lib/brand';
 import BreakEvenBadge from './BreakEvenBadge';
 import StationStatusChip from './StationStatusChip';
+import StationBrandLogo from './StationBrandLogo';
 import { stationTrajectorySecondary } from '../lib/trajectory';
 import { isStationOpenNow, shouldDeEmphasise } from '../lib/stationStatus';
 import { isFeatureEnabled } from '../config/featureFlags';
@@ -255,9 +256,12 @@ const StationCard = ({ station, fuelType = 'unleaded', onPress, onFlagPrice, isC
       accessibilityRole="button"
     >
     <Animated.View style={cardStyle}>
-      {/* Top row: brand + distance + favourite */}
+      {/* Top row: brand logo + brand text + distance + favourite */}
       <View style={styles.topRow}>
-        <Text style={styles.brand}>{brandToString(brand) || 'Unknown'}</Text>
+        <View style={styles.brandRow}>
+          <StationBrandLogo brand={brandToString(brand)} size={24} style={styles.brandLogoMr} />
+          <Text style={styles.brand}>{brandToString(brand) || 'Unknown'}</Text>
+        </View>
         <View style={styles.topRight}>
           {distanceLabel ? (
             <View style={styles.distanceBadge}>
@@ -423,6 +427,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  brandLogoMr: {
+    marginRight: 6,
+    flexShrink: 0,
   },
   brand: {
     fontSize: FONT_SIZES.xs,

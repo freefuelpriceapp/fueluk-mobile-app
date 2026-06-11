@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { getBrands } from '../api/fuelApi';
 import { brandToString } from '../lib/brand';
 import { toRenderableString } from '../lib/safeRender';
+import StationBrandLogo from './StationBrandLogo';
 
 const BRAND_COLORS = {
   Shell: '#FFD500',
@@ -77,6 +78,7 @@ export default function BrandFilter({ selectedBrand, onSelectBrand }) {
               ]}
               onPress={() => onSelectBrand(active ? null : name)}
             >
+              <StationBrandLogo brand={name} size={18} style={styles.chipLogo} />
               <Text style={[styles.chipText, active && { color: '#fff' }]}>{name}</Text>
             </TouchableOpacity>
           );
@@ -104,12 +106,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#E0E0E0',
     backgroundColor: '#F8F9FA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipLogo: {
+    flexShrink: 0,
   },
   chipActive: {
     backgroundColor: '#00B4D8',
