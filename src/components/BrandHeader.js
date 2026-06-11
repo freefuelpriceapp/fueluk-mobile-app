@@ -53,59 +53,54 @@ function LogoMark({ size = 36, accent = '#2ECC71' }) {
       }}
     >
       {/*
-        Bespoke fuel-pump nozzle silhouette drawn on a 36×36 canvas.
-        Geometry (all values in SVG units):
-          - Handle: thick rounded vertical bar at x≈12, from y=22 down to y=10
-          - Hose curve: cubic bezier arcing right from top of handle to barrel entry
-          - Barrel: horizontal flared rectangle from x≈17 to x≈26, centred at y≈10
-          - Nozzle tip: slight flare at the end (wider rect cap)
-          - Trigger detail: small horizontal notch on underside of handle
-          - Spark: small filled circle at (28, 7) — tip of the nozzle
+        Bespoke pistol-grip fuel pump nozzle silhouette.
+        Single closed filled path so the grip, barrel and tip read as one
+        connected gun-shaped silhouette at small sizes (the previous
+        multi-primitive version disintegrated into a deflated curl).
+        Geometry on a 36×36 viewBox:
+          - Top edge: barrel runs horizontally across the top half, with a
+            short upward-angled nub at the right (the spout tip).
+          - Right edge: spout tip descends to barrel base, then a step in.
+          - Bottom edge: under-barrel, then drops down forming the pistol
+            grip (slanted back-edge like a real pump handle).
+          - Left edge: rises back up to close the shape.
+          - A separate trigger guard rectangle is cut in front of the grip.
+          - A droplet sits just below the spout tip for the "fuel" cue.
         Drawn from scratch; not derived from any icon library.
       */}
       <Svg width={size} height={size} viewBox="0 0 36 36">
-        {/* Nozzle handle — thick vertical stroke with rounded ends */}
+        {/* Pistol-grip pump nozzle silhouette — single closed path */}
         <Path
-          d="M12 22 L12 10"
-          stroke={accent}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        {/* Hose arc — curves from top of handle rightward to barrel entry */}
-        <Path
-          d="M12 10 C12 6 16 6 18 8"
-          stroke={accent}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        {/* Barrel body — horizontal filled shape */}
-        <Path
-          d="M18 6 L26 6 L27 8 L26 12 L18 12 Z"
+          d="
+            M 7 9
+            L 23 9
+            L 26 6
+            L 29 6
+            L 29 11
+            L 26 13
+            L 17 13
+            L 17 18
+            L 20 18
+            L 20 21
+            L 17 21
+            L 17 27
+            L 10 27
+            L 7 18
+            Z
+          "
           fill={accent}
-          strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {/* Nozzle tip flare — wider cap at end of barrel */}
+        {/* Trigger guard cut-out — small dark notch on the front of the grip */}
         <Path
-          d="M26 5.5 L29 7 L29 11 L26 12.5 Z"
+          d="M 14 19 L 16 19 L 16 21 L 14 21 Z"
+          fill="#0D1117"
+        />
+        {/* Fuel droplet below the spout tip — communicates "fuel" cleanly */}
+        <Path
+          d="M 27.5 15.5 C 26.6 17 26.4 18.4 27.5 18.6 C 28.6 18.4 28.4 17 27.5 15.5 Z"
           fill={accent}
-          strokeLinecap="round"
-          strokeLinejoin="round"
         />
-        {/* Trigger detail — small notch under the handle */}
-        <Path
-          d="M10 18 L14 18"
-          stroke={accent}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {/* Spark accent — small filled circle at nozzle tip */}
-        <Circle cx="28" cy="7" r="3" fill={accent} />
       </Svg>
     </View>
   );
