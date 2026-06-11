@@ -176,6 +176,72 @@ export default function MapScreen({ navigation, route }) {
   // 'pins' (default) | 'heatmap'. Persisted under @fueluk/map_view_v1.
   const [viewMode, setViewMode] = useState('pins');
   const [selectedCluster, setSelectedCluster] = useState(null);
+  // Brand chip overflow — how many to show before "More (+N)" chip
+  const BRAND_VISIBLE_COUNT = 4;
+  const [brandOverflowOpen, setBrandOverflowOpen] = useState(false);
+  // Persisted brand chip preference
+  const BRAND_PREF_KEY = '@fueluk/map_brand_pref_v1';
+
+  // E5 last-opened flag (7-day window)
+  const E5_LAST_OPENED_KEY = '@fueluk/e5_last_opened_v1';
+  const [e5RecentlyOpened, setE5RecentlyOpened] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(E5_LAST_OPENED_KEY)
+      .then((v) => {
+        if (!mounted) return;
+        if (v) {
+          const ts = parseInt(v, 10);
+          if (Number.isFinite(ts) && Date.now() - ts < 7 * 24 * 60 * 60 * 1000) {
+            setE5RecentlyOpened(true);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  // Persist brand preference and restore on mount
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(BRAND_PREF_KEY)
+      .then((v) => { if (mounted && v) setSelectedBrand(v === '__all__' ? null : v); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSetSelectedBrand = (brand) => {
+    setSelectedBrand(brand);
+    AsyncStorage.setItem(BRAND_PREF_KEY, brand ?? '__all__').catch(() => {});
+  };
+
+  // Recenter pulse animation during fetch
+  const recenterPulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (stationsLoading) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(recenterPulseAnim, {
+            toValue: 1.18,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(recenterPulseAnim, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      recenterPulseAnim.setValue(1);
+    }
+  }, [stationsLoading, recenterPulseAnim]);
 
   useEffect(() => {
     let mounted = true;
@@ -954,31 +1020,45 @@ export default function MapScreen({ navigation, route }) {
           </ScrollView>
         </View>
 
+        {/* E5 opt-in — gated: only show when no vehicle profile, vehicle is pre-2002,
+             or user has explicitly opened E5 prices within the last 7 days. */}
         {(fuelType === 'unleaded' || fuelType === 'petrol') && (
-          <TouchableOpacity
-            style={styles.e5OptInRow}
-            onPress={() =>
-              handleSetFuelType(fuelType === 'petrol' ? 'unleaded' : 'petrol')
-            }
-            accessibilityRole="button"
-            accessibilityLabel={
-              fuelType === 'petrol'
-                ? 'Back to standard petrol prices'
-                : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
-            }
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Ionicons
-              name={fuelType === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
-              size={12}
-              color={COLORS.textSecondary}
-            />
-            <Text style={styles.e5OptInText} numberOfLines={2}>
-              {fuelType === 'petrol'
-                ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
-                : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
-            </Text>
-          </TouchableOpacity>
+          (() => {
+            const vehicleYear = userVehicle?.yearOfManufacture ?? userVehicle?.year ?? null;
+            const showE5 = !userVehicle || (vehicleYear && vehicleYear < 2002) || e5RecentlyOpened || fuelType === 'petrol';
+            if (!showE5) return null;
+            return (
+              <TouchableOpacity
+                style={styles.e5OptInRow}
+                onPress={() => {
+                  const nextFuel = fuelType === 'petrol' ? 'unleaded' : 'petrol';
+                  handleSetFuelType(nextFuel);
+                  if (nextFuel === 'petrol') {
+                    AsyncStorage.setItem(E5_LAST_OPENED_KEY, String(Date.now())).catch(() => {});
+                    setE5RecentlyOpened(true);
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  fuelType === 'petrol'
+                    ? 'Back to standard petrol prices'
+                    : 'Driving an older car or want premium 97 or 99 petrol? Tap for E5 prices.'
+                }
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons
+                  name={fuelType === 'petrol' ? 'arrow-back' : 'information-circle-outline'}
+                  size={12}
+                  color={COLORS.textSecondary}
+                />
+                <Text style={styles.e5OptInText} numberOfLines={2}>
+                  {fuelType === 'petrol'
+                    ? 'Showing E5 (premium 97/99). Tap to go back to standard petrol.'
+                    : 'Driving an older car (pre-2002) or want premium 97/99? Tap for E5 prices.'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()
         )}
 
         {brands.length > 0 && (
@@ -988,22 +1068,24 @@ export default function MapScreen({ navigation, route }) {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.brandFilterScroll}
             >
+              {/* "All" chip */}
               <TouchableOpacity
                 style={[styles.brandChip, !selectedBrand && styles.brandChipActive]}
-                onPress={() => setSelectedBrand(null)}
+                onPress={() => handleSetSelectedBrand(null)}
               >
                 <Text style={[styles.brandChipText, !selectedBrand && styles.brandChipTextActive]}>
                   All
                 </Text>
               </TouchableOpacity>
-              {brands.map((brand) => {
+              {/* Visible brands: first BRAND_VISIBLE_COUNT */}
+              {brands.slice(0, BRAND_VISIBLE_COUNT).map((brand) => {
                 const brandLabel = toRenderableString(brand);
                 if (!brandLabel) return null;
                 return (
                   <TouchableOpacity
                     key={brandLabel}
                     style={[styles.brandChip, selectedBrand === brandLabel && styles.brandChipActive]}
-                    onPress={() => setSelectedBrand(prev => prev === brandLabel ? null : brandLabel)}
+                    onPress={() => handleSetSelectedBrand(prev => prev === brandLabel ? null : brandLabel)}
                   >
                     <Text style={[styles.brandChipText, selectedBrand === brandLabel && styles.brandChipTextActive]}>
                       {brandLabel}
@@ -1011,7 +1093,54 @@ export default function MapScreen({ navigation, route }) {
                   </TouchableOpacity>
                 );
               })}
+              {/* "More (+N)" overflow chip */}
+              {brands.length > BRAND_VISIBLE_COUNT && (
+                <TouchableOpacity
+                  style={[styles.brandChip, brandOverflowOpen && styles.brandChipActive]}
+                  onPress={() => setBrandOverflowOpen(true)}
+                  accessibilityLabel={`Show ${brands.length - BRAND_VISIBLE_COUNT} more brands`}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.brandChipText, brandOverflowOpen && styles.brandChipTextActive]}>
+                    More (+{brands.length - BRAND_VISIBLE_COUNT})
+                  </Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
+            {/* Overflow full-brand sheet */}
+            {brandOverflowOpen && (
+              <View style={styles.brandOverflowSheet}>
+                <View style={styles.brandOverflowHeader}>
+                  <Text style={styles.brandOverflowTitle}>All brands</Text>
+                  <TouchableOpacity onPress={() => setBrandOverflowOpen(false)}>
+                    <Ionicons name="close" size={18} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.brandOverflowChips}>
+                  <TouchableOpacity
+                    style={[styles.brandChip, !selectedBrand && styles.brandChipActive]}
+                    onPress={() => { handleSetSelectedBrand(null); setBrandOverflowOpen(false); }}
+                  >
+                    <Text style={[styles.brandChipText, !selectedBrand && styles.brandChipTextActive]}>All</Text>
+                  </TouchableOpacity>
+                  {brands.map((brand) => {
+                    const brandLabel = toRenderableString(brand);
+                    if (!brandLabel) return null;
+                    return (
+                      <TouchableOpacity
+                        key={brandLabel}
+                        style={[styles.brandChip, selectedBrand === brandLabel && styles.brandChipActive]}
+                        onPress={() => { handleSetSelectedBrand(brandLabel); setBrandOverflowOpen(false); }}
+                      >
+                        <Text style={[styles.brandChipText, selectedBrand === brandLabel && styles.brandChipTextActive]}>
+                          {brandLabel}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -1169,15 +1298,23 @@ export default function MapScreen({ navigation, route }) {
 
       </SafeAreaView>
 
-      {/* Re-center on user location */}
+      {/* Re-center on user location — pulses while station data is loading */}
       {MapView && (
-        <TouchableOpacity
-          style={styles.recenterBtn}
-          onPress={recenterMap}
-          accessibilityLabel="Re-center on my location"
+        <Animated.View
+          style={[
+            styles.recenterBtn,
+            { transform: [{ scale: recenterPulseAnim }] },
+          ]}
         >
-          <Ionicons name="locate-outline" size={22} color={COLORS.accent} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={recenterMap}
+            accessibilityLabel="Re-center on my location"
+            style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}
+          >
+            <Ionicons name="locate-outline" size={22} color={COLORS.accent} />
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       {FEATURE_FLAGS.vehicleSettings && MapView ? (
@@ -1626,6 +1763,29 @@ const styles = StyleSheet.create({
   },
   brandChipTextActive: {
     color: COLORS.background,
+  },
+  brandOverflowSheet: {
+    backgroundColor: COLORS.mapOverlayStrong,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  brandOverflowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  brandOverflowTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  brandOverflowChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   viewToggleRow: {
     flexDirection: 'row',
