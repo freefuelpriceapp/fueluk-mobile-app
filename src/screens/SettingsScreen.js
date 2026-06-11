@@ -243,6 +243,9 @@ export default function SettingsScreen() {
       <Text style={styles.footer}>
         {`FuelUK \u00A9 2025-26. All rights reserved.\nHelping UK drivers find the cheapest fuel nearby.`}
       </Text>
+      <Text style={styles.attribution}>
+        {'Fuel retailer logos are trademarks of their respective owners and are used here for identification purposes only.'}
+      </Text>
     </ScrollView>
   );
 }
@@ -318,5 +321,15 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginHorizontal: 24,
     lineHeight: 18,
+  },
+  attribution: {
+    fontSize: 11,
+    color: '#333',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    marginHorizontal: 24,
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
 });
