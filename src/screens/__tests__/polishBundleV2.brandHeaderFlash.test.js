@@ -1,8 +1,10 @@
 /**
- * Polish Bundle v3 — BrandHeader: bespoke fuel-nozzle SVG mark verification.
+ * Polish Bundle v3.1 — BrandHeader: pistol-grip fuel-nozzle SVG mark.
  *
- * Verifies that BrandHeader.js no longer references the stock Ionicons "flash"
- * glyph (removed in v3) and now uses a bespoke react-native-svg nozzle path.
+ * Verifies that BrandHeader.js uses a bespoke react-native-svg single closed
+ * pistol-grip nozzle silhouette (the v3 multi-primitive version was rejected
+ * by the user as a "deflated curl"; v3.1 redraws as one filled path so the
+ * grip / barrel / spout read as one connected gun-shaped silhouette).
  * Done via source-text inspection (no JSX renderer available in Node env).
  */
 
@@ -18,11 +20,10 @@ describe('BrandHeader — LogoMark bespoke SVG nozzle (v3)', () => {
     expect(source).not.toContain('"flash"');
   });
 
-  test('imports react-native-svg Svg, Path, Circle', () => {
+  test('imports react-native-svg Svg and Path', () => {
     expect(source).toContain("from 'react-native-svg'");
     expect(source).toMatch(/Svg/);
     expect(source).toMatch(/Path/);
-    expect(source).toMatch(/Circle/);
   });
 
   test('LogoMark function is still present (props contract unchanged)', () => {
@@ -33,15 +34,22 @@ describe('BrandHeader — LogoMark bespoke SVG nozzle (v3)', () => {
     expect(source).toMatch(/function LogoMark\(\s*\{\s*size/);
   });
 
-  test('LogoMark SVG uses a bespoke path (fuel nozzle handle line)', () => {
-    // Handle: vertical stroke M12 22 L12 10
-    expect(source).toContain('M12 22 L12 10');
+  test('LogoMark SVG uses a single closed pistol-grip silhouette path', () => {
+    // The new silhouette begins at the top-left of the barrel at M 7 9 and
+    // closes the shape with Z. We check for the start coord and a Z close.
+    expect(source).toMatch(/M\s*7\s+9/);
+    expect(source).toMatch(/\bZ\b/);
   });
 
-  test('LogoMark SVG includes spark Circle element', () => {
-    // Spark dot at tip of nozzle: cx=28 cy=7
-    expect(source).toContain('cx="28"');
-    expect(source).toContain('cy="7"');
+  test('LogoMark SVG includes a fuel droplet below the spout', () => {
+    // Droplet is a small cubic-curve Path near the top-right of the viewBox.
+    expect(source).toMatch(/droplet/i);
+    expect(source).toMatch(/C\s*26\.6\s+17/);
+  });
+
+  test('LogoMark SVG includes a trigger-guard cut-out', () => {
+    // Dark notch in front of the grip — communicates "trigger" cue.
+    expect(source).toMatch(/trigger guard/i);
   });
 
   test('outer pulse halo animation logic is still present (unchanged)', () => {
