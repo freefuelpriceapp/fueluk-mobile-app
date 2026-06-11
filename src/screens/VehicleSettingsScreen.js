@@ -176,17 +176,38 @@ export default function VehicleSettingsScreen({ navigation, route }) {
     try {
       const parsedMpg = parseFloat(mpgInput);
       const hasManualMpg = Number.isFinite(parsedMpg) && parsedMpg > 0;
+
+      // Preserve any DVLA-sourced vehicle identity (reg / make / model /
+      // year / colour / body_type) when the user taps "Save settings"
+      // after a successful Look up. Previously this path called
+      // saveUserVehicle with only { fuel_type, mpg, source } which
+      // REPLACES the stored object, dropping reg/make/model and resetting
+      // source back to 'manual' — visibly reverting the SAVED VEHICLE
+      // card to manual after a DVLA lookup.
+      //
+      // Source field rule:
+      //   - If MPG is manually overridden, source becomes 'manual' (the
+      //     user is now overriding any DVLA-estimated mpg)
+      //   - Otherwise keep whatever source was already on the saved
+      //     vehicle (e.g. 'dvla'), or 'estimated' if no prior save
+      const preservedSource = hasManualMpg
+        ? 'manual'
+        : (current && current.source) || 'estimated';
+
       const saved = await saveUserVehicle({
+        // Merge the existing saved vehicle so reg/make/model/year/colour
+        // all survive a manual fuel-type or mpg edit.
+        ...(current || {}),
         fuel_type: fuelType,
         mpg: hasManualMpg ? parsedMpg : defaultMpgFor(fuelType),
-        source: hasManualMpg ? 'manual' : 'estimated',
+        source: preservedSource,
       });
       setCurrent(saved);
       Alert.alert('Saved', 'We\u2019ll use this for break-even savings.');
     } finally {
       setSaving(false);
     }
-  }, [fuelType, mpgInput]);
+  }, [fuelType, mpgInput, current]);
 
   const handleClear = useCallback(async () => {
     await clearUserVehicle();
