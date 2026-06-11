@@ -1085,7 +1085,7 @@ export default function MapScreen({ navigation, route }) {
                   <TouchableOpacity
                     key={brandLabel}
                     style={[styles.brandChip, selectedBrand === brandLabel && styles.brandChipActive]}
-                    onPress={() => handleSetSelectedBrand(prev => prev === brandLabel ? null : brandLabel)}
+                    onPress={() => handleSetSelectedBrand(selectedBrand === brandLabel ? null : brandLabel)}
                   >
                     <Text style={[styles.brandChipText, selectedBrand === brandLabel && styles.brandChipTextActive]}>
                       {brandLabel}
