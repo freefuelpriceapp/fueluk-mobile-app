@@ -43,6 +43,7 @@ import InstantAnswerHeadline from '../components/InstantAnswerHeadline';
 import MonthlySavingsCard from '../components/MonthlySavingsCard';
 import LifetimeSavingsCard from '../components/LifetimeSavingsCard';
 import FuelIntelCard from '../components/FuelIntelCard';
+import ComingNextStrip from '../components/ComingNextStrip';
 import LiveDataTile from '../components/LiveDataTile';
 import PriceTrajectorySparkline from '../components/PriceTrajectorySparkline';
 import {
@@ -730,6 +731,7 @@ const HomeScreen = ({ navigation }) => {
           }
           ListFooterComponent={
             <>
+              <ComingNextStrip />
               {updatedInfo ? (
                 <Text style={[styles.footerText, updatedInfo.stale && styles.footerStale]}>
                   Prices last checked: {updatedInfo.label}{updatedInfo.stale ? ' (data may be out of date \u2014 pull down to refresh)' : ''}
