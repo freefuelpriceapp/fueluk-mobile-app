@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { cheapestStationBrand } from '../lib/brandLeadership';
 import { brandToString } from '../lib/brand';
-import AmbientParticles from './AmbientParticles';
 
 /**
  * BrandHeader
@@ -33,13 +33,16 @@ const DEFAULT_THEME = {
 };
 
 /**
- * LogoMark — lightning bolt (Ionicons "flash") centred inside the green halo.
- * Replaced the custom fuel-drop+pin shape; the outer breathing halo (pulse prop)
- * is unchanged — only the inner body changes here.
+ * LogoMark — bespoke fuel-nozzle SVG silhouette + spark accent.
+ * 36×36 viewBox: thick handle stroke, curved hose, barrel, spark dot.
+ * Replaces the stock lightning-bolt glyph introduced in polish bundle v2.
+ * The outer breathing halo (pulse prop on BrandHeader) is unchanged.
  */
 function LogoMark({ size = 36, accent = '#2ECC71' }) {
   return (
     <View
+      accessible
+      accessibilityLabel="FuelUK"
       style={{
         width: size,
         height: size,
@@ -49,7 +52,61 @@ function LogoMark({ size = 36, accent = '#2ECC71' }) {
         justifyContent: 'center',
       }}
     >
-      <Ionicons name="flash" size={Math.round(size * 0.61)} color={accent} />
+      {/*
+        Bespoke fuel-pump nozzle silhouette drawn on a 36×36 canvas.
+        Geometry (all values in SVG units):
+          - Handle: thick rounded vertical bar at x≈12, from y=22 down to y=10
+          - Hose curve: cubic bezier arcing right from top of handle to barrel entry
+          - Barrel: horizontal flared rectangle from x≈17 to x≈26, centred at y≈10
+          - Nozzle tip: slight flare at the end (wider rect cap)
+          - Trigger detail: small horizontal notch on underside of handle
+          - Spark: small filled circle at (28, 7) — tip of the nozzle
+        Drawn from scratch; not derived from any icon library.
+      */}
+      <Svg width={size} height={size} viewBox="0 0 36 36">
+        {/* Nozzle handle — thick vertical stroke with rounded ends */}
+        <Path
+          d="M12 22 L12 10"
+          stroke={accent}
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* Hose arc — curves from top of handle rightward to barrel entry */}
+        <Path
+          d="M12 10 C12 6 16 6 18 8"
+          stroke={accent}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* Barrel body — horizontal filled shape */}
+        <Path
+          d="M18 6 L26 6 L27 8 L26 12 L18 12 Z"
+          fill={accent}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Nozzle tip flare — wider cap at end of barrel */}
+        <Path
+          d="M26 5.5 L29 7 L29 11 L26 12.5 Z"
+          fill={accent}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Trigger detail — small notch under the handle */}
+        <Path
+          d="M10 18 L14 18"
+          stroke={accent}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Spark accent — small filled circle at nozzle tip */}
+        <Circle cx="28" cy="7" r="3" fill={accent} />
+      </Svg>
     </View>
   );
 }
@@ -83,7 +140,6 @@ export default function BrandHeader({
   theme = DEFAULT_THEME,
   showSearch = true,
   pulse = false,
-  enableParticles = true,
 }) {
   // Derive brand-leadership subtitle when station data is available.
   const brandSubtitle = useMemo(
@@ -135,9 +191,6 @@ export default function BrandHeader({
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-      {enableParticles ? (
-        <AmbientParticles accent={theme.accent} height={68} />
-      ) : null}
       <View style={styles.row}>
         <View style={styles.logoBlock}>
           <Animated.View
