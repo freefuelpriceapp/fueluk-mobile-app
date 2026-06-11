@@ -35,6 +35,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, FONT_SIZES } from '../lib/theme';
 import { lookupVehicle, getSavingsEstimate } from '../api/fuelApi';
+import GlowInput from '../components/GlowInput';
 
 export const WELCOME_COMPLETED_KEY = 'welcome_completed';
 
@@ -307,7 +308,7 @@ export default function WelcomeFlowScreen({ onComplete }) {
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Enter your postcode</Text>
-                <TextInput
+                <GlowInput
                   style={styles.postcodeInput}
                   placeholder="e.g. B7 5SA"
                   placeholderTextColor={COLORS.placeholderMuted}
@@ -378,7 +379,7 @@ export default function WelcomeFlowScreen({ onComplete }) {
               <Text style={styles.errorText}>{error}</Text>
             ) : null}
 
-            <TextInput
+            <GlowInput
               style={[styles.plateInput, plateError ? styles.inputError : null]}
               placeholder="e.g. AB12 CDE"
               placeholderTextColor={COLORS.placeholderMuted}
