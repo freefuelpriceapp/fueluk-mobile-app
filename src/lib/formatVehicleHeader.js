@@ -154,4 +154,50 @@ export function formatVehicleHeader(vehicle) {
   return parts.join(' \u00B7 ');
 }
 
+/**
+ * buildTrimString — a compact display line for the vehicle chip / FuelIntelCard.
+ *
+ * Outputs e.g. "Audi A3 · 1.5L Petrol · 2019"
+ * Gracefully handles missing fields:
+ *   - missing model → "Audi · 1.5L Petrol · 2019"
+ *   - missing engine cc → "Audi A3 · Petrol · 2019"
+ *   - missing year → "Audi A3 · 1.5L Petrol"
+ *   - null/undefined inputs → null
+ *
+ * Unlike formatVehicleHeader (which includes colour), buildTrimString
+ * targets a shorter chip label: make+model, engine L, fuel, year.
+ */
+export function buildTrimString(vehicle) {
+  if (!vehicle || typeof vehicle !== 'object') return null;
+
+  const make = formatMake(vehicle.make);
+  if (!make) return null;
+
+  const baseModel = formatModel(vehicle.model);
+  const variantRaw = vehicle?.spec?.variant;
+  const variant = variantRaw && typeof variantRaw === 'string' ? variantRaw.trim() : null;
+  const model = baseModel ? (variant ? `${baseModel} ${variant}` : baseModel) : null;
+
+  const ccRaw = vehicle.engineCapacity ?? vehicle.engine_capacity;
+  const engine = formatEngine(ccRaw);
+  const fuel = formatFuel(vehicle.fuelType ?? vehicle.fuel_type);
+  const year = (() => {
+    const raw = vehicle.yearOfManufacture ?? vehicle.year;
+    if (raw == null) return null;
+    const num = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+    if (!Number.isFinite(num) || num < 1900 || num > 2999) return null;
+    return String(num);
+  })();
+
+  // Head: "Make Model" or just "Make" if no model
+  const head = model ? `${make} ${model}` : make;
+
+  // Engine/fuel slot: "1.5L Petrol", "1.5L", "Petrol", or omitted
+  const enginePart = [engine, fuel].filter(Boolean).join(' ') || null;
+
+  const parts = [head, enginePart, year].filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.join(' \u00B7 ');
+}
+
 export default formatVehicleHeader;
