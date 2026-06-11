@@ -39,6 +39,8 @@ import TrajectoryBadge from '../components/TrajectoryBadge';
 import FlagPriceSheet from '../components/FlagPriceSheet';
 import PersonalisationChip from '../components/PersonalisationChip';
 import FirstVehicleCelebration from '../components/FirstVehicleCelebration';
+import PriceTicker from '../components/PriceTicker';
+import LicencePlateChip from '../components/LicencePlateChip';
 import InstantAnswerHeadline from '../components/InstantAnswerHeadline';
 import MonthlySavingsCard from '../components/MonthlySavingsCard';
 import LifetimeSavingsCard from '../components/LifetimeSavingsCard';
@@ -481,6 +483,7 @@ const HomeScreen = ({ navigation }) => {
         fuelType={selectedFuel}
         onSearchPress={() => navigation.navigate('Search')}
       />
+      <PriceTicker stations={stations} fuelType={selectedFuel} />
 
       {(usingFallback || location?.isFallback) && (
         <View
@@ -615,7 +618,7 @@ const HomeScreen = ({ navigation }) => {
         );
       })()}
 
-      {/* Sort toggle — Nearest / Cheapest, with regional 7-day sparkline */}
+      {/* Sort toggle — Nearest / Cheapest + compact UK plate chip */}
       <View style={styles.sortRow}>
         {SORT_MODES.map(sm => {
           const active = sortMode === sm.key;
@@ -643,9 +646,14 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           );
         })}
-        <View style={styles.sortSparkline}>
-          <PriceTrajectorySparkline values={sparklineValues} />
-        </View>
+        {/* LicencePlateChip — compact inline plate pill, always visible */}
+        <LicencePlateChip
+          userVehicle={userVehicle}
+          onPress={() => navigation.navigate('VehicleSettings')}
+        />
+        {/* TODO: relocate PriceTrajectorySparkline to below the sort row or
+            inside FuelIntelCard in a future PR — removed here to avoid
+            horizontal crowding with the plate chip. */}
       </View>
 
       {/* Brand filter */}
