@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getNearbyStations, getCheapestStations } from '../api/fuelApi';
+import { getNearbyStations } from '../api/fuelApi';
 
 /**
  * useStations — Sprint 6 + differentiators v1.
@@ -37,26 +37,23 @@ export function useStations(location, options = {}) {
     setError(null);
 
     try {
-      let data;
-      if (mode === 'cheapest') {
-        data = await getCheapestStations({
-          lat: location.lat,
-          lon: location.lng,
-          radiusKm,
-          fuelType,
-          mpg,
-          tankFillLitres,
-        });
-      } else {
-        data = await getNearbyStations({
-          lat: location.lat,
-          lng: location.lng,
-          radiusKm,
-          fuel: fuelType,
-          mpg,
-          tankFillLitres,
-        });
-      }
+      // NOTE (2026-06-15): we deliberately route 'cheapest' through the
+      // /stations/nearby endpoint and sort client-side rather than calling
+      // /stations/cheapest. The backend cheapest endpoint sorts the raw
+      // `stations` table by price and surfaces duplicate `gcqd...` gov-data
+      // rows that froze on 2026-04-20 (gov sync died) — most visibly the
+      // ghost Applegreen rows around Birmingham showing 135.8p E10 from
+      // April. The nearby endpoint already runs the modern dedup +
+      // per-field quarantine pipeline, so we use it as the canonical source
+      // and order on the client. Backend-side fix is tracked separately.
+      const data = await getNearbyStations({
+        lat: location.lat,
+        lng: location.lng,
+        radiusKm,
+        fuel: fuelType,
+        mpg,
+        tankFillLitres,
+      });
       setStations(data.stations || []);
       setMeta({
         nationalTrajectory:
