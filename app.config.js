@@ -33,7 +33,8 @@ module.exports = () => ({
       bundleIdentifier: "com.freefuelpriceapp.uk",
       buildNumber: "2",
       config: {
-        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY_IOS,
+        // TEMP HARDCODED FOR DEBUG — REVERT AFTER MAPS CONFIRMED WORKING
+        googleMapsApiKey: "AIzaSyAgf9-8v_m_kWPyAkctx_2lORMwkBYDtvg",
       },
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
@@ -51,7 +52,8 @@ module.exports = () => ({
       versionCode: 7,
       config: {
         googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_API_KEY_ANDROID,
+          // TEMP HARDCODED FOR DEBUG — REVERT AFTER MAPS CONFIRMED WORKING
+          apiKey: "AIzaSyAdHxdIcgmP83ttY9KvfKkulAJRBI5GpW8",
         },
       },
       permissions: [
