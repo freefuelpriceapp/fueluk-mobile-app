@@ -78,6 +78,13 @@ module.exports = () => ({
           defaultChannel: "price-alerts",
         },
       ],
+      [
+        "react-native-maps",
+        {
+          androidGoogleMapsApiKey: "AIzaSyAdHxdIcgmP83ttY9KvfKkulAJRBI5GpW8",
+          iosGoogleMapsApiKey: "AIzaSyAgf9-8v_m_kWPyAkctx_2lORMwkBYDtvg",
+        },
+      ],
       "./plugins/withAdiRegistration.js",
     ],
     extra: {
