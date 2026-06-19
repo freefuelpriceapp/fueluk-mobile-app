@@ -32,10 +32,10 @@ module.exports = () => ({
       supportsTablet: true,
       bundleIdentifier: "com.freefuelpriceapp.uk",
       buildNumber: "2",
-      config: {
-        // TEMP HARDCODED FOR DEBUG — REVERT AFTER MAPS CONFIRMED WORKING
-        googleMapsApiKey: "AIzaSyAgf9-8v_m_kWPyAkctx_2lORMwkBYDtvg",
-      },
+      // Maps API key is injected by the react-native-maps config plugin
+      // below — do NOT also set ios.config.googleMapsApiKey here, the
+      // two sources collide in the generated manifest and the SDK ends
+      // up with no usable key (tiles silently never load).
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "FuelUK uses your location to show fuel stations near you, sorted by distance and price. Your location is never stored or shared.",
@@ -50,12 +50,11 @@ module.exports = () => ({
       },
       package: "com.freefuelpriceapp.uk",
       versionCode: 7,
-      config: {
-        googleMaps: {
-          // TEMP HARDCODED FOR DEBUG — REVERT AFTER MAPS CONFIRMED WORKING
-          apiKey: "AIzaSyAdHxdIcgmP83ttY9KvfKkulAJRBI5GpW8",
-        },
-      },
+      // Maps API key is injected by the react-native-maps config plugin
+      // below — do NOT also set android.config.googleMaps.apiKey here,
+      // the two sources both write com.google.android.geo.API_KEY into
+      // AndroidManifest.xml and the duplicate meta-data tag results in
+      // the SDK reading an empty/unresolved key (tiles silently fail).
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
