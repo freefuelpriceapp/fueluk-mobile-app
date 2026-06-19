@@ -14,14 +14,24 @@ import {
   useColorScheme,
   AccessibilityInfo,
 } from 'react-native';
-// Conditional imports — react-native-maps + clustering don't support web
+// Conditional imports — react-native-maps doesn't support web.
+// IMPORTANT: We use react-native-maps' MapView directly (NOT the
+// react-native-map-clustering wrapper). The wrapper has a known race
+// condition on Android where the Google Maps token init happens after
+// the first render frame, causing tiles to silently fail to load for
+// fresh installs that don't have a cached Maps token from a prior
+// session. Symptom: watermark renders, grey tiles, no errors logged.
+// Trade-off: we lose JS-side supercluster clustering until we move to
+// react-native-maps' built-in onClusterPress or a worklet-based
+// approach. Existing renderCluster/clusterColor/radius/minZoom/maxZoom
+// props below are silently ignored by react-native-maps — leaving
+// them in place so the diff stays small and reverting is trivial.
 let MapView;
 let Marker;
 let Circle;
 let PROVIDER_GOOGLE;
 if (Platform.OS !== 'web') {
-  // ClusteredMapView wraps react-native-maps' MapView with built-in supercluster.
-  MapView = require('react-native-map-clustering').default;
+  MapView = require('react-native-maps').default;
   Marker = require('react-native-maps').Marker;
   Circle = require('react-native-maps').Circle;
   // PROVIDER_GOOGLE forces Google Maps on both platforms. On Android this
