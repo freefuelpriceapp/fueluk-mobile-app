@@ -43,7 +43,18 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - run: npm ci
+      - name: Install dependencies (with retry on transient npm registry hiccups)
+        run: |
+          for attempt in 1 2 3; do
+            echo "npm ci attempt $attempt"
+            if npm ci --no-audit --no-fund; then
+              exit 0
+            fi
+            echo "npm ci failed; sleeping 15s before retry"
+            sleep 15
+          done
+          echo "npm ci failed after 3 attempts"
+          exit 1
 
       - name: Publish EAS Update to production
         run: |
